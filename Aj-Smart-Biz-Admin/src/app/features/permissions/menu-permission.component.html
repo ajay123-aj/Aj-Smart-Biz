@@ -1,0 +1,230 @@
+<app-page-header title="Menu Permission Management" subtitle="Decide what each role can see and do, and manage your own menus" />
+
+<div class="card">
+  <div class="tabs">
+    <button type="button" [class.active]="tab() === 'matrix'" (click)="tab.set('matrix')">Role permissions</button>
+    <button type="button" [class.active]="tab() === 'menus'" (click)="tab.set('menus')">Menus</button>
+  </div>
+
+  <!-- ------------------------- PERMISSION MATRIX ------------------------- -->
+  @if (tab() === 'matrix') {
+    <div class="card-head">
+      <div class="row">
+        <label for="roleSelect" class="tiny strong">Role</label>
+        <select id="roleSelect" class="select" style="width:auto;min-width:210px" [value]="selectedRoleId() ?? ''" (change)="selectRole($event)">
+          <option value="">Choose a role…</option>
+          @for (role of roles(); track role.id) {
+            <option [value]="role.id">{{ role.name }}</option>
+          }
+        </select>
+      </div>
+
+      @if (matrix() && !matrix()!.role.isSystem) {
+        <div class="row">
+          <button type="button" class="btn btn-sm btn-ghost" (click)="setAll(true)">Select all</button>
+          <button type="button" class="btn btn-sm btn-ghost" (click)="setAll(false)">Clear all</button>
+          <button type="button" class="btn btn-sm btn-primary" (click)="savePermissions()" [disabled]="savingMatrix()" *appCan="'menu-permission'; action: 'canEdit'">
+            {{ savingMatrix() ? 'Saving…' : 'Save permissions' }}
+          </button>
+        </div>
+      }
+    </div>
+
+    <div class="card-body tight">
+      @if (!selectedRoleId()) {
+        <div class="empty">
+          <div class="empty-icon">🔐</div>
+          <div class="strong">Pick a role to edit</div>
+          <div class="tiny">Choose a role above to see its menu permission grid.</div>
+        </div>
+      } @else if (loadingMatrix()) {
+        <div style="padding:16px">
+          @for (row of [1, 2, 3, 4, 5]; track row) {
+            <div class="skeleton" style="height:38px;margin-bottom:8px"></div>
+          }
+        </div>
+      } @else if (matrix(); as m) {
+        @if (m.role.isSystem) {
+          <div class="notice">
+            <strong>{{ m.role.name }}</strong> is the built-in company admin role. It always has full access and cannot be
+            restricted.
+          </div>
+        }
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th style="min-width:220px">Menu</th>
+                @for (action of actions; track action) {
+                  <th class="text-center">
+                    <div>{{ label(action) }}</div>
+                    @if (!m.role.isSystem) {
+                      <button type="button" class="btn-link tiny" (click)="toggleColumn(action)">toggle</button>
+                    }
+                  </th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of rows(); track row.menuId) {
+                <tr>
+                  <td>
+                    <span class="strong">{{ row.name }}</span>
+                    <div class="tiny muted">{{ row.route || row.slug }}</div>
+                  </td>
+                  @for (action of actions; track action) {
+                    <td class="text-center">
+                      <input
+                        type="checkbox"
+                        class="cell-check"
+                        [checked]="row[action]"
+                        [disabled]="m.role.isSystem"
+                        (change)="toggleCell(row.menuId, action, $event)"
+                        [attr.aria-label]="label(action) + ' ' + row.name"
+                      />
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        @if (!m.role.isSystem) {
+          <div class="row-end" style="padding:14px 16px">
+            <button type="button" class="btn btn-primary" (click)="savePermissions()" [disabled]="savingMatrix()" *appCan="'menu-permission'; action: 'canEdit'">
+              {{ savingMatrix() ? 'Saving…' : 'Save permissions' }}
+            </button>
+          </div>
+        }
+      }
+    </div>
+  }
+
+  <!-- ------------------------------- MENUS ------------------------------- -->
+  @if (tab() === 'menus') {
+    <div class="card-head">
+      <h3>Menus</h3>
+      <button type="button" class="btn btn-sm btn-primary" (click)="openMenuModal(null)" *appCan="'menu-permission'; action: 'canCreate'">
+        ＋ Add menu
+      </button>
+    </div>
+
+    <div class="card-body tight">
+      <app-table-state [loading]="loadingMenus()" [empty]="!loadingMenus() && menus().length === 0" icon="🗂️" title="No menus" />
+
+      @if (!loadingMenus() && menus().length > 0) {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Menu</th><th>Slug</th><th>Route</th><th>Parent</th><th>Order</th><th>Status</th><th class="text-right">Actions</th></tr>
+            </thead>
+            <tbody>
+              @for (menu of menus(); track menu.id) {
+                <tr>
+                  <td>
+                    <span class="strong">{{ menu.icon ? menu.icon + ' ' : '' }}{{ menu.name }}</span>
+                    @if (menu.isSystem) {
+                      <span class="badge badge-muted" style="margin-left:6px">Platform</span>
+                    }
+                  </td>
+                  <td class="muted">{{ menu.slug }}</td>
+                  <td class="muted">{{ menu.route || '—' }}</td>
+                  <td class="muted">{{ menu.parent?.name || '—' }}</td>
+                  <td class="muted">{{ menu.sequence }}</td>
+                  <td><app-status-badge [value]="menu.status" /></td>
+                  <td>
+                    <div class="row-end">
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-ghost"
+                        [disabled]="menu.isSystem"
+                        [title]="menu.isSystem ? 'Platform menus are read only' : ''"
+                        (click)="openMenuModal(menu)"
+                        *appCan="'menu-permission'; action: 'canEdit'"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-danger"
+                        [disabled]="menu.isSystem"
+                        (click)="removeMenu(menu)"
+                        *appCan="'menu-permission'; action: 'canDelete'"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+@if (menuModalOpen()) {
+  <app-modal
+    [title]="editingMenu() ? 'Edit menu' : 'Add menu'"
+    size="sm"
+    [closeOnBackdrop]="false"
+    (closed)="menuModalOpen.set(false)"
+  >
+    <form [formGroup]="menuForm" (ngSubmit)="saveMenu()" id="menu-form">
+      <div class="field">
+        <label for="mname">Name <span class="req">*</span></label>
+        <input id="mname" class="input" formControlName="name" placeholder="Reports" />
+        <app-field-error [control]="menuForm.controls.name" label="Name" />
+      </div>
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="mslug">Slug <span class="req">*</span></label>
+          <input id="mslug" class="input" formControlName="slug" placeholder="reports" />
+          <span class="hint">Lowercase kebab-case</span>
+          <app-field-error [control]="menuForm.controls.slug" label="Slug" />
+        </div>
+        <div class="field">
+          <label for="micon">Icon</label>
+          <input id="micon" class="input" formControlName="icon" placeholder="📈" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="mroute">Route</label>
+        <input id="mroute" class="input" formControlName="route" placeholder="/reports" />
+      </div>
+      <div class="grid grid-3">
+        <div class="field">
+          <label for="mparent">Parent menu</label>
+          <select id="mparent" class="select" formControlName="parentId">
+            <option [ngValue]="null">None</option>
+            @for (option of menuOptions(); track option.id) {
+              <option [ngValue]="option.id">{{ option.name }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label for="msequence">Order</label>
+          <input id="msequence" class="input" type="number" formControlName="sequence" />
+        </div>
+        <div class="field">
+          <label for="mstatus">Status</label>
+          <select id="mstatus" class="select" formControlName="status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="menuModalOpen.set(false)">Cancel</button>
+      <button type="submit" form="menu-form" class="btn btn-primary" [disabled]="savingMenu()">
+        {{ savingMenu() ? 'Saving…' : editingMenu() ? 'Save changes' : 'Create menu' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

@@ -1,0 +1,88 @@
+<app-page-header title="My Profile" subtitle="Your admin account" />
+
+@if (forced()) {
+  <div class="notice">
+    🔐 You are signed in with a temporary password. Set a new one below before continuing.
+  </div>
+}
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-head"><h3>Account details</h3></div>
+    <div class="card-body">
+      <div class="row" style="margin-bottom:18px">
+        <span class="avatar" style="width:54px;height:54px;font-size:18px">{{ initialsOf(auth.user()?.name) }}</span>
+        <div>
+          <div class="strong" style="font-size:16px">{{ auth.user()?.name }}</div>
+          <div class="tiny muted">{{ auth.user()?.email }}</div>
+          <div style="margin-top:5px">
+            <span class="badge badge-info">
+              {{ auth.user()?.isCompanyAdmin ? 'Main admin' : auth.user()?.role?.name || 'Admin' }}
+            </span>
+            <span class="badge badge-muted" style="margin-left:5px">{{ auth.companyName() }}</span>
+          </div>
+        </div>
+      </div>
+
+      <form [formGroup]="profileForm" (ngSubmit)="saveProfile()">
+        <div class="field">
+          <label for="name">Full name <span class="req">*</span></label>
+          <input id="name" class="input" formControlName="name" />
+          <app-field-error [control]="profileForm.controls.name" label="Full name" />
+        </div>
+        <div class="field">
+          <label for="phone">Phone</label>
+          <input id="phone" class="input" formControlName="phone" />
+        </div>
+        <div class="field">
+          <label for="avatar">Avatar URL</label>
+          <input id="avatar" class="input" formControlName="avatar" placeholder="https://…" />
+        </div>
+
+        <div class="row-end">
+          <button type="submit" class="btn btn-primary" [disabled]="savingProfile()">
+            {{ savingProfile() ? 'Saving…' : 'Save profile' }}
+          </button>
+        </div>
+      </form>
+
+      <div class="divider"></div>
+      <div class="tiny muted">
+        Last sign in:
+        {{ auth.user()?.lastLoginAt ? (auth.user()!.lastLoginAt | date: 'dd MMM yyyy, HH:mm') : 'first session' }}
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Change password</h3></div>
+    <div class="card-body">
+      <form [formGroup]="passwordForm" (ngSubmit)="changePassword()">
+        <div class="field">
+          <label for="currentPassword">Current password <span class="req">*</span></label>
+          <input id="currentPassword" class="input" type="password" autocomplete="current-password" formControlName="currentPassword" />
+          <app-field-error [control]="passwordForm.controls.currentPassword" label="Current password" />
+        </div>
+        <div class="field">
+          <label for="newPassword">New password <span class="req">*</span></label>
+          <input id="newPassword" class="input" type="password" autocomplete="new-password" formControlName="newPassword" />
+          <span class="hint">Min 8 characters with an uppercase, a lowercase and a number.</span>
+          <app-field-error [control]="passwordForm.controls.newPassword" label="New password" />
+        </div>
+        <div class="field">
+          <label for="confirmPassword">Confirm new password <span class="req">*</span></label>
+          <input id="confirmPassword" class="input" type="password" autocomplete="new-password" formControlName="confirmPassword" />
+          @if (passwordForm.errors?.['mismatch'] && passwordForm.controls.confirmPassword.touched) {
+            <span class="error-text">Passwords do not match</span>
+          }
+        </div>
+
+        <div class="row-end">
+          <button type="submit" class="btn btn-primary" [disabled]="savingPassword()">
+            {{ savingPassword() ? 'Saving…' : 'Change password' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

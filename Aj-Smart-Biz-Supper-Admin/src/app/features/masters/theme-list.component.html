@@ -1,0 +1,157 @@
+<app-page-header title="Theme Management" subtitle="Colour palettes a company's workspace can use">
+  <button type="button" class="btn btn-primary" (click)="page.openCreate()">＋ Add theme</button>
+</app-page-header>
+
+<div class="card">
+  <div class="card-head">
+    <input class="input" style="max-width:280px" type="search" placeholder="Search theme name or code…" (input)="page.onSearch($event)" />
+    <select class="select" style="width:auto" (change)="page.onStatus($event)">
+      <option value="">All statuses</option>
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+  </div>
+
+  <div class="card-body tight">
+    <app-table-state
+      [loading]="page.store.loading()"
+      [empty]="!page.store.loading() && page.store.items().length === 0"
+      icon="🎨"
+      title="No themes found"
+      message="Create a palette so companies can brand their workspace."
+    />
+
+    @if (!page.store.loading() && page.store.items().length > 0) {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th class="sortable" (click)="page.store.toggleSort('name')">Theme{{ page.store.sortIcon('name') }}</th>
+              <th>Palette</th>
+              <th>Mode</th>
+              <th>Status</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of page.store.items(); track row.id) {
+              <tr>
+                <td>
+                  <span class="strong">{{ row.name }}</span>
+                  @if (row.isDefault) {
+                    <span class="badge badge-info" style="margin-left:6px">Default</span>
+                  }
+                  @if (row.code) {
+                    <div class="tiny muted">{{ row.code }}</div>
+                  }
+                </td>
+                <td>
+                  <div class="swatches">
+                    <span class="swatch" [style.background]="row.primaryColor" [title]="'Primary ' + row.primaryColor"></span>
+                    <span class="swatch" [style.background]="row.secondaryColor" [title]="'Secondary ' + row.secondaryColor"></span>
+                    @if (row.accentColor) {
+                      <span class="swatch" [style.background]="row.accentColor" [title]="'Accent ' + row.accentColor"></span>
+                    }
+                    <span class="tiny muted">{{ row.primaryColor }}</span>
+                  </div>
+                </td>
+                <td class="muted">{{ row.mode === 'dark' ? '🌙 Dark' : '☀️ Light' }}</td>
+                <td><app-status-badge [value]="row.status" /></td>
+                <td>
+                  <div class="row-end">
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="page.toggleStatus(row)">
+                      {{ row.status === 'active' ? 'Deactivate' : 'Activate' }}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="page.openEdit(row)">Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" [disabled]="row.isDefault" (click)="page.remove(row)">
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pager [meta]="page.store.meta()" (pageChange)="page.store.setPage($event)" (limitChange)="page.store.setLimit($event)" />
+    }
+  </div>
+</div>
+
+@if (page.modalOpen()) {
+  <app-modal [title]="page.editing() ? 'Edit theme' : 'Add theme'" [closeOnBackdrop]="false" (closed)="page.closeModal()">
+    <form [formGroup]="form" (ngSubmit)="page.save()" id="theme-form">
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="name">Name <span class="req">*</span></label>
+          <input id="name" class="input" formControlName="name" placeholder="Ocean Blue" />
+          <app-field-error [control]="form.controls.name" label="Name" />
+        </div>
+        <div class="field">
+          <label for="code">Code</label>
+          <input id="code" class="input" formControlName="code" placeholder="ocean-blue" />
+        </div>
+      </div>
+
+      <div class="grid grid-3">
+        @for (swatch of colorFields; track swatch.key) {
+          <div class="field">
+            <label [attr.for]="swatch.key">
+              {{ swatch.label }}
+              @if (swatch.required) {
+                <span class="req">*</span>
+              }
+            </label>
+            <div class="row">
+              <input [id]="swatch.key" class="input" type="color" style="max-width:56px" [formControlName]="swatch.key" />
+              <input class="input" [formControlName]="swatch.key" placeholder="#2563eb" />
+            </div>
+            <app-field-error [control]="form.get(swatch.key)" [label]="swatch.label" />
+          </div>
+        }
+      </div>
+
+      <div class="preview" [style.background]="form.value.backgroundColor || '#f8fafc'">
+        <div class="preview-bar" [style.background]="form.value.primaryColor || '#2563eb'">Preview header</div>
+        <div class="preview-body">
+          <span class="preview-chip" [style.background]="form.value.accentColor || '#22c55e'">Accent</span>
+          <span class="preview-chip" [style.background]="form.value.secondaryColor || '#0f172a'">Secondary</span>
+        </div>
+      </div>
+
+      <div class="grid grid-3" style="margin-top:14px">
+        <div class="field">
+          <label for="mode">Mode</label>
+          <select id="mode" class="select" formControlName="mode">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fontFamily">Font family</label>
+          <input id="fontFamily" class="input" formControlName="fontFamily" placeholder="Inter" />
+        </div>
+        <div class="field">
+          <label for="status">Status</label>
+          <select id="status" class="select" formControlName="status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+
+      <label class="check">
+        <input type="checkbox" formControlName="isDefault" />
+        Use as the default theme for new companies
+      </label>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="page.closeModal()">Cancel</button>
+      <button type="submit" form="theme-form" class="btn btn-primary" [disabled]="page.saving()">
+        {{ page.saving() ? 'Saving…' : page.editing() ? 'Save changes' : 'Create theme' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

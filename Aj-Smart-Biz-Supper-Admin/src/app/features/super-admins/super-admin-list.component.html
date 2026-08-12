@@ -1,0 +1,162 @@
+<app-page-header title="Super Admin Management" subtitle="People who can administer the whole platform">
+  <button type="button" class="btn btn-primary" (click)="openCreate()">＋ Add super admin</button>
+</app-page-header>
+
+<div class="card">
+  <div class="card-head">
+    <input class="input" style="max-width:280px" type="search" placeholder="Search name, email or phone…" (input)="page.onSearch($event)" />
+    <select class="select" style="width:auto" (change)="page.onStatus($event)">
+      <option value="">All statuses</option>
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+  </div>
+
+  <div class="card-body tight">
+    <app-table-state
+      [loading]="page.store.loading()"
+      [empty]="!page.store.loading() && page.store.items().length === 0"
+      icon="🛡️"
+      title="No super admins found"
+      message="Invite a colleague to help administer the platform."
+    />
+
+    @if (!page.store.loading() && page.store.items().length > 0) {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th class="sortable" (click)="page.store.toggleSort('name')">Name{{ page.store.sortIcon('name') }}</th>
+              <th class="sortable" (click)="page.store.toggleSort('email')">Email{{ page.store.sortIcon('email') }}</th>
+              <th>Role</th>
+              <th>Last login</th>
+              <th>Status</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of page.store.items(); track row.id) {
+              <tr>
+                <td>
+                  <div class="row">
+                    <span class="avatar">{{ initialsOf(row.name) }}</span>
+                    <div>
+                      <span class="strong">{{ row.name }}</span>
+                      @if (row.isRoot) {
+                        <span class="badge badge-info" style="margin-left:6px">Root</span>
+                      }
+                      @if (row.id === auth.user()?.id) {
+                        <span class="badge badge-muted" style="margin-left:4px">You</span>
+                      }
+                      <div class="tiny muted">{{ row.phone || '—' }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="muted">{{ row.email }}</td>
+                <td class="muted">{{ row.role === 'super_admin' ? 'Super admin' : 'Staff' }}</td>
+                <td class="tiny muted nowrap">{{ row.lastLoginAt ? (row.lastLoginAt | date: 'dd MMM yyyy, HH:mm') : 'Never' }}</td>
+                <td><app-status-badge [value]="row.status" /></td>
+                <td>
+                  <div class="row-end">
+                    <button type="button" class="btn btn-sm btn-ghost" [disabled]="row.isRoot || row.id === auth.user()?.id" (click)="page.toggleStatus(row)">
+                      {{ row.status === 'active' ? 'Deactivate' : 'Activate' }}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="openReset(row)">Reset password</button>
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="openEdit(row)">Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" [disabled]="row.isRoot || row.id === auth.user()?.id" (click)="page.remove(row)">
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pager [meta]="page.store.meta()" (pageChange)="page.store.setPage($event)" (limitChange)="page.store.setLimit($event)" />
+    }
+  </div>
+</div>
+
+@if (page.modalOpen()) {
+  <app-modal
+    [title]="page.editing() ? 'Edit super admin' : 'Add super admin'"
+    size="sm"
+    [closeOnBackdrop]="false"
+    (closed)="page.closeModal()"
+  >
+    <form [formGroup]="form" (ngSubmit)="page.save()" id="sa-form">
+      <div class="field">
+        <label for="name">Full name <span class="req">*</span></label>
+        <input id="name" class="input" formControlName="name" placeholder="Priya Sharma" />
+        <app-field-error [control]="form.controls.name" label="Full name" />
+      </div>
+      <div class="field">
+        <label for="email">Email <span class="req">*</span></label>
+        <input id="email" class="input" type="email" formControlName="email" placeholder="priya@ajsmartbiz.com" />
+        <app-field-error [control]="form.controls.email" label="Email" />
+      </div>
+      <div class="field">
+        <label for="phone">Phone</label>
+        <input id="phone" class="input" formControlName="phone" placeholder="9876543210" />
+      </div>
+      <div class="field">
+        <label for="password">
+          Password
+          @if (!page.editing()) {
+            <span class="req">*</span>
+          }
+        </label>
+        <input id="password" class="input" type="password" formControlName="password" autocomplete="new-password" />
+        <span class="hint">
+          {{ page.editing() ? 'Leave blank to keep the current password.' : 'Min 8 characters with an uppercase, a lowercase and a number.' }}
+        </span>
+        <app-field-error [control]="form.controls.password" label="Password" />
+      </div>
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="role">Role</label>
+          <select id="role" class="select" formControlName="role" [attr.disabled]="page.editing()?.isRoot ? '' : null">
+            <option value="staff">Staff</option>
+            <option value="super_admin">Super admin</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="status">Status</label>
+          <select id="status" class="select" formControlName="status" [attr.disabled]="page.editing()?.isRoot ? '' : null">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="page.closeModal()">Cancel</button>
+      <button type="submit" form="sa-form" class="btn btn-primary" [disabled]="page.saving()">
+        {{ page.saving() ? 'Saving…' : page.editing() ? 'Save changes' : 'Create super admin' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}
+
+@if (resetTarget(); as target) {
+  <app-modal title="Reset password" [subtitle]="target.name" size="sm" [closeOnBackdrop]="false" (closed)="resetTarget.set(null)">
+    <form [formGroup]="resetForm" (ngSubmit)="submitReset()" id="reset-form">
+      <div class="field">
+        <label for="newPassword">New password <span class="req">*</span></label>
+        <input id="newPassword" class="input" type="text" formControlName="newPassword" autocomplete="new-password" />
+        <span class="hint">Min 8 characters with an uppercase, a lowercase and a number.</span>
+        <app-field-error [control]="resetForm.controls.newPassword" label="New password" />
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="resetTarget.set(null)">Cancel</button>
+      <button type="submit" form="reset-form" class="btn btn-primary" [disabled]="resetting()">
+        {{ resetting() ? 'Saving…' : 'Reset password' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

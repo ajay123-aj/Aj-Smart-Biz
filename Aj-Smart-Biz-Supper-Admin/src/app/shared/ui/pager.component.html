@@ -1,0 +1,31 @@
+@if (meta(); as m) {
+  <div class="pager">
+    <div class="tiny muted">
+      @if (m.total > 0) {
+        Showing {{ from() }}–{{ to() }} of {{ m.total }}
+      } @else {
+        No records
+      }
+    </div>
+
+    <div class="row">
+      <select class="select" style="width:auto" [value]="m.limit" (change)="onLimit($event)" aria-label="Rows per page">
+        @for (size of pageSizes; track size) {
+          <option [value]="size">{{ size }} / page</option>
+        }
+      </select>
+
+      <div class="pager-pages">
+        <button type="button" [disabled]="m.page <= 1" (click)="pageChange.emit(m.page - 1)" aria-label="Previous page">‹</button>
+        @for (page of pages(); track page) {
+          @if (page === -1) {
+            <button type="button" disabled>…</button>
+          } @else {
+            <button type="button" [class.active]="page === m.page" (click)="pageChange.emit(page)">{{ page }}</button>
+          }
+        }
+        <button type="button" [disabled]="!m.hasNext" (click)="pageChange.emit(m.page + 1)" aria-label="Next page">›</button>
+      </div>
+    </div>
+  </div>
+}

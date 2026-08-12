@@ -1,0 +1,104 @@
+<app-page-header title="State Management" subtitle="States available to company and branch addresses">
+  <button type="button" class="btn btn-primary" (click)="page.openCreate()">＋ Add state</button>
+</app-page-header>
+
+<div class="card">
+  <div class="card-head">
+    <input class="input" style="max-width:280px" type="search" placeholder="Search name, code or country…" (input)="page.onSearch($event)" />
+    <select class="select" style="width:auto" (change)="page.onStatus($event)">
+      <option value="">All statuses</option>
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+  </div>
+
+  <div class="card-body tight">
+    <app-table-state
+      [loading]="page.store.loading()"
+      [empty]="!page.store.loading() && page.store.items().length === 0"
+      icon="🗺️"
+      title="No states found"
+      message="Add the states your companies operate in."
+    />
+
+    @if (!page.store.loading() && page.store.items().length > 0) {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th class="sortable" (click)="page.store.toggleSort('name')">Name{{ page.store.sortIcon('name') }}</th>
+              <th class="sortable" (click)="page.store.toggleSort('code')">Code{{ page.store.sortIcon('code') }}</th>
+              <th>GST code</th>
+              <th class="sortable" (click)="page.store.toggleSort('country')">Country{{ page.store.sortIcon('country') }}</th>
+              <th>Status</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of page.store.items(); track row.id) {
+              <tr>
+                <td class="strong">{{ row.name }}</td>
+                <td class="muted">{{ row.code || '—' }}</td>
+                <td class="muted">{{ row.gstCode || '—' }}</td>
+                <td class="muted">{{ row.country }}</td>
+                <td><app-status-badge [value]="row.status" /></td>
+                <td>
+                  <div class="row-end">
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="page.toggleStatus(row)">
+                      {{ row.status === 'active' ? 'Deactivate' : 'Activate' }}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="page.openEdit(row)">Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" (click)="page.remove(row)">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pager [meta]="page.store.meta()" (pageChange)="page.store.setPage($event)" (limitChange)="page.store.setLimit($event)" />
+    }
+  </div>
+</div>
+
+@if (page.modalOpen()) {
+  <app-modal [title]="page.editing() ? 'Edit state' : 'Add state'" size="sm" [closeOnBackdrop]="false" (closed)="page.closeModal()">
+    <form [formGroup]="form" (ngSubmit)="page.save()" id="state-form">
+      <div class="field">
+        <label for="name">Name <span class="req">*</span></label>
+        <input id="name" class="input" formControlName="name" placeholder="Gujarat" />
+        <app-field-error [control]="form.controls.name" label="Name" />
+      </div>
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="code">Short code</label>
+          <input id="code" class="input" formControlName="code" placeholder="GJ" />
+        </div>
+        <div class="field">
+          <label for="gstCode">GST code</label>
+          <input id="gstCode" class="input" formControlName="gstCode" placeholder="24" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="country">Country <span class="req">*</span></label>
+        <input id="country" class="input" formControlName="country" />
+        <app-field-error [control]="form.controls.country" label="Country" />
+      </div>
+      <div class="field">
+        <label for="status">Status</label>
+        <select id="status" class="select" formControlName="status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="page.closeModal()">Cancel</button>
+      <button type="submit" form="state-form" class="btn btn-primary" [disabled]="page.saving()">
+        {{ page.saving() ? 'Saving…' : page.editing() ? 'Save changes' : 'Create state' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

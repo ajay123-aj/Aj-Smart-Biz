@@ -1,0 +1,181 @@
+<app-page-header title="Dashboard" subtitle="Platform health at a glance">
+  <button type="button" class="btn btn-ghost" (click)="load()" [disabled]="loading()">↻ Refresh</button>
+  <a class="btn btn-primary" routerLink="/companies/new">＋ New company</a>
+</app-page-header>
+
+@if (loading() && !data()) {
+  <div class="grid grid-4">
+    @for (item of [1, 2, 3, 4]; track item) {
+      <div class="skeleton" style="height:118px"></div>
+    }
+  </div>
+} @else if (data(); as d) {
+  <!-- Headline tiles: companies and income -->
+  <section class="grid grid-4">
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--brand-100);color:var(--brand-700)">🏢</span>
+        <span class="tile-label">Total companies</span>
+      </div>
+      <div class="tile-value">{{ d.companies.total }}</div>
+      <div class="tile-foot">
+        <span class="badge badge-success">{{ d.companies.active }} active</span>
+        <span class="badge badge-muted">{{ d.companies.inactive }} inactive</span>
+        @if (d.companies.deleted > 0) {
+          <span class="badge badge-danger">{{ d.companies.deleted }} deleted</span>
+        }
+      </div>
+    </article>
+
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--success-bg);color:var(--success)">💰</span>
+        <span class="tile-label">Total income</span>
+      </div>
+      <div class="tile-value">{{ money(d.income.total, d.income.currency) }}</div>
+      <div class="tile-foot">
+        <span class="tiny muted">{{ money(d.income.thisMonth, d.income.currency) }} this month</span>
+        @if (d.income.growthPercent !== null) {
+          <span class="badge" [class.badge-success]="d.income.growthPercent >= 0" [class.badge-danger]="d.income.growthPercent < 0">
+            {{ d.income.growthPercent >= 0 ? '▲' : '▼' }} {{ absGrowth(d.income.growthPercent) }}%
+          </span>
+        }
+      </div>
+    </article>
+
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--info-bg);color:var(--info)">💳</span>
+        <span class="tile-label">Active subscriptions</span>
+      </div>
+      <div class="tile-value">{{ d.counts.activeSubscriptions }}</div>
+      <div class="tile-foot">
+        <span class="tiny muted">{{ d.counts.activePlans }} of {{ d.counts.plans }} plans live</span>
+        @if (d.counts.expiringSoon > 0) {
+          <span class="badge badge-warning">{{ d.counts.expiringSoon }} expiring in 30d</span>
+        }
+      </div>
+    </article>
+
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--warning-bg);color:var(--warning)">👥</span>
+        <span class="tile-label">Platform users</span>
+      </div>
+      <div class="tile-value">{{ d.counts.admins }}</div>
+      <div class="tile-foot">
+        <span class="tiny muted">{{ d.counts.branches }} branches · {{ d.counts.superAdmins }} super admins</span>
+      </div>
+    </article>
+  </section>
+
+  <!-- Income trend + plan mix -->
+  <section class="grid" style="grid-template-columns:minmax(0,2fr) minmax(0,1fr);margin-top:20px">
+    <div class="card">
+      <div class="card-head">
+        <h3>Income · last 12 months</h3>
+        <span class="tiny muted">Successful transactions only</span>
+      </div>
+      <div class="card-body">
+        @if (d.monthlyIncome.length === 0) {
+          <div class="empty"><div class="empty-icon">📈</div><div>No payments recorded yet</div></div>
+        } @else {
+          <div class="chart" role="img" [attr.aria-label]="chartSummary()">
+            @for (point of d.monthlyIncome; track point.month) {
+              <div class="chart-col" [title]="monthName(point.month) + ': ' + money(point.total, d.income.currency)">
+                <span class="chart-value tiny">{{ compact(point.total, d.income.currency) }}</span>
+                <div class="chart-bar" [style.height.%]="barHeight(point.total)"></div>
+                <span class="chart-axis tiny muted">{{ monthName(point.month) }}</span>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Companies by plan</h3></div>
+      <div class="card-body">
+        @if (d.companiesByPlan.length === 0) {
+          <div class="empty"><div class="empty-icon">🧩</div><div>No plans assigned yet</div></div>
+        } @else {
+          @for (row of d.companiesByPlan; track row.planId) {
+            <div class="plan-row">
+              <div class="row-between">
+                <span class="strong">{{ row.planName }}</span>
+                <span class="tiny muted">{{ row.total }}</span>
+              </div>
+              <div class="meter"><div class="meter-fill" [style.width.%]="planShare(row.total)"></div></div>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Recent activity -->
+  <section class="grid grid-2" style="margin-top:20px">
+    <div class="card">
+      <div class="card-head">
+        <h3>Newest companies</h3>
+        <a class="btn btn-sm btn-ghost" routerLink="/companies">View all</a>
+      </div>
+      <div class="card-body tight">
+        @if (d.recentCompanies.length === 0) {
+          <div class="empty"><div class="empty-icon">🏢</div><div>No companies yet</div></div>
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>Company</th><th>Type</th><th>Status</th><th>Added</th></tr>
+              </thead>
+              <tbody>
+                @for (company of d.recentCompanies; track company.id) {
+                  <tr>
+                    <td>
+                      <a [routerLink]="['/companies', company.id]" class="strong">{{ company.name }}</a>
+                      <div class="tiny muted">{{ company.code }}</div>
+                    </td>
+                    <td class="muted">{{ company.businessType?.name || '—' }}</td>
+                    <td><app-status-badge [value]="company.status" /></td>
+                    <td class="tiny muted nowrap">{{ company.createdAt | date: 'dd MMM yyyy' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Latest transactions</h3></div>
+      <div class="card-body tight">
+        @if (d.recentTransactions.length === 0) {
+          <div class="empty"><div class="empty-icon">🧾</div><div>No transactions yet</div></div>
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>Invoice</th><th>Company</th><th class="text-right">Amount</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                @for (txn of d.recentTransactions; track txn.id) {
+                  <tr>
+                    <td>
+                      <span class="strong">{{ txn.invoiceNo }}</span>
+                      <div class="tiny muted">{{ txn.paidAt | date: 'dd MMM yyyy' }}</div>
+                    </td>
+                    <td class="muted">{{ txn.company?.name || '—' }}</td>
+                    <td class="text-right strong nowrap">{{ money(txn.totalAmount, txn.currency) }}</td>
+                    <td><app-status-badge [value]="txn.status" /></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+}

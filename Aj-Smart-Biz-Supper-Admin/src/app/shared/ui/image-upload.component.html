@@ -1,0 +1,46 @@
+<div class="uploader" [class.disabled]="disabled()">
+  @if (previewUrl(); as src) {
+    <div class="preview" [class.preview-favicon]="variant() === 'favicon'">
+      <img [src]="src" [alt]="label() + ' preview'" />
+    </div>
+  } @else {
+    <label
+      class="dropzone"
+      [class.dragging]="dragging()"
+      (dragover)="onDragOver($event)"
+      (dragleave)="dragging.set(false)"
+      (drop)="onDrop($event)"
+    >
+      <input type="file" [accept]="acceptAttr()" [disabled]="disabled()" (change)="onPick($event)" hidden />
+      <span class="dz-icon" aria-hidden="true">{{ variant() === 'favicon' ? '🔖' : '🖼️' }}</span>
+      <span class="dz-text">Click or drop an image</span>
+      <span class="dz-hint">{{ hintText() }}</span>
+    </label>
+  }
+
+  <div class="side">
+    @if (uploading()) {
+      <div class="bar"><div class="bar-fill" [style.width.%]="progress()"></div></div>
+      <span class="tiny muted">Uploading… {{ progress() }}%</span>
+    } @else {
+      <div class="row" style="gap:6px">
+        <label class="btn btn-sm btn-ghost" [class.disabled]="disabled()">
+          <input type="file" [accept]="acceptAttr()" [disabled]="disabled()" (change)="onPick($event)" hidden />
+          {{ previewUrl() ? 'Replace' : 'Choose file' }}
+        </label>
+        @if (previewUrl() && !disabled()) {
+          <button type="button" class="btn btn-sm btn-ghost danger" (click)="clear()">Remove</button>
+        }
+      </div>
+      @if (fileName()) {
+        <span class="tiny muted ellipsis">{{ fileName() }}</span>
+      } @else {
+        <span class="tiny muted">{{ hintText() }}</span>
+      }
+    }
+
+    @if (error()) {
+      <span class="error-text">{{ error() }}</span>
+    }
+  </div>
+</div>

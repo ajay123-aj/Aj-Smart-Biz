@@ -1,0 +1,66 @@
+<div class="auth">
+  <div class="auth-art">
+    <div class="brand-mark">AJ</div>
+    <h1>Aj Smart Biz</h1>
+    <p>The control room for every company, plan and payment on the platform.</p>
+    <ul>
+      <li>🏢 Onboard companies with branches and a main admin in one step</li>
+      <li>💳 Assign plans, track renewals and record every transaction</li>
+      <li>📊 Watch income and tenant growth from a single dashboard</li>
+    </ul>
+  </div>
+
+  <div class="auth-panel">
+    <form class="auth-form card" [formGroup]="form" (ngSubmit)="submit()">
+      <div class="card-body">
+        <h2>Super admin sign in</h2>
+        <p class="muted" style="margin:6px 0 22px">Use the credentials configured in the API environment.</p>
+
+        @if (errorMessage()) {
+          <div class="alert">{{ errorMessage() }}</div>
+        }
+
+        <div class="field">
+          <label for="email">Email <span class="req">*</span></label>
+          <input
+            id="email"
+            class="input"
+            type="email"
+            autocomplete="username"
+            formControlName="email"
+            [class.invalid]="form.controls.email.touched && form.controls.email.invalid"
+            placeholder="superadmin@ajsmartbiz.com"
+          />
+          <app-field-error [control]="form.controls.email" label="Email" />
+        </div>
+
+        <div class="field">
+          <label for="password">Password <span class="req">*</span></label>
+          <div class="pw">
+            <input
+              id="password"
+              class="input"
+              [type]="showPassword() ? 'text' : 'password'"
+              autocomplete="current-password"
+              formControlName="password"
+              [class.invalid]="form.controls.password.touched && form.controls.password.invalid"
+              placeholder="••••••••"
+            />
+            <button type="button" class="pw-toggle" (click)="showPassword.set(!showPassword())" tabindex="-1">
+              {{ showPassword() ? '🙈' : '👁️' }}
+            </button>
+          </div>
+          <app-field-error [control]="form.controls.password" label="Password" />
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px" [disabled]="loading()">
+          @if (loading()) {
+            <span class="spinner"></span> Signing in…
+          } @else {
+            Sign in
+          }
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

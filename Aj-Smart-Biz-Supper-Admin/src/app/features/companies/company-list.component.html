@@ -1,0 +1,111 @@
+<app-page-header title="Company Management" subtitle="Every tenant on the platform, with its plan and branches">
+  <a class="btn btn-primary" routerLink="/companies/new">＋ New company</a>
+</app-page-header>
+
+<div class="card">
+  <div class="card-head">
+    <input class="input" style="max-width:280px" type="search" placeholder="Search name, code, email, GST…" (input)="onSearch($event)" />
+
+    <select class="select" style="width:auto" (change)="store.patch({ businessTypeId: value($event) })">
+      <option value="">All business types</option>
+      @for (option of businessTypes(); track option.id) {
+        <option [value]="option.id">{{ option.name }}</option>
+      }
+    </select>
+
+    <select class="select" style="width:auto" (change)="store.patch({ planId: value($event) })">
+      <option value="">All plans</option>
+      @for (option of plans(); track option.id) {
+        <option [value]="option.id">{{ option.name }}</option>
+      }
+    </select>
+
+    <select class="select" style="width:auto" (change)="store.patch({ status: value($event) })">
+      <option value="">All statuses</option>
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+  </div>
+
+  <div class="card-body tight">
+    <app-table-state
+      [loading]="store.loading()"
+      [empty]="!store.loading() && store.items().length === 0"
+      icon="🏢"
+      title="No companies found"
+      message="Create a company to provision its head office, main admin and plan in one step."
+    />
+
+    @if (!store.loading() && store.items().length > 0) {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th class="sortable" (click)="store.toggleSort('name')">Company{{ store.sortIcon('name') }}</th>
+              <th>Contact</th>
+              <th>Business type</th>
+              <th>Plan</th>
+              <th class="sortable" (click)="store.toggleSort('subscription_end_date')">
+                Renews{{ store.sortIcon('subscription_end_date') }}
+              </th>
+              <th>Status</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of store.items(); track row.id) {
+              <tr>
+                <td>
+                  <div class="row">
+                    <span class="avatar">{{ initialsOf(row.name) }}</span>
+                    <div>
+                      <a [routerLink]="['/companies', row.id]" class="strong">{{ row.name }}</a>
+                      <div class="tiny muted">{{ row.code }}{{ row.city ? ' · ' + row.city : '' }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="tiny">{{ row.email }}</div>
+                  <div class="tiny muted">{{ row.phone }}</div>
+                </td>
+                <td class="muted">{{ row.businessType?.name || '—' }}</td>
+                <td>
+                  @if (row.activeSubscription?.plan?.name; as planName) {
+                    <span class="badge badge-info">{{ planName }}</span>
+                  } @else {
+                    <span class="badge badge-muted">No plan</span>
+                  }
+                </td>
+                <td class="nowrap">
+                  @if (row.subscriptionEndDate; as endDate) {
+                    <div class="tiny">{{ endDate | date: 'dd MMM yyyy' }}</div>
+                    @if (daysLeft(endDate) < 0) {
+                      <span class="badge badge-danger">Expired</span>
+                    } @else if (daysLeft(endDate) <= 30) {
+                      <span class="badge badge-warning">{{ daysLeft(endDate) }}d left</span>
+                    }
+                  } @else {
+                    <span class="tiny muted">—</span>
+                  }
+                </td>
+                <td><app-status-badge [value]="row.status" /></td>
+                <td>
+                  <div class="row-end">
+                    <a class="btn btn-sm btn-ghost" [routerLink]="['/companies', row.id]">View</a>
+                    <a class="btn btn-sm btn-ghost" [routerLink]="['/companies', row.id, 'edit']">Edit</a>
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="toggleStatus(row)">
+                      {{ row.status === 'active' ? 'Deactivate' : 'Activate' }}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-danger" (click)="remove(row)">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pager [meta]="store.meta()" (pageChange)="store.setPage($event)" (limitChange)="store.setLimit($event)" />
+    }
+  </div>
+</div>

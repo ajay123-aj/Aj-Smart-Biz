@@ -1,0 +1,229 @@
+<div class="card-head">
+  <div>
+    <h3>Branches</h3>
+    <span class="tiny muted">Shops, offices and warehouses your company operates</span>
+  </div>
+  <div class="row wrap">
+    <input class="input" style="max-width:240px" type="search" placeholder="Search name, code or city…" (input)="onSearch($event)" />
+    <select class="select" style="width:auto" (change)="store.patch({ status: selectValue($event) })">
+      <option value="">All statuses</option>
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+    <!-- Disabled, with the reason on the button, once the plan has no room left. -->
+    <button
+      type="button"
+      class="btn btn-sm btn-primary"
+      *appCan="'branch-management'; action: 'canCreate'"
+      [disabled]="!canAddBranch()"
+      [title]="canAddBranch() ? 'Add a branch' : (branchLimit()?.message ?? '')"
+      (click)="openModal(null)"
+    >
+      ＋ Add branch
+    </button>
+    @if (branchLimit(); as limit) {
+      @if (!limit.unlimited) {
+        <span class="tiny muted nowrap">{{ limit.used }} / {{ limit.limit }} used</span>
+      }
+    }
+  </div>
+</div>
+
+<div class="card-body tight">
+  <!-- Says why the button is off, and offers the one thing that fixes it. -->
+  <div style="padding:14px 16px 0">
+    <app-limit-notice [line]="branchLimit()" resource="branch" />
+  </div>
+
+    <app-table-state
+      [loading]="store.loading()"
+      [empty]="!store.loading() && store.items().length === 0"
+      icon="📍"
+      title="No branches found"
+      message="Add the shops, offices or warehouses your company operates."
+    />
+
+    @if (!store.loading() && store.items().length > 0) {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th class="sortable" (click)="store.toggleSort('name')">Branch{{ store.sortIcon('name') }}</th>
+              <th>Contact</th>
+              <th>Location</th>
+              <th>Contacts</th>
+              <th>Status</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of store.items(); track row.id) {
+              <tr>
+                <td>
+                  <div class="row">
+                    <span class="logo-cell">
+                      @if (logoUrl(row); as src) {
+                        <img [src]="src" [alt]="row.name + ' logo'" />
+                      } @else {
+                        <span class="logo-fallback">{{ row.name.charAt(0).toUpperCase() }}</span>
+                      }
+                    </span>
+                    <div>
+                      <a [routerLink]="['/company/branches', row.id]" class="strong">{{ row.name }}</a>
+                      @if (row.isMain) {
+                        <span class="badge badge-info" style="margin-left:6px">Head office</span>
+                      }
+                      <div class="tiny muted">{{ row.code }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="tiny">
+                  <div>{{ row.phone || '—' }}</div>
+                  <div class="muted">{{ row.email || '—' }}</div>
+                </td>
+                <td class="tiny muted">{{ row.city || '—' }}{{ row.state?.name ? ', ' + row.state?.name : '' }}</td>
+                <td class="tiny muted">{{ row.contacts?.length ?? 0 }}</td>
+                <td><app-status-badge [value]="row.status" /></td>
+                <td>
+                  <div class="row-end">
+                    <a class="btn btn-sm btn-ghost" [routerLink]="['/company/branches', row.id]">Contacts</a>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-ghost"
+                      [disabled]="row.isMain"
+                      (click)="toggleStatus(row)"
+                      *appCan="'branch-management'; action: 'canEdit'"
+                    >
+                      {{ row.status === 'active' ? 'Deactivate' : 'Activate' }}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="openModal(row)" *appCan="'branch-management'; action: 'canEdit'">
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-danger"
+                      [disabled]="row.isMain"
+                      (click)="remove(row)"
+                      *appCan="'branch-management'; action: 'canDelete'"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pager [meta]="store.meta()" (pageChange)="store.setPage($event)" (limitChange)="store.setLimit($event)" />
+    }
+</div>
+
+@if (modalOpen()) {
+  <app-modal [title]="editing() ? 'Edit branch' : 'Add branch'" [closeOnBackdrop]="false" (closed)="modalOpen.set(false)">
+    <form [formGroup]="form" (ngSubmit)="save()" id="branch-form">
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="name">Branch name <span class="req">*</span></label>
+          <input id="name" class="input" formControlName="name" placeholder="Ring Road Branch" />
+          <app-field-error [control]="form.controls.name" label="Branch name" />
+        </div>
+        <div class="field">
+          <label for="code">Branch code</label>
+          <input id="code" class="input" formControlName="code" placeholder="Auto-generated" />
+        </div>
+      </div>
+
+      <!-- Branding: uploaded as soon as a file is picked; the form stores the path -->
+      <div class="grid grid-2">
+        <div class="field">
+          <label>Branch logo</label>
+          <app-image-upload
+            formControlName="logo"
+            label="Branch logo"
+            folder="branch"
+            hint="PNG, JPG, WEBP or SVG · up to 2 MB"
+          />
+        </div>
+        <div class="field">
+          <label>Favicon</label>
+          <app-image-upload
+            formControlName="favicon"
+            label="Favicon"
+            folder="branch"
+            variant="favicon"
+            accept="image/png,image/x-icon,image/svg+xml"
+            hint="Square PNG, ICO or SVG · 32×32 or larger"
+          />
+        </div>
+      </div>
+
+      <div class="grid grid-3">
+        <div class="field">
+          <label for="phone">Phone</label>
+          <input id="phone" class="input" formControlName="phone" />
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" class="input" type="email" formControlName="email" />
+          <app-field-error [control]="form.controls.email" label="Email" />
+        </div>
+        <div class="field">
+          <label for="gstNumber">GST number</label>
+          <input id="gstNumber" class="input" formControlName="gstNumber" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="addressLine1">Address</label>
+        <input id="addressLine1" class="input" formControlName="addressLine1" />
+      </div>
+
+      <div class="grid grid-3">
+        <div class="field">
+          <label for="stateId">State</label>
+          <select id="stateId" class="select" formControlName="stateId">
+            <option [ngValue]="null">Select…</option>
+            @for (option of states(); track option.id) {
+              <option [ngValue]="option.id">{{ option.name }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label for="city">City</label>
+          <input id="city" class="input" formControlName="city" />
+        </div>
+        <div class="field">
+          <label for="pincode">Pincode</label>
+          <input id="pincode" class="input" formControlName="pincode" />
+        </div>
+      </div>
+
+      <div class="grid grid-3">
+        <div class="field">
+          <label for="openingTime">Opens at</label>
+          <input id="openingTime" class="input" type="time" formControlName="openingTime" />
+        </div>
+        <div class="field">
+          <label for="closingTime">Closes at</label>
+          <input id="closingTime" class="input" type="time" formControlName="closingTime" />
+        </div>
+        <div class="field">
+          <label for="status">Status</label>
+          <select id="status" class="select" formControlName="status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+      <button type="submit" form="branch-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Add branch' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

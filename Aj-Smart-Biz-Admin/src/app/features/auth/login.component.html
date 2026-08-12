@@ -1,0 +1,83 @@
+<div class="auth">
+  <!-- Branding is resolved from the browser's hostname before sign-in -->
+  <div class="auth-art">
+    @if (branding.logoUrl(); as logo) {
+      <img class="brand-logo" [src]="logo" [alt]="company().name + ' logo'" />
+    } @else {
+      <div class="brand-mark">{{ brandInitials() }}</div>
+    }
+
+    <h1>{{ company().name }}</h1>
+    <p>{{ company().description || 'Sign in with the admin credentials issued when your company was onboarded.' }}</p>
+
+    @if (!company().resolved) {
+      <ul>
+        <li>🏢 Keep company and branch details up to date</li>
+        <li>🛡️ Define roles and exactly what each one can see</li>
+        <li>👥 Give your team their own logins</li>
+      </ul>
+    }
+  </div>
+
+  <div class="auth-panel">
+    <form class="auth-form card" [formGroup]="form" (ngSubmit)="submit()">
+      <div class="card-body">
+        <!-- Repeated on the panel so the branding survives the mobile layout -->
+        <div class="panel-brand">
+          @if (branding.logoUrl(); as logo) {
+            <img [src]="logo" [alt]="company().name + ' logo'" />
+          }
+          <div>
+            <h2>{{ company().name }}</h2>
+            <p class="muted tiny mb-0">{{ company().resolved ? 'Company admin sign in' : 'Use the email your super admin set up for you.' }}</p>
+          </div>
+        </div>
+
+        @if (errorMessage()) {
+          <div class="alert">{{ errorMessage() }}</div>
+        }
+
+        <div class="field">
+          <label for="email">Email <span class="req">*</span></label>
+          <input
+            id="email"
+            class="input"
+            type="email"
+            autocomplete="username"
+            formControlName="email"
+            [class.invalid]="form.controls.email.touched && form.controls.email.invalid"
+            placeholder="admin@yourcompany.com"
+          />
+          <app-field-error [control]="form.controls.email" label="Email" />
+        </div>
+
+        <div class="field">
+          <label for="password">Password <span class="req">*</span></label>
+          <div class="pw">
+            <input
+              id="password"
+              class="input"
+              [type]="showPassword() ? 'text' : 'password'"
+              autocomplete="current-password"
+              formControlName="password"
+              [class.invalid]="form.controls.password.touched && form.controls.password.invalid"
+              placeholder="••••••••"
+            />
+            <button type="button" class="pw-toggle" (click)="showPassword.set(!showPassword())" tabindex="-1">
+              {{ showPassword() ? '🙈' : '👁️' }}
+            </button>
+          </div>
+          <app-field-error [control]="form.controls.password" label="Password" />
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px" [disabled]="loading()">
+          @if (loading()) {
+            <span class="spinner"></span> Signing in…
+          } @else {
+            Sign in
+          }
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

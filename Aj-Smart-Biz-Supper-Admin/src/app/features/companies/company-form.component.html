@@ -1,0 +1,548 @@
+<app-page-header
+  [title]="isEdit() ? 'Edit company' : 'Create company'"
+  [subtitle]="
+    isEdit()
+      ? 'Update the tenant profile'
+      : 'Creating a company also provisions its head office branch, the Company Admin role and the main admin login'
+  "
+>
+  <a class="btn btn-ghost" routerLink="/companies">← Back to list</a>
+</app-page-header>
+
+@if (loading()) {
+  <div class="skeleton" style="height:420px"></div>
+} @else {
+  <!--
+    Plan changes sit in their own form with their own button: they bill the
+    company and rewrite its subscription history, so they must never ride along
+    with a profile save.
+  -->
+  @if (isEdit()) {
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-head">
+        <h3>Plan</h3>
+        @if (currentPlan(); as current) {
+          <a class="btn btn-sm btn-ghost" [routerLink]="['/subscriptions', current.id]">All plan actions →</a>
+        }
+      </div>
+
+      <div class="card-body">
+        @if (currentPlan(); as current) {
+          <div class="plan-now">
+            <div class="plan-facts">
+              <div>
+                <div class="tiny muted">Currently on</div>
+                <div class="plan-fact-value">{{ planNameOf(current) }}</div>
+                <div style="margin-top:4px"><app-status-badge [value]="current.status" /></div>
+              </div>
+              <div>
+                <div class="tiny muted">Term</div>
+                <div class="plan-fact-value">{{ current.startDate | date: 'dd MMM yyyy' }}</div>
+                <div class="tiny muted">to {{ current.endDate | date: 'dd MMM yyyy' }}</div>
+              </div>
+              <div>
+                <div class="tiny muted">Expires in</div>
+                <div style="margin-top:3px">
+                  <app-plan-timer [timer]="current.timer" [live]="isLive(current)" [showBar]="false" />
+                </div>
+              </div>
+              <div>
+                <div class="tiny muted">Term value</div>
+                <div class="plan-fact-value">{{ money(current.totalAmount, current.currency) }}</div>
+              </div>
+            </div>
+          </div>
+
+          @if (planView()?.scheduled; as queued) {
+            <p class="tiny muted" style="margin:14px 0 0">
+              A renewal is already booked on {{ queued.plan?.name ?? queued.planSnapshot?.name }}, starting
+              {{ queued.startDate | date: 'dd MMM yyyy' }}. Changing the plan now leaves that booking in place.
+            </p>
+          }
+
+          <div class="divider"></div>
+        } @else {
+          <div class="row-between" style="flex-wrap:wrap;gap:12px;margin-bottom:16px">
+            <div>
+              <span class="badge badge-warning">No active plan</span>
+              <div class="tiny muted" style="margin-top:6px">
+                This company is not on a plan. Pick one below to activate it.
+              </div>
+            </div>
+          </div>
+        }
+
+        <form [formGroup]="planForm" id="plan-change-form">
+          <div class="grid grid-3">
+            <div class="field">
+              <label for="planTarget">{{ isChangingPlan() ? 'Change to' : 'Plan' }} <span class="req">*</span></label>
+              <select id="planTarget" class="select" formControlName="planId" (change)="onPlanChosen()">
+                <option [ngValue]="null">Select a plan…</option>
+                @for (plan of sellablePlans(); track plan.id) {
+                  @if (plan.id !== currentPlan()?.planId) {
+                    <option [ngValue]="plan.id">
+                      {{ plan.name }} — {{ money(plan.discountPrice ?? plan.price, plan.currency) }} / {{ plan.billingCycle }}
+                    </option>
+                  }
+                }
+              </select>
+              <app-field-error [control]="planForm.controls.planId" label="Plan" />
+            </div>
+
+            @if (isChangingPlan()) {
+              <div class="field">
+                <label>Unused value</label>
+                <label class="check" style="margin-top:8px">
+                  <input type="checkbox" formControlName="applyCredit" (change)="onPlanChosen()" />
+                  Credit what is left of the running term
+                </label>
+              </div>
+            } @else {
+              <div class="field">
+                <label for="planStart">Start date</label>
+                <input id="planStart" class="input" type="date" formControlName="startDate" />
+                <span class="hint">Defaults to today</span>
+              </div>
+              <div class="field">
+                <label for="planAmount">Amount charged</label>
+                <input id="planAmount" class="input" type="number" min="0" step="0.01" formControlName="amount" />
+              </div>
+            }
+          </div>
+
+          @if (previewing()) {
+            <div class="skeleton" style="height:140px;margin-top:14px"></div>
+          } @else if (preview(); as p) {
+            <!-- Exactly what the API will charge — these numbers are its call, not the form's. -->
+            <div class="preview">
+              <div class="preview-row">
+                <span class="muted">Change</span>
+                <span
+                  class="strong"
+                  [class.delta-up]="p.changeType === 'upgrade'"
+                  [class.delta-down]="p.changeType === 'downgrade'"
+                >
+                  {{ p.currentPlan?.name }} → {{ p.targetPlan.name }} ({{ p.changeType }})
+                </span>
+              </div>
+              <div class="preview-row">
+                <span class="muted">New term</span>
+                <span>
+                  {{ p.pricing.startDate | date: 'dd MMM yyyy' }} → {{ p.pricing.endDate | date: 'dd MMM yyyy' }}
+                  ({{ p.pricing.durationDays }} days)
+                </span>
+              </div>
+              <div class="preview-row">
+                <span class="muted">Plan price</span>
+                <span>{{ money(p.pricing.price, p.pricing.currency) }}</span>
+              </div>
+              <div class="preview-row">
+                <span class="muted">Credit for {{ p.proration.remainingDays }} unused day(s)</span>
+                <span class="delta-up">− {{ money(p.pricing.creditApplied, p.pricing.currency) }}</span>
+              </div>
+              <div class="preview-row total">
+                <span>Payable now</span>
+                <span>{{ money(p.pricing.payable, p.pricing.currency) }}</span>
+              </div>
+
+              @if (p.limitChanges; as limits) {
+                <div class="preview-row" style="margin-top:8px">
+                  <span class="muted">Limits</span>
+                  <span class="tiny">
+                    branches {{ limits.maxBranches.from }} → {{ limits.maxBranches.to }} ·
+                    admins {{ limits.maxAdmins.from }} → {{ limits.maxAdmins.to }} ·
+                    users {{ limits.maxUsers.from }} → {{ limits.maxUsers.to }}
+                  </span>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="grid grid-4" style="margin-top:14px">
+            <div class="field">
+              <label for="planDiscount">Discount</label>
+              <input id="planDiscount" class="input" type="number" min="0" step="0.01" formControlName="discount" />
+            </div>
+            <div class="field">
+              <label for="planTax">Tax</label>
+              <input id="planTax" class="input" type="number" min="0" step="0.01" formControlName="taxAmount" />
+            </div>
+            <div class="field">
+              <label for="planGrace">Grace days</label>
+              <input id="planGrace" class="input" type="number" min="0" max="90" formControlName="graceDays" />
+              <span class="hint">Access after the end date</span>
+            </div>
+            <div class="field">
+              <label for="planPayMode">Record payment as</label>
+              <select id="planPayMode" class="select" formControlName="paymentMode">
+                @for (mode of paymentModes; track mode.value) {
+                  <option [value]="mode.value">{{ mode.label }}</option>
+                }
+              </select>
+            </div>
+          </div>
+
+          @if (planForm.controls.paymentMode.value) {
+            <div class="field" style="max-width:340px">
+              <label for="planPayRef">Payment reference</label>
+              <input id="planPayRef" class="input" formControlName="paymentReference" placeholder="UPI / cheque / txn id" />
+            </div>
+          }
+
+          <div class="field">
+            <label for="planRemarks">Remarks</label>
+            <textarea id="planRemarks" class="textarea" formControlName="remarks"></textarea>
+          </div>
+
+          <label class="check">
+            <input type="checkbox" formControlName="autoRenew" />
+            Renew automatically at the end of the term
+          </label>
+
+          <div class="row-end" style="margin-top:14px">
+            @if (isChangingPlan()) {
+              <span class="tiny muted" style="margin-right:auto">
+                The running term is closed as <strong>superseded</strong> and a new one starts today.
+              </span>
+              <button
+                type="button"
+                class="btn btn-primary"
+                [disabled]="savingPlan() || planForm.invalid"
+                (click)="applyPlanChange()"
+              >
+                {{ savingPlan() ? 'Applying…' : '⬆️ Apply plan change' }}
+              </button>
+            } @else {
+              <button
+                type="button"
+                class="btn btn-primary"
+                [disabled]="savingPlan() || planForm.invalid"
+                (click)="assignPlan()"
+              >
+                {{ savingPlan() ? 'Activating…' : '＋ Assign & activate plan' }}
+              </button>
+            }
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-head"><h3>Company profile</h3></div>
+      <div class="card-body">
+        <div class="grid grid-3">
+          <div class="field">
+            <label for="name">Company name <span class="req">*</span></label>
+            <input id="name" class="input" formControlName="name" placeholder="Acme Traders" />
+            <app-field-error [control]="form.controls.name" label="Company name" />
+          </div>
+          <div class="field">
+            <label for="legalName">Legal name</label>
+            <input id="legalName" class="input" formControlName="legalName" placeholder="Acme Traders Pvt Ltd" />
+          </div>
+          <div class="field">
+            <label for="code">Tenant code</label>
+            <input id="code" class="input" formControlName="code" placeholder="Auto-generated" />
+            <span class="hint">Leave blank to generate from the name</span>
+          </div>
+        </div>
+
+        <div class="grid grid-3">
+          <div class="field">
+            <label for="email">Email <span class="req">*</span></label>
+            <input id="email" class="input" type="email" formControlName="email" placeholder="owner@acme.com" />
+            <app-field-error [control]="form.controls.email" label="Email" />
+          </div>
+          <div class="field">
+            <label for="phone">Phone <span class="req">*</span></label>
+            <input id="phone" class="input" formControlName="phone" placeholder="9876543210" />
+            <app-field-error [control]="form.controls.phone" label="Phone" />
+          </div>
+          <div class="field">
+            <label for="alternatePhone">Alternate phone</label>
+            <input id="alternatePhone" class="input" formControlName="alternatePhone" />
+          </div>
+        </div>
+
+        <div class="grid grid-3">
+          <div class="field">
+            <label for="businessTypeId">Business type</label>
+            <select id="businessTypeId" class="select" formControlName="businessTypeId">
+              <option [ngValue]="null">Select…</option>
+              @for (option of businessTypes(); track option.id) {
+                <option [ngValue]="option.id">{{ option.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="field">
+            <label for="themeId">Theme</label>
+            <select id="themeId" class="select" formControlName="themeId">
+              <option [ngValue]="null">Select…</option>
+              @for (option of themes(); track option.id) {
+                <option [ngValue]="option.id">{{ option.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="field">
+            <label for="website">Website</label>
+            <input id="website" class="input" formControlName="website" placeholder="https://acme.com" />
+            <app-field-error [control]="form.controls.website" label="Website" />
+          </div>
+        </div>
+
+        <div class="grid grid-4">
+          <div class="field">
+            <label for="gstNumber">GST number</label>
+            <input id="gstNumber" class="input" formControlName="gstNumber" />
+          </div>
+          <div class="field">
+            <label for="panNumber">PAN</label>
+            <input id="panNumber" class="input" formControlName="panNumber" />
+          </div>
+          <div class="field">
+            <label for="currency">Currency</label>
+            <input id="currency" class="input" formControlName="currency" />
+          </div>
+          <div class="field">
+            <label for="timezone">Timezone</label>
+            <input id="timezone" class="input" formControlName="timezone" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Drives the tenant's own login screen, resolved by domain -->
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-head">
+        <h3>Login screen branding</h3>
+        <span class="tiny muted">Shown before anyone signs in, resolved from the portal domain</span>
+      </div>
+      <div class="card-body">
+        @if (!isEdit()) {
+          <div class="field">
+            <label for="domain">Portal domain</label>
+            <input id="domain" class="input" formControlName="domain" placeholder="acme.ajsmartbiz.com" />
+            <span class="hint">
+              Bare hostname, no https:// — becomes the company's primary domain. More can be added, and pointed at
+              individual branches, from the Domains tab afterwards.
+            </span>
+            <app-field-error [control]="form.controls.domain" label="Portal domain" />
+          </div>
+        } @else {
+          <p class="tiny muted" style="margin-top:0">
+            Domains are managed on the company's <strong>Domains</strong> tab, where each host can also be pointed at
+            a specific branch.
+          </p>
+        }
+
+        <div class="field">
+          <label for="description">Description</label>
+          <textarea
+            id="description"
+            class="textarea"
+            formControlName="description"
+            placeholder="Billing, stock and reporting for every Acme outlet."
+          ></textarea>
+          <span class="hint">One or two lines, shown under the company name on the login screen.</span>
+        </div>
+
+        <div class="grid grid-2">
+          <div class="field">
+            <label>Company logo</label>
+            <app-image-upload formControlName="logo" label="Company logo" folder="company" />
+          </div>
+          <div class="field">
+            <label>Favicon</label>
+            <app-image-upload formControlName="favicon" label="Favicon" folder="company" variant="favicon" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-head"><h3>Registered address</h3></div>
+      <div class="card-body">
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="addressLine1">Address line 1</label>
+            <input id="addressLine1" class="input" formControlName="addressLine1" />
+          </div>
+          <div class="field">
+            <label for="addressLine2">Address line 2</label>
+            <input id="addressLine2" class="input" formControlName="addressLine2" />
+          </div>
+        </div>
+        <div class="grid grid-3">
+          <div class="field">
+            <label for="stateId">State</label>
+            <select id="stateId" class="select" formControlName="stateId">
+              <option [ngValue]="null">Select…</option>
+              @for (option of states(); track option.id) {
+                <option [ngValue]="option.id">{{ option.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="field">
+            <label for="city">City</label>
+            <input id="city" class="input" formControlName="city" />
+          </div>
+          <div class="field">
+            <label for="pincode">Pincode</label>
+            <input id="pincode" class="input" formControlName="pincode" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    @if (!isEdit()) {
+      <!-- Provisioning block: only meaningful when the tenant is created -->
+      <div class="card" style="margin-bottom:18px" formGroupName="mainAdmin">
+        <div class="card-head">
+          <h3>Main admin</h3>
+          <span class="tiny muted">Auto-created with full access to the company workspace</span>
+        </div>
+        <div class="card-body">
+          <div class="grid grid-2">
+            <div class="field">
+              <label for="adminName">Admin name <span class="req">*</span></label>
+              <input id="adminName" class="input" formControlName="name" placeholder="Acme Owner" />
+              <app-field-error [control]="form.controls.mainAdmin.controls.name" label="Admin name" />
+            </div>
+            <div class="field">
+              <label for="adminEmail">Login email <span class="req">*</span></label>
+              <input id="adminEmail" class="input" type="email" formControlName="email" placeholder="admin@acme.com" />
+              <app-field-error [control]="form.controls.mainAdmin.controls.email" label="Login email" />
+            </div>
+          </div>
+          <div class="grid grid-2">
+            <div class="field">
+              <label for="adminPhone">Admin phone</label>
+              <input id="adminPhone" class="input" formControlName="phone" />
+            </div>
+            <div class="field">
+              <label for="adminPassword">Password</label>
+              <input id="adminPassword" class="input" type="text" formControlName="password" autocomplete="new-password" />
+              <span class="hint">Leave blank and the API generates one, shown once after saving.</span>
+              <app-field-error [control]="form.controls.mainAdmin.controls.password" label="Password" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:18px" formGroupName="subscription">
+        <div class="card-head">
+          <h3>Starting plan</h3>
+          <span class="tiny muted">Optional — a plan can also be assigned later</span>
+        </div>
+        <div class="card-body">
+          <div class="grid grid-3">
+            <div class="field">
+              <label for="planId">Plan</label>
+              <select id="planId" class="select" formControlName="planId">
+                <option [ngValue]="null">No plan for now</option>
+                @for (plan of plans(); track plan.id) {
+                  <option [ngValue]="plan.id">{{ plan.name }} — {{ plan.price }} {{ plan.currency }}</option>
+                }
+              </select>
+            </div>
+            <div class="field">
+              <label for="startDate">Start date</label>
+              <input id="startDate" class="input" type="date" formControlName="startDate" />
+            </div>
+            <div class="field">
+              <label for="amount">Amount charged</label>
+              <input id="amount" class="input" type="number" min="0" step="0.01" formControlName="amount" />
+              <span class="hint">Defaults to the plan price</span>
+            </div>
+          </div>
+
+          @if (form.controls.subscription.controls.planId.value) {
+            <div class="grid grid-3">
+              <div class="field">
+                <label for="discount">Discount</label>
+                <input id="discount" class="input" type="number" min="0" step="0.01" formControlName="discount" />
+              </div>
+              <div class="field">
+                <label for="taxAmount">Tax</label>
+                <input id="taxAmount" class="input" type="number" min="0" step="0.01" formControlName="taxAmount" />
+              </div>
+              <div class="field">
+                <label for="paymentMode">Payment</label>
+                <select id="paymentMode" class="select" formControlName="paymentMode">
+                  <option value="">Do not record a payment</option>
+                  <option value="cash">Cash</option>
+                  <option value="upi">UPI</option>
+                  <option value="card">Card</option>
+                  <option value="net_banking">Net banking</option>
+                  <option value="cheque">Cheque</option>
+                  <option value="bank_transfer">Bank transfer</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            @if (form.controls.subscription.controls.paymentMode.value) {
+              <div class="field" style="max-width:340px">
+                <label for="paymentReference">Payment reference</label>
+                <input id="paymentReference" class="input" formControlName="paymentReference" placeholder="UPI / cheque / txn id" />
+              </div>
+            }
+
+            <label class="check">
+              <input type="checkbox" formControlName="autoRenew" />
+              Renew this plan automatically
+            </label>
+          }
+        </div>
+      </div>
+    } @else {
+      <div class="card" style="margin-bottom:18px">
+        <div class="card-head"><h3>Status</h3></div>
+        <div class="card-body">
+          <div class="field" style="max-width:260px">
+            <label for="status">Company status</label>
+            <select id="status" class="select" formControlName="status">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            <span class="hint">Deactivating blocks every admin of this company from signing in.</span>
+          </div>
+        </div>
+      </div>
+    }
+
+    <div class="row-end">
+      <a class="btn btn-ghost" routerLink="/companies">Cancel</a>
+      <button type="submit" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : isEdit() ? 'Save changes' : 'Create company' }}
+      </button>
+    </div>
+  </form>
+}
+
+@if (credentials(); as creds) {
+  <app-modal
+    title="Company created"
+    subtitle="Hand these credentials over — the password is shown only once"
+    size="sm"
+    [closeOnBackdrop]="false"
+    (closed)="finishCreate()"
+  >
+    <div class="dl">
+      <div class="dl-item"><dt>Company</dt><dd>{{ creds.companyName }}</dd></div>
+      <div class="dl-item"><dt>Tenant code</dt><dd>{{ creds.code }}</dd></div>
+      <div class="dl-item"><dt>Admin email</dt><dd>{{ creds.email }}</dd></div>
+      <div class="dl-item"><dt>Password</dt><dd><code>{{ creds.password }}</code></dd></div>
+    </div>
+    <p class="tiny muted" style="margin-top:14px">
+      The main admin signs in at the Aj-Smart-Biz-Admin portal and will be asked to change this password.
+    </p>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="copyCredentials()">Copy</button>
+      <button type="button" class="btn btn-primary" (click)="finishCreate()">Done</button>
+    </ng-container>
+  </app-modal>
+}

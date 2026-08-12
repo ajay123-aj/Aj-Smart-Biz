@@ -1,0 +1,120 @@
+<div class="card-head">
+  <div>
+    <h3>Domains</h3>
+    <span class="tiny muted">Hosts that open this company's login screen</span>
+  </div>
+  @if (canEdit()) {
+    <button type="button" class="btn btn-sm btn-primary" (click)="openModal(null)">＋ Add domain</button>
+  }
+</div>
+
+<div class="card-body tight">
+  <app-table-state
+    [loading]="loading()"
+    [empty]="!loading() && rows().length === 0"
+    icon="🌐"
+    title="No domains mapped"
+    message="Add the host this company's admin portal is served from."
+  />
+
+  @if (!loading() && rows().length > 0) {
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr><th>Domain</th><th>Points at</th><th>Status</th><th class="text-right">Actions</th></tr>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.id) {
+            <tr>
+              <td>
+                <span class="strong">{{ row.domain }}</span>
+                @if (row.isPrimary) {
+                  <span class="badge badge-info" style="margin-left:6px">Primary</span>
+                }
+              </td>
+              <td class="muted">
+                @if (row.branch) {
+                  🏬 {{ row.branch.name }}
+                  <div class="tiny">Branch-specific branding</div>
+                } @else {
+                  🏢 Whole company
+                }
+              </td>
+              <td><app-status-badge [value]="row.status" /></td>
+              <td>
+                <div class="row-end">
+                  @if (canEdit()) {
+                    @if (!row.isPrimary) {
+                      <button type="button" class="btn btn-sm btn-ghost" (click)="makePrimary(row)">Make primary</button>
+                    }
+                    <button type="button" class="btn btn-sm btn-ghost" [disabled]="row.isPrimary" (click)="toggleStatus(row)">
+                      {{ row.status === 'active' ? 'Deactivate' : 'Activate' }}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="openModal(row)">Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" (click)="remove(row)">Delete</button>
+                  } @else {
+                    <span class="tiny muted">Read only</span>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <p class="tiny muted" style="padding:12px 16px;margin:0">
+      A host resolves to exactly one company. Point a domain at a branch to serve that branch's logo and favicon on
+      its login screen.
+    </p>
+  }
+</div>
+
+@if (modalOpen()) {
+  <app-modal
+    [title]="editing() ? 'Edit domain' : 'Add domain'"
+    size="sm"
+    [closeOnBackdrop]="false"
+    (closed)="modalOpen.set(false)"
+  >
+    <form [formGroup]="form" (ngSubmit)="save()" id="domain-form">
+      <div class="field">
+        <label for="domain">Domain <span class="req">*</span></label>
+        <input id="domain" class="input" formControlName="domain" placeholder="acme.ajsmartbiz.com" />
+        <span class="hint">Bare hostname — no https://, no port, no path.</span>
+        <app-field-error [control]="form.controls.domain" label="Domain" />
+      </div>
+
+      <div class="field">
+        <label for="subCompanyId">Points at</label>
+        <select id="subCompanyId" class="select" formControlName="subCompanyId">
+          <option [ngValue]="null">The whole company</option>
+          @for (branch of branches(); track branch.id) {
+            <option [ngValue]="branch.id">{{ branch.name }}</option>
+          }
+        </select>
+        <span class="hint">Pick a branch to show that branch's logo and favicon on this host.</span>
+      </div>
+
+      <div class="field" style="max-width:220px">
+        <label for="status">Status</label>
+        <select id="status" class="select" formControlName="status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+
+      <label class="check">
+        <input type="checkbox" formControlName="isPrimary" />
+        Use as the company's primary domain
+      </label>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+      <button type="submit" form="domain-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Add domain' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

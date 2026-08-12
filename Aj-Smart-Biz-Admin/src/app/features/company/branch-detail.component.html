@@ -1,0 +1,177 @@
+@if (loading()) {
+  <div class="skeleton" style="height:420px"></div>
+} @else if (branch(); as b) {
+  <app-page-header [title]="b.name" [subtitle]="b.code + (b.isMain ? ' · Head office' : '')">
+    <a class="btn btn-ghost" routerLink="/company">← Company details</a>
+  </app-page-header>
+
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-head">
+      <h3>Branch details</h3>
+      <app-status-badge [value]="b.status" />
+    </div>
+    <div class="card-body">
+      @if (logoUrl(b) || faviconUrl(b)) {
+        <div class="branding">
+          <div class="brand-slot">
+            <span class="tiny muted">Logo</span>
+            @if (logoUrl(b); as src) {
+              <div class="brand-box"><img [src]="src" [alt]="b.name + ' logo'" /></div>
+            } @else {
+              <div class="brand-box empty-box">—</div>
+            }
+          </div>
+          <div class="brand-slot">
+            <span class="tiny muted">Favicon</span>
+            @if (faviconUrl(b); as src) {
+              <div class="brand-box"><img class="favicon" [src]="src" [alt]="b.name + ' favicon'" /></div>
+            } @else {
+              <div class="brand-box empty-box">—</div>
+            }
+          </div>
+        </div>
+      }
+
+      <dl class="dl">
+        <div class="dl-item"><dt>Phone</dt><dd>{{ b.phone || '—' }}</dd></div>
+        <div class="dl-item"><dt>Email</dt><dd>{{ b.email || '—' }}</dd></div>
+        <div class="dl-item"><dt>GST number</dt><dd>{{ b.gstNumber || '—' }}</dd></div>
+        <div class="dl-item"><dt>Address</dt><dd>{{ addressOf(b) }}</dd></div>
+        <div class="dl-item"><dt>State</dt><dd>{{ b.state?.name || '—' }}</dd></div>
+        <div class="dl-item"><dt>Hours</dt><dd>
+          {{ b.openingTime ? b.openingTime.slice(0, 5) : '—' }} – {{ b.closingTime ? b.closingTime.slice(0, 5) : '—' }}
+        </dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Branch contacts</h3>
+      <button type="button" class="btn btn-sm btn-primary" (click)="openModal(null)" *appCan="'branch-management'; action: 'canCreate'">
+        ＋ Add contact
+      </button>
+    </div>
+    <div class="card-body tight">
+      @if (contacts().length === 0) {
+        <div class="empty">
+          <div class="empty-icon">📇</div>
+          <div class="strong">No contacts yet</div>
+          <div class="tiny">Add the people customers and suppliers should reach at this branch.</div>
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Contact</th><th>Designation</th><th>Phone</th><th>Email</th><th>Status</th><th class="text-right">Actions</th></tr>
+            </thead>
+            <tbody>
+              @for (contact of contacts(); track contact.id) {
+                <tr>
+                  <td>
+                    <div class="row">
+                      <span class="avatar">{{ initialsOf(contact.name) }}</span>
+                      <div>
+                        <span class="strong">{{ contact.name }}</span>
+                        @if (contact.isPrimary) {
+                          <span class="badge badge-info" style="margin-left:6px">Primary</span>
+                        }
+                        @if (contact.department) {
+                          <div class="tiny muted">{{ contact.department }}</div>
+                        }
+                      </div>
+                    </div>
+                  </td>
+                  <td class="muted">{{ contact.designation || '—' }}</td>
+                  <td class="tiny">
+                    <div>{{ contact.phone }}</div>
+                    @if (contact.alternatePhone) {
+                      <div class="muted">{{ contact.alternatePhone }}</div>
+                    }
+                  </td>
+                  <td class="muted">{{ contact.email || '—' }}</td>
+                  <td><app-status-badge [value]="contact.status" /></td>
+                  <td>
+                    <div class="row-end">
+                      <button type="button" class="btn btn-sm btn-ghost" (click)="openModal(contact)" *appCan="'branch-management'; action: 'canEdit'">
+                        Edit
+                      </button>
+                      <button type="button" class="btn btn-sm btn-danger" (click)="remove(contact)" *appCan="'branch-management'; action: 'canDelete'">
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+
+  @if (modalOpen()) {
+    <app-modal
+      [title]="editing() ? 'Edit contact' : 'Add contact'"
+      size="sm"
+      [closeOnBackdrop]="false"
+      (closed)="modalOpen.set(false)"
+    >
+      <form [formGroup]="form" (ngSubmit)="save()" id="contact-form">
+        <div class="field">
+          <label for="cname">Name <span class="req">*</span></label>
+          <input id="cname" class="input" formControlName="name" placeholder="Ramesh Patel" />
+          <app-field-error [control]="form.controls.name" label="Name" />
+        </div>
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="designation">Designation</label>
+            <input id="designation" class="input" formControlName="designation" placeholder="Branch Manager" />
+          </div>
+          <div class="field">
+            <label for="department">Department</label>
+            <input id="department" class="input" formControlName="department" placeholder="Operations" />
+          </div>
+        </div>
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="cphone">Phone <span class="req">*</span></label>
+            <input id="cphone" class="input" formControlName="phone" />
+            <app-field-error [control]="form.controls.phone" label="Phone" />
+          </div>
+          <div class="field">
+            <label for="alternatePhone">Alternate phone</label>
+            <input id="alternatePhone" class="input" formControlName="alternatePhone" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="cemail">Email</label>
+          <input id="cemail" class="input" type="email" formControlName="email" />
+          <app-field-error [control]="form.controls.email" label="Email" />
+        </div>
+        <div class="field">
+          <label for="notes">Notes</label>
+          <textarea id="notes" class="textarea" formControlName="notes"></textarea>
+        </div>
+        <div class="field" style="max-width:200px">
+          <label for="cstatus">Status</label>
+          <select id="cstatus" class="select" formControlName="status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <label class="check">
+          <input type="checkbox" formControlName="isPrimary" />
+          Primary contact for this branch
+        </label>
+      </form>
+
+      <ng-container footer>
+        <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+        <button type="submit" form="contact-form" class="btn btn-primary" [disabled]="saving()">
+          {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Add contact' }}
+        </button>
+      </ng-container>
+    </app-modal>
+  }
+}

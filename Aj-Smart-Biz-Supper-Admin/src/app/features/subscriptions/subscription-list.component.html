@@ -1,0 +1,605 @@
+<app-page-header
+  title="Company Plans"
+  subtitle="Every company's plan, its expiry timer and everything you can do to it"
+>
+  <a class="btn btn-ghost" routerLink="/plans">💳 Plan catalogue</a>
+  <button type="button" class="btn btn-primary" [disabled]="sweeping()" (click)="runDue()">
+    {{ sweeping() ? 'Checking…' : '⟳ Run expiry check' }}
+  </button>
+</app-page-header>
+
+<!-- Counters. Each one is a filter, so a number you don't like is one click from the list behind it. -->
+@if (summary(); as s) {
+  <section class="tiles">
+    <button type="button" class="tile" [class.active]="activeView() === 'live'" (click)="selectView(quickViews[0])">
+      <div class="tiny muted">Running</div>
+      <div class="tile-value good">{{ s.statuses.active }}</div>
+      <div class="tiny muted">{{ s.flags.autoRenewOn }} on auto renew</div>
+    </button>
+    <button type="button" class="tile" [class.active]="activeView() === 'expiring7'" (click)="selectView(quickViews[1])">
+      <div class="tiny muted">Expiring in 7 days</div>
+      <div class="tile-value bad">{{ s.attention.expiringIn7 }}</div>
+      <div class="tiny muted">needs a renewal call</div>
+    </button>
+    <button type="button" class="tile" [class.active]="activeView() === 'expiring30'" (click)="selectView(quickViews[2])">
+      <div class="tiny muted">Expiring in 30 days</div>
+      <div class="tile-value warn">{{ s.attention.expiringIn30 }}</div>
+      <div class="tiny muted">{{ s.attention.inGrace }} already in grace</div>
+    </button>
+    <button type="button" class="tile" [class.active]="activeView() === 'scheduled'" (click)="selectView(quickViews[3])">
+      <div class="tiny muted">Scheduled</div>
+      <div class="tile-value">{{ s.statuses.pending }}</div>
+      <div class="tiny muted">pre-booked renewals</div>
+    </button>
+    <button type="button" class="tile" [class.active]="activeView() === 'suspended'" (click)="selectView(quickViews[4])">
+      <div class="tiny muted">Suspended</div>
+      <div class="tile-value warn">{{ s.statuses.suspended }}</div>
+      <div class="tiny muted">paused, term intact</div>
+    </button>
+    <button type="button" class="tile" [class.active]="activeView() === 'expired'" (click)="selectView(quickViews[5])">
+      <div class="tiny muted">Expired</div>
+      <div class="tile-value bad">{{ s.statuses.expired }}</div>
+      <div class="tiny muted">{{ s.attention.companiesWithoutPlan }} companies with no plan</div>
+    </button>
+    <div class="tile" style="cursor:default">
+      <div class="tiny muted">Plan requests</div>
+      <div class="tile-value" [class.warn]="s.attention.pendingRequests > 0">{{ s.attention.pendingRequests }}</div>
+      <div class="tiny muted">waiting on your decision</div>
+    </div>
+  </section>
+}
+
+<!--
+  Tenants waiting on a decision. This leads the page when there are any: it is
+  the only thing here where someone is actually blocked on you.
+-->
+@if (requests().length) {
+  <div class="card" style="margin-bottom:20px;border-color:var(--brand-600)">
+    <div class="card-head">
+      <h3>Plan requests <span class="badge badge-warning">{{ requests().length }} waiting</span></h3>
+      <span class="tiny muted">Raised from the company workspace — approving is what applies the plan</span>
+    </div>
+    <div class="card-body tight">
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Company</th><th>Asking for</th><th>Raised</th><th>Note</th><th class="text-right">Decision</th></tr>
+          </thead>
+          <tbody>
+            @for (request of requests(); track request.id) {
+              <tr>
+                <td>
+                  <a [routerLink]="['/companies', request.companyId]" class="strong">{{ request.company?.name }}</a>
+                  <div class="tiny muted">{{ request.company?.code }}</div>
+                </td>
+                <td>
+                  <span class="strong">{{ request.requestedPlan?.name }}</span>
+                  <div class="tiny muted">
+                    @if (request.currentPlan?.name) {
+                      from {{ request.currentPlan?.name }} ·
+                    }
+                    {{ request.type }}
+                  </div>
+                </td>
+                <td class="tiny muted nowrap">
+                  {{ request.createdAt | date: 'dd MMM yyyy' }}
+                  <div>by {{ request.requestedByName || '—' }}</div>
+                </td>
+                <td class="tiny muted">{{ request.note || '—' }}</td>
+                <td>
+                  <div class="row-end">
+                    <button type="button" class="btn btn-sm btn-primary" (click)="openApprove(request)">Approve</button>
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="rejectRequest(request)">Reject</button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+}
+
+<div class="card">
+  <div class="card-head" style="flex-wrap:wrap;gap:10px">
+    <div class="views">
+      @for (view of quickViews; track view.key) {
+        <button type="button" class="view-chip" [class.active]="activeView() === view.key" (click)="selectView(view)">
+          {{ view.icon }} {{ view.label }}
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="card-head">
+    <input
+      class="input"
+      style="max-width:280px"
+      type="search"
+      placeholder="Search company name, code or email…"
+      (input)="onSearch($event)"
+    />
+    <select class="select" style="width:auto" (change)="onPlanFilter($event)">
+      <option value="">All plans</option>
+      @for (plan of plans(); track plan.id) {
+        <option [value]="plan.id">{{ plan.name }}</option>
+      }
+    </select>
+  </div>
+
+  <div class="card-body tight">
+    <app-table-state
+      [loading]="store.loading()"
+      [empty]="!store.loading() && store.items().length === 0"
+      icon="🗓️"
+      title="Nothing in this view"
+      message="No company matches these filters. Try another view, or assign a plan from Company Management."
+    />
+
+    @if (!store.loading() && store.items().length > 0) {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Company</th>
+              <th>Plan</th>
+              <th class="sortable" (click)="store.toggleSort('start_date')">Term{{ store.sortIcon('start_date') }}</th>
+              <th class="sortable" (click)="store.toggleSort('end_date')">Expires in{{ store.sortIcon('end_date') }}</th>
+              <th class="text-right sortable" (click)="store.toggleSort('total_amount')">
+                Value{{ store.sortIcon('total_amount') }}
+              </th>
+              <th>Auto renew</th>
+              <th>Status</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of store.items(); track row.id) {
+              <tr [style.opacity]="busyId() === row.id ? 0.5 : 1">
+                <td>
+                  <a [routerLink]="['/companies', row.companyId]" class="strong">{{ row.company?.name ?? '—' }}</a>
+                  <div class="tiny muted">{{ row.company?.code }}</div>
+                </td>
+                <td>
+                  <span class="strong">{{ planNameOf(row) }}</span>
+                  <div class="tiny muted">
+                    {{ row.plan?.billingCycle ?? row.planSnapshot?.billingCycle }}
+                    @if (row.isTrial) { · <span class="badge badge-info">Trial</span> }
+                    @if (changeLabel(row.changeType); as label) { · {{ label }} }
+                  </div>
+                </td>
+                <td class="tiny muted nowrap">
+                  {{ row.startDate | date: 'dd MMM yyyy' }}<br />
+                  → {{ row.endDate | date: 'dd MMM yyyy' }}
+                  @if (row.graceDays) {
+                    <div>+{{ row.graceDays }}d grace</div>
+                  }
+                </td>
+                <td>
+                  <!-- Live countdown; static terms show their length instead. -->
+                  <app-plan-timer [timer]="row.timer" [live]="isLive(row)" />
+                </td>
+                <td class="text-right nowrap">
+                  <span class="strong">{{ money(row.totalAmount, row.currency) }}</span>
+                  @if (+(row.creditApplied ?? 0) > 0) {
+                    <div class="tiny muted">credit {{ money(row.creditApplied, row.currency) }}</div>
+                  }
+                </td>
+                <td>
+                  <label class="switch" [title]="row.autoRenew ? 'Switch auto renew off' : 'Switch auto renew on'">
+                    <input
+                      type="checkbox"
+                      [checked]="row.autoRenew"
+                      [disabled]="!isLive(row)"
+                      (change)="toggleAutoRenew(row)"
+                    />
+                    <span class="slider"></span>
+                  </label>
+                </td>
+                <td><app-status-badge [value]="row.status" /></td>
+                <td>
+                  <div class="row-end">
+                    <a class="btn btn-sm btn-ghost" [routerLink]="['/subscriptions', row.id]">Details</a>
+
+                    @if (isLive(row)) {
+                      <button type="button" class="btn btn-sm btn-primary" (click)="openRenew(row)">Renew</button>
+                    } @else if (row.status === 'expired' || row.status === 'cancelled') {
+                      <button type="button" class="btn btn-sm btn-primary" (click)="reactivate(row)">Reactivate</button>
+                    }
+
+                    <div class="rowmenu">
+                      <button type="button" class="btn btn-sm btn-ghost" (click)="toggleMenu(row.id)" aria-label="More actions">⋯</button>
+
+                      @if (openMenu() === row.id) {
+                        <div class="rowmenu-panel">
+                          @if (isLive(row)) {
+                            <button type="button" class="rowmenu-item" (click)="openChange(row)">⬆️ Upgrade / downgrade</button>
+                            <button type="button" class="rowmenu-item" (click)="openRenew(row)">🔁 Renew or pre-renew</button>
+                            <button type="button" class="rowmenu-item" (click)="openExtend(row)">⏳ Extend the term</button>
+                          }
+                          @if (can(row, 'active') && row.status === 'pending') {
+                            <button type="button" class="rowmenu-item" (click)="startNow(row)">▶️ Start now</button>
+                          }
+                          @if (can(row, 'active') && row.status === 'suspended') {
+                            <button type="button" class="rowmenu-item" (click)="resume(row)">▶️ Resume</button>
+                          }
+                          @if (can(row, 'suspended')) {
+                            <button type="button" class="rowmenu-item" (click)="suspend(row)">⏸️ Suspend</button>
+                          }
+                          @if (can(row, 'expired')) {
+                            <button type="button" class="rowmenu-item" (click)="expire(row)">⛔ Expire now</button>
+                          }
+                          @if (can(row, 'cancelled')) {
+                            <button type="button" class="rowmenu-item danger" (click)="cancel(row)">🚫 Cancel</button>
+                          }
+                          @if (!(row.allowedTransitions ?? []).length) {
+                            <button type="button" class="rowmenu-item" (click)="reactivate(row)">♻️ Reactivate on this plan</button>
+                          }
+                        </div>
+                      }
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pager [meta]="store.meta()" (pageChange)="store.setPage($event)" (limitChange)="store.setLimit($event)" />
+    }
+  </div>
+</div>
+
+<!-- Plan-by-plan split: which plans are actually carrying the book. -->
+@if (summary(); as s) {
+  @if (s.byPlan.length) {
+    <div class="card" style="margin-top:20px">
+      <div class="card-head"><h3>Companies per plan</h3></div>
+      <div class="card-body tight">
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Plan</th><th>Billing</th><th class="text-right">Price</th><th class="text-right">Companies</th><th>Plan status</th></tr>
+            </thead>
+            <tbody>
+              @for (row of s.byPlan; track row.planId) {
+                <tr>
+                  <td class="strong">{{ row.planName }}</td>
+                  <td class="muted tiny">{{ row.billingCycle }}</td>
+                  <td class="text-right nowrap">{{ money(row.price, row.currency) }}</td>
+                  <td class="text-right strong">{{ row.companies }}</td>
+                  <td><app-status-badge [value]="row.planStatus" /></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
+}
+
+<!-- ------------------------------ RENEW ------------------------------ -->
+@if (renewFor(); as row) {
+  <app-modal
+    title="Renew plan"
+    [subtitle]="(row.company?.name ?? '') + ' · currently on ' + planNameOf(row)"
+    size="lg"
+    [closeOnBackdrop]="false"
+    (closed)="renewFor.set(null)"
+  >
+    <form [formGroup]="renewForm" (ngSubmit)="saveRenew()" id="renew-form">
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="rplan">Renew onto</label>
+          <select id="rplan" class="select" formControlName="planId" (change)="syncRenewAmount()">
+            @for (plan of renewPlans(); track plan.id) {
+              <option [ngValue]="plan.id">
+                {{ plan.name }} — {{ money(plan.discountPrice ?? plan.price, plan.currency) }}
+                @if (plan.status !== 'active') { (retired) }
+              </option>
+            }
+          </select>
+          <span class="hint">Defaults to the plan the company is already on</span>
+        </div>
+        <div class="field">
+          <label for="rmode">When</label>
+          <select id="rmode" class="select" formControlName="mode">
+            <option value="schedule">Pre-renew — queue it behind the running term</option>
+            <option value="immediate">Start today — close the running term now</option>
+          </select>
+          <span class="hint">
+            @if (renewForm.controls.mode.value === 'schedule') {
+              The new term begins the day after {{ row.endDate | date: 'dd MMM yyyy' }} and switches on by itself.
+            } @else {
+              The running term is closed off today and the new one starts immediately.
+            }
+          </span>
+        </div>
+      </div>
+
+      <div class="grid grid-4">
+        <div class="field">
+          <label for="rstart">Start date</label>
+          <input id="rstart" class="input" type="date" formControlName="startDate" />
+          <span class="hint">Optional override</span>
+        </div>
+        <div class="field">
+          <label for="ramount">Amount</label>
+          <input id="ramount" class="input" type="number" min="0" step="0.01" formControlName="amount" />
+        </div>
+        <div class="field">
+          <label for="rdiscount">Discount</label>
+          <input id="rdiscount" class="input" type="number" min="0" step="0.01" formControlName="discount" />
+        </div>
+        <div class="field">
+          <label for="rtax">Tax</label>
+          <input id="rtax" class="input" type="number" min="0" step="0.01" formControlName="taxAmount" />
+        </div>
+      </div>
+
+      <div class="grid grid-3">
+        <div class="field">
+          <label for="rgrace">Grace days</label>
+          <input id="rgrace" class="input" type="number" min="0" max="90" formControlName="graceDays" />
+          <span class="hint">Days of access after the end date</span>
+        </div>
+        <div class="field">
+          <label for="rmode2">Record payment as</label>
+          <select id="rmode2" class="select" formControlName="paymentMode">
+            @for (mode of paymentModes; track mode.value) {
+              <option [value]="mode.value">{{ mode.label }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label for="rref">Payment reference</label>
+          <input id="rref" class="input" formControlName="paymentReference" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="rremarks">Remarks</label>
+        <textarea id="rremarks" class="textarea" formControlName="remarks"></textarea>
+      </div>
+
+      <label class="check">
+        <input type="checkbox" formControlName="autoRenew" />
+        Renew automatically at the end of the new term
+      </label>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="renewFor.set(null)">Cancel</button>
+      <button type="submit" form="renew-form" class="btn btn-primary" [disabled]="savingRenew()">
+        {{ savingRenew() ? 'Saving…' : renewForm.controls.mode.value === 'schedule' ? 'Schedule renewal' : 'Renew now' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}
+
+<!-- --------------------------- CHANGE PLAN --------------------------- -->
+@if (changeFor(); as row) {
+  <app-modal
+    title="Change plan"
+    [subtitle]="(row.company?.name ?? '') + ' · currently on ' + planNameOf(row)"
+    size="lg"
+    [closeOnBackdrop]="false"
+    (closed)="changeFor.set(null)"
+  >
+    <form [formGroup]="changeForm" (ngSubmit)="saveChange()" id="change-form">
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="cplan">Move to <span class="req">*</span></label>
+          <select id="cplan" class="select" formControlName="planId" (change)="loadPreview()">
+            <option [ngValue]="null">Select a plan…</option>
+            @for (plan of sellablePlans(); track plan.id) {
+              @if (plan.id !== row.planId) {
+                <option [ngValue]="plan.id">{{ plan.name }} — {{ money(plan.discountPrice ?? plan.price, plan.currency) }}</option>
+              }
+            }
+          </select>
+          <app-field-error [control]="changeForm.controls.planId" label="Plan" />
+        </div>
+        <div class="field">
+          <label>Unused value</label>
+          <label class="check" style="margin-top:8px">
+            <input type="checkbox" formControlName="applyCredit" (change)="loadPreview()" />
+            Credit what is left of the running term
+          </label>
+        </div>
+      </div>
+
+      @if (previewing()) {
+        <div class="skeleton" style="height:150px"></div>
+      } @else if (preview(); as p) {
+        <div class="preview">
+          <div class="preview-row">
+            <span class="muted">Change</span>
+            <span class="strong" [class.delta-up]="p.changeType === 'upgrade'" [class.delta-down]="p.changeType === 'downgrade'">
+              {{ p.currentPlan?.name }} → {{ p.targetPlan.name }} ({{ p.changeType }})
+            </span>
+          </div>
+          <div class="preview-row">
+            <span class="muted">New term</span>
+            <span>{{ p.pricing.startDate | date: 'dd MMM yyyy' }} → {{ p.pricing.endDate | date: 'dd MMM yyyy' }} ({{ p.pricing.durationDays }} days)</span>
+          </div>
+          <div class="preview-row">
+            <span class="muted">Plan price</span>
+            <span>{{ money(p.pricing.price, p.pricing.currency) }}</span>
+          </div>
+          <div class="preview-row">
+            <span class="muted">Credit for {{ p.proration.remainingDays }} unused day(s)</span>
+            <span class="delta-up">− {{ money(p.pricing.creditApplied, p.pricing.currency) }}</span>
+          </div>
+          <div class="preview-row total">
+            <span>Payable now</span>
+            <span>{{ money(p.pricing.payable, p.pricing.currency) }}</span>
+          </div>
+
+          @if (p.limitChanges; as limits) {
+            <div class="preview-row" style="margin-top:8px">
+              <span class="muted">Limits</span>
+              <span class="tiny">
+                branches {{ limits.maxBranches.from }} → {{ limits.maxBranches.to }} ·
+                admins {{ limits.maxAdmins.from }} → {{ limits.maxAdmins.to }} ·
+                users {{ limits.maxUsers.from }} → {{ limits.maxUsers.to }}
+              </span>
+            </div>
+          }
+        </div>
+      }
+
+      <div class="grid grid-3" style="margin-top:14px">
+        <div class="field">
+          <label for="cdiscount">Extra discount</label>
+          <input id="cdiscount" class="input" type="number" min="0" step="0.01" formControlName="discount" />
+        </div>
+        <div class="field">
+          <label for="ctax">Tax</label>
+          <input id="ctax" class="input" type="number" min="0" step="0.01" formControlName="taxAmount" />
+        </div>
+        <div class="field">
+          <label for="cmode">Record payment as</label>
+          <select id="cmode" class="select" formControlName="paymentMode">
+            @for (mode of paymentModes; track mode.value) {
+              <option [value]="mode.value">{{ mode.label }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="cremarks">Remarks</label>
+        <textarea id="cremarks" class="textarea" formControlName="remarks"></textarea>
+      </div>
+
+      <p class="tiny muted" style="margin:0">
+        The running term is marked <strong>superseded</strong> rather than expired — it did not run its course, and the
+        history keeps that distinction.
+      </p>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="changeFor.set(null)">Cancel</button>
+      <button type="submit" form="change-form" class="btn btn-primary" [disabled]="savingChange() || changeForm.invalid">
+        {{ savingChange() ? 'Saving…' : 'Apply change' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}
+
+<!-- --------------------------- APPROVE REQUEST ------------------------- -->
+@if (approveFor(); as request) {
+  <app-modal
+    title="Approve plan request"
+    [subtitle]="(request.company?.name ?? '') + ' → ' + (request.requestedPlan?.name ?? '')"
+    [closeOnBackdrop]="false"
+    (closed)="approveFor.set(null)"
+  >
+    <form [formGroup]="approveForm" (ngSubmit)="approveRequest()" id="approve-form">
+      <dl class="dl">
+        <div class="dl-item"><dt>Company</dt><dd>{{ request.company?.name }}</dd></div>
+        <div class="dl-item">
+          <dt>Move</dt>
+          <dd>{{ request.currentPlan?.name || 'No plan' }} → <strong>{{ request.requestedPlan?.name }}</strong></dd>
+        </div>
+        <div class="dl-item"><dt>Raised by</dt><dd>{{ request.requestedByName || '—' }}</dd></div>
+        @if (request.note) {
+          <div class="dl-item"><dt>Their note</dt><dd>{{ request.note }}</dd></div>
+        }
+      </dl>
+
+      <div class="divider"></div>
+
+      @if (request.currentPlan?.name) {
+        <label class="check">
+          <input type="checkbox" formControlName="applyCredit" />
+          Credit the unused days of their running term
+        </label>
+      }
+
+      <div class="grid grid-3" style="margin-top:12px">
+        <div class="field">
+          <label for="adiscount">Discount</label>
+          <input id="adiscount" class="input" type="number" min="0" step="0.01" formControlName="discount" />
+        </div>
+        <div class="field">
+          <label for="atax">Tax</label>
+          <input id="atax" class="input" type="number" min="0" step="0.01" formControlName="taxAmount" />
+        </div>
+        <div class="field">
+          <label for="amode">Record payment as</label>
+          <select id="amode" class="select" formControlName="paymentMode">
+            @for (mode of paymentModes; track mode.value) {
+              <option [value]="mode.value">{{ mode.label }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      @if (approveForm.controls.paymentMode.value) {
+        <div class="field" style="max-width:340px">
+          <label for="aref">Payment reference</label>
+          <input id="aref" class="input" formControlName="paymentReference" />
+        </div>
+      }
+
+      <div class="field">
+        <label for="anote">Reply to the company</label>
+        <textarea id="anote" class="textarea" formControlName="decisionNote" placeholder="Applied from today, invoice to follow."></textarea>
+      </div>
+
+      <label class="check">
+        <input type="checkbox" formControlName="autoRenew" />
+        Renew this plan automatically
+      </label>
+
+      <p class="tiny muted" style="margin:12px 0 0">
+        Approving applies the plan immediately — their current term is closed as superseded and the new one starts today.
+      </p>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="approveFor.set(null)">Cancel</button>
+      <button type="submit" form="approve-form" class="btn btn-primary" [disabled]="deciding()">
+        {{ deciding() ? 'Applying…' : 'Approve & apply' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}
+
+<!-- ------------------------------ EXTEND ----------------------------- -->
+@if (extendFor(); as row) {
+  <app-modal
+    title="Extend the term"
+    [subtitle]="(row.company?.name ?? '') + ' · ends ' + (row.endDate | date: 'dd MMM yyyy')"
+    size="sm"
+    [closeOnBackdrop]="false"
+    (closed)="extendFor.set(null)"
+  >
+    <form [formGroup]="extendForm" (ngSubmit)="saveExtend()" id="extend-form">
+      <div class="field">
+        <label for="edays">Extend by (days) <span class="req">*</span></label>
+        <input id="edays" class="input" type="number" min="1" max="365" formControlName="days" />
+        <app-field-error [control]="extendForm.controls.days" label="Days" />
+      </div>
+      <div class="field">
+        <label for="ereason">Reason</label>
+        <textarea id="ereason" class="textarea" formControlName="reason" placeholder="Payment in transit"></textarea>
+      </div>
+      <p class="tiny muted" style="margin:0">
+        Nothing is charged. The end date moves out and the change is written to the subscription's history.
+      </p>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="extendFor.set(null)">Cancel</button>
+      <button type="submit" form="extend-form" class="btn btn-primary" [disabled]="savingExtend()">
+        {{ savingExtend() ? 'Saving…' : 'Extend term' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

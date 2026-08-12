@@ -1,0 +1,134 @@
+<app-page-header title="Dashboard" [subtitle]="auth.companyName()">
+  <button type="button" class="btn btn-ghost" (click)="load()" [disabled]="loading()">↻ Refresh</button>
+  <button type="button" class="btn btn-primary" routerLink="/admins" *appCan="'admin-management'; action: 'canCreate'">
+    ＋ Add admin
+  </button>
+</app-page-header>
+
+@if (loading() && !data()) {
+  <div class="grid grid-3">
+    @for (item of [1, 2, 3]; track item) {
+      <div class="skeleton" style="height:118px"></div>
+    }
+  </div>
+} @else if (data(); as d) {
+  <!-- Admin counters are the headline figure for this portal -->
+  <section class="grid grid-3">
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--brand-100);color:var(--brand-700)">👥</span>
+        <span class="tile-label">Total admins</span>
+      </div>
+      <div class="tile-value">{{ d.admins.total }}</div>
+      <div class="tile-foot">
+        <span class="badge badge-success">{{ d.admins.active }} active</span>
+        <span class="badge badge-muted">{{ d.admins.inactive }} inactive</span>
+      </div>
+    </article>
+
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--info-bg);color:var(--info)">📍</span>
+        <span class="tile-label">Branches</span>
+      </div>
+      <div class="tile-value">{{ d.branches.total }}</div>
+      <div class="tile-foot">
+        <span class="badge badge-success">{{ d.branches.active }} active</span>
+        <span class="tiny muted">{{ d.roles.total }} roles configured</span>
+      </div>
+    </article>
+
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--success-bg);color:var(--success)">💳</span>
+        <span class="tile-label">Current plan</span>
+      </div>
+      @if (d.subscription; as sub) {
+        <div class="tile-value" style="font-size:20px">{{ sub.planName || '—' }}</div>
+        <!-- Live countdown rather than a static day count, so the tile stays true. -->
+        <div style="margin:6px 0 2px">
+          <app-plan-timer [timer]="sub.timer" [showBar]="false" [showMeta]="false" />
+        </div>
+        <div class="tile-foot">
+          <span class="tiny muted">Until {{ sub.endDate | date: 'dd MMM yyyy' }}</span>
+          <a class="tiny" routerLink="/plan">View plan →</a>
+        </div>
+      } @else {
+        <div class="tile-value" style="font-size:18px">No active plan</div>
+        <div class="tile-foot"><span class="tiny muted">Contact your platform administrator</span></div>
+      }
+    </article>
+  </section>
+
+  @if (d.subscription?.limits; as limits) {
+    <section class="card" style="margin-top:20px">
+      <div class="card-head">
+        <h3>Plan usage</h3>
+        <span class="tiny muted">Limits come from your active subscription</span>
+      </div>
+      <div class="card-body">
+        <div class="grid grid-3">
+          <div>
+            <div class="row-between">
+              <span class="tiny strong">Admins</span>
+              <span class="tiny muted">{{ d.admins.total }} / {{ limits.maxAdmins ?? '∞' }}</span>
+            </div>
+            <div class="meter"><div class="meter-fill" [style.width.%]="usage(d.admins.total, limits.maxAdmins)"></div></div>
+          </div>
+          <div>
+            <div class="row-between">
+              <span class="tiny strong">Branches</span>
+              <span class="tiny muted">{{ d.branches.total }} / {{ limits.maxBranches ?? '∞' }}</span>
+            </div>
+            <div class="meter"><div class="meter-fill" [style.width.%]="usage(d.branches.total, limits.maxBranches)"></div></div>
+          </div>
+          <div>
+            <div class="row-between">
+              <span class="tiny strong">Users</span>
+              <span class="tiny muted">up to {{ limits.maxUsers ?? '∞' }}</span>
+            </div>
+            <div class="meter"><div class="meter-fill" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  }
+
+  <section class="card" style="margin-top:20px">
+    <div class="card-head">
+      <h3>Recently added admins</h3>
+      <a class="btn btn-sm btn-ghost" routerLink="/admins" *appCan="'admin-management'">View all</a>
+    </div>
+    <div class="card-body tight">
+      @if (d.recentAdmins.length === 0) {
+        <div class="empty"><div class="empty-icon">👥</div><div>No admins yet</div></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Admin</th><th>Role</th><th>Last login</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              @for (admin of d.recentAdmins; track admin.id) {
+                <tr>
+                  <td>
+                    <div class="row">
+                      <span class="avatar">{{ initialsOf(admin.name) }}</span>
+                      <div>
+                        <span class="strong">{{ admin.name }}</span>
+                        <div class="tiny muted">{{ admin.email }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="muted">{{ admin.role?.name || '—' }}</td>
+                  <td class="tiny muted nowrap">{{ admin.lastLoginAt ? (admin.lastLoginAt | date: 'dd MMM yyyy, HH:mm') : 'Never' }}</td>
+                  <td><app-status-badge [value]="admin.status" /></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </section>
+}

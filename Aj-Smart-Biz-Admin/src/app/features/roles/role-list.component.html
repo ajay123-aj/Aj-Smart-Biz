@@ -1,0 +1,128 @@
+<app-page-header title="Role Management" subtitle="Job roles your admins can be assigned to">
+  <a class="btn btn-ghost" routerLink="/menu-permissions" *appCan="'menu-permission'">🔐 Menu permissions</a>
+  <button type="button" class="btn btn-primary" (click)="openModal(null)" *appCan="'role-management'; action: 'canCreate'">
+    ＋ Add role
+  </button>
+</app-page-header>
+
+<div class="card">
+  <div class="card-head">
+    <input class="input" style="max-width:280px" type="search" placeholder="Search role name…" (input)="onSearch($event)" />
+    <select class="select" style="width:auto" (change)="store.patch({ status: selectValue($event) })">
+      <option value="">All statuses</option>
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+  </div>
+
+  <div class="card-body tight">
+    <app-table-state
+      [loading]="store.loading()"
+      [empty]="!store.loading() && store.items().length === 0"
+      icon="🛡️"
+      title="No roles found"
+      message="Create a role, then grant it menu permissions."
+    />
+
+    @if (!store.loading() && store.items().length > 0) {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th class="sortable" (click)="store.toggleSort('name')">Role{{ store.sortIcon('name') }}</th>
+              <th>Description</th>
+              <th>Admins</th>
+              <th>Status</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of store.items(); track row.id) {
+              <tr>
+                <td>
+                  <span class="strong">{{ row.name }}</span>
+                  @if (row.isSystem) {
+                    <span class="badge badge-info" style="margin-left:6px">System</span>
+                  }
+                </td>
+                <td class="muted">{{ row.description || '—' }}</td>
+                <td class="muted">{{ row.adminCount ?? 0 }}</td>
+                <td><app-status-badge [value]="row.status" /></td>
+                <td>
+                  <div class="row-end">
+                    <a
+                      class="btn btn-sm btn-ghost"
+                      routerLink="/menu-permissions"
+                      [queryParams]="{ roleId: row.id }"
+                      *appCan="'menu-permission'"
+                    >
+                      Permissions
+                    </a>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-ghost"
+                      [disabled]="row.isSystem"
+                      (click)="toggleStatus(row)"
+                      *appCan="'role-management'; action: 'canEdit'"
+                    >
+                      {{ row.status === 'active' ? 'Deactivate' : 'Activate' }}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="openModal(row)" *appCan="'role-management'; action: 'canEdit'">
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-danger"
+                      [disabled]="row.isSystem"
+                      (click)="remove(row)"
+                      *appCan="'role-management'; action: 'canDelete'"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pager [meta]="store.meta()" (pageChange)="store.setPage($event)" (limitChange)="store.setLimit($event)" />
+    }
+  </div>
+</div>
+
+@if (modalOpen()) {
+  <app-modal [title]="editing() ? 'Edit role' : 'Add role'" size="sm" [closeOnBackdrop]="false" (closed)="modalOpen.set(false)">
+    <form [formGroup]="form" (ngSubmit)="save()" id="role-form">
+      <div class="field">
+        <label for="name">Role name <span class="req">*</span></label>
+        <input id="name" class="input" formControlName="name" placeholder="Cashier" />
+        <app-field-error [control]="form.controls.name" label="Role name" />
+      </div>
+      <div class="field">
+        <label for="description">Description</label>
+        <textarea id="description" class="textarea" formControlName="description" placeholder="Handles billing at the counter"></textarea>
+      </div>
+      <div class="field" style="max-width:220px">
+        <label for="status">Status</label>
+        <select id="status" class="select" formControlName="status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+      @if (!editing()) {
+        <p class="tiny muted mb-0">
+          After creating the role, open <strong>Menu permissions</strong> to choose what it can see and do.
+        </p>
+      }
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+      <button type="submit" form="role-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Create role' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

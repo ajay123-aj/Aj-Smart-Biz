@@ -1,0 +1,463 @@
+// =============================================================================
+// Aj Smart Biz — database schema
+// Paste into https://dbdiagram.io to view or diff against your own diagram.
+//
+// Conventions
+//  - every table is paranoid: deleted_at IS NULL means "live"
+//  - created_at / updated_at are maintained by Sequelize
+//  - created_by / updated_by hold the acting super admin or admin id
+//  - uniqueness (company code, emails, role names) is enforced in the service
+//    layer, not by DB indexes, because a soft-deleted row would otherwise keep
+//    holding the value hostage
+// =============================================================================
+
+Project aj_smart_biz {
+  database_type: 'MySQL'
+  Note: 'Multi-tenant SaaS: platform masters, companies (tenants), billing and per-tenant RBAC'
+}
+
+// ----------------------------- platform masters -----------------------------
+
+Table states {
+  id int [pk, increment]
+  name varchar(120) [not null]
+  code varchar(20)
+  country varchar(120) [not null, default: 'India']
+  gst_code varchar(10)
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    name
+    status
+  }
+}
+
+Table business_types {
+  id int [pk, increment]
+  name varchar(150) [not null]
+  slug varchar(150)
+  icon varchar(120)
+  description text
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+}
+
+Table themes {
+  id int [pk, increment]
+  name varchar(120) [not null]
+  code varchar(60)
+  primary_color varchar(20) [not null]
+  secondary_color varchar(20) [not null]
+  accent_color varchar(20)
+  text_color varchar(20)
+  background_color varchar(20)
+  sidebar_color varchar(20)
+  font_family varchar(120)
+  mode enum_theme_mode [not null, default: 'light']
+  preview_image varchar(255)
+  config json
+  is_default boolean [not null, default: false]
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+}
+
+Table plans {
+  id int [pk, increment]
+  name varchar(120) [not null]
+  code varchar(60)
+  description text
+  price decimal(12,2) [not null, default: 0]
+  discount_price decimal(12,2)
+  currency varchar(10) [not null, default: 'INR']
+  billing_cycle enum_billing_cycle [not null, default: 'monthly']
+  duration_days int [note: 'overrides the billing cycle length when set']
+  trial_days int [not null, default: 0]
+  max_branches int [not null, default: 1]
+  max_admins int [not null, default: 1]
+  max_users int [not null, default: 5]
+  storage_mb int [not null, default: 1024]
+  features json [note: 'string array']
+  is_popular boolean [not null, default: false]
+  sequence int [not null, default: 0]
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+}
+
+// ------------------------------ platform users ------------------------------
+
+Table super_admins {
+  id int [pk, increment]
+  name varchar(150) [not null]
+  email varchar(160) [not null]
+  phone varchar(20)
+  password varchar(255) [not null, note: 'bcrypt']
+  avatar varchar(255)
+  role enum_super_admin_role [not null, default: 'staff']
+  is_root boolean [not null, default: false, note: 'seeded from env on boot; cannot be deleted or disabled']
+  last_login_at datetime
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    email
+    status
+  }
+}
+
+// --------------------------------- tenants ----------------------------------
+
+Table companies {
+  id int [pk, increment]
+  name varchar(180) [not null]
+  code varchar(40) [not null, note: 'tenant code, generated from the name when omitted']
+  legal_name varchar(200)
+  description text [note: 'tagline shown on the tenant login screen']
+  business_type_id int [ref: > business_types.id]
+  theme_id int [ref: > themes.id]
+  state_id int [ref: > states.id]
+  email varchar(160) [not null]
+  phone varchar(20) [not null]
+  alternate_phone varchar(20)
+  website varchar(180)
+  gst_number varchar(20)
+  pan_number varchar(20)
+  address_line1 varchar(255)
+  address_line2 varchar(255)
+  city varchar(120)
+  pincode varchar(12)
+  logo varchar(255) [note: 'upload path']
+  favicon varchar(255) [note: 'upload path; ICO only, enforced on upload']
+  currency varchar(10) [not null, default: 'INR']
+  timezone varchar(60) [not null, default: 'Asia/Kolkata']
+  current_subscription_id int [note: 'denormalised pointer; no FK, breaks the cycle with company_subscriptions']
+  subscription_end_date date
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    code
+    email
+    status
+    business_type_id
+  }
+}
+
+Table branches {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  name varchar(180) [not null]
+  code varchar(40) [not null]
+  is_main boolean [not null, default: false, note: 'head office, auto-created with the company; exactly one per tenant']
+  logo varchar(255) [note: 'upload path, e.g. /uploads/branch/abc.png']
+  favicon varchar(255) [note: 'upload path']
+  email varchar(160)
+  phone varchar(20)
+  gst_number varchar(20)
+  state_id int [ref: > states.id]
+  address_line1 varchar(255)
+  address_line2 varchar(255)
+  city varchar(120)
+  pincode varchar(12)
+  latitude decimal(10,7)
+  longitude decimal(10,7)
+  opening_time time
+  closing_time time
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+}
+
+Table company_domain {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  sub_company_id int [ref: > branches.id, note: 'branch this host is dedicated to; NULL = whole company']
+  domain varchar(255) [not null, note: 'bare hostname, stored lower-case; unique across every tenant']
+  is_primary boolean [not null, default: false, note: 'exactly one per company']
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    domain
+    company_id
+    sub_company_id
+  }
+  Note: 'GET /public/branding resolves the request Host here first, then falls back to matching the leading label against companies.code'
+}
+
+Table branch_contacts {
+  id int [pk, increment]
+  branch_id int [not null, ref: > branches.id]
+  company_id int [not null, ref: > companies.id]
+  name varchar(150) [not null]
+  designation varchar(120)
+  department varchar(120)
+  email varchar(160)
+  phone varchar(20) [not null]
+  alternate_phone varchar(20)
+  is_primary boolean [not null, default: false]
+  notes text
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+}
+
+// --------------------------------- billing ----------------------------------
+
+Table company_subscriptions {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  plan_id int [not null, ref: > plans.id]
+  plan_snapshot json [note: 'plan terms frozen at activation so later plan edits do not rewrite history']
+  start_date date [not null]
+  end_date date [not null]
+  amount decimal(12,2) [not null, default: 0]
+  discount decimal(12,2) [not null, default: 0]
+  tax_amount decimal(12,2) [not null, default: 0]
+  total_amount decimal(12,2) [not null, default: 0]
+  currency varchar(10) [not null, default: 'INR']
+  credit_applied decimal(12,2) [not null, default: 0, note: 'unused value carried over from the term this one replaced']
+  is_trial boolean [not null, default: false]
+  auto_renew boolean [not null, default: false]
+  grace_days int [not null, default: 0, note: 'days of access after end_date before the sweeper closes the term']
+  change_type enum_subscription_change_type [not null, default: 'new', note: 'how this term began']
+  previous_subscription_id int [note: 'the term this one replaced; no FK, self-reference breaks sync ordering']
+  status enum_subscription_status [not null, default: 'active', note: 'at most one active or suspended row per company']
+  activated_at datetime
+  suspended_at datetime
+  cancelled_at datetime
+  ended_at datetime
+  remarks text
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    plan_id
+    status
+    end_date
+    start_date
+  }
+}
+
+// Append-only trail of every subscription transition. The subscription row says
+// where a company stands today; this says how it got there.
+Table subscription_events {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  subscription_id int [ref: > company_subscriptions.id]
+  type enum_subscription_event [not null]
+  from_status enum_subscription_status
+  to_status enum_subscription_status
+  from_plan_id int [ref: > plans.id]
+  to_plan_id int [ref: > plans.id]
+  amount decimal(12,2)
+  effective_at datetime [note: 'when the change takes effect, not always when it was recorded']
+  reason text
+  meta json [note: 'term dates, proration workings, sweeper marker']
+  actor_id int [note: 'null when the platform itself acted — the expiry sweeper']
+  actor_name varchar(150)
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    subscription_id
+    type
+    created_at
+  }
+}
+
+// A tenant asking to be moved onto another plan. Raising one writes nothing to
+// the subscription — a super admin approving it is what does, which is how a
+// company gets an "upgrade" button without being able to raise its own limits.
+Table plan_requests {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  requested_plan_id int [not null, ref: > plans.id]
+  current_plan_id int [ref: > plans.id, note: 'the plan they were on when they asked']
+  type enum_plan_request_type [not null, default: 'upgrade']
+  status enum_plan_request_status [not null, default: 'pending', note: 'one pending row per company at a time']
+  note text [note: 'what the tenant wrote when asking']
+  decision_note text [note: 'what the super admin wrote back']
+  requested_by_id int
+  requested_by_name varchar(150)
+  decided_by_id int
+  decided_by_name varchar(150)
+  decided_at datetime
+  resulting_subscription_id int [note: 'the term an approval produced']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    requested_plan_id
+    status
+    created_at
+  }
+}
+
+Table transactions {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  subscription_id int [ref: > company_subscriptions.id]
+  plan_id int [ref: > plans.id]
+  invoice_no varchar(50) [not null, note: 'INV-YYYY-000001, sequential per year']
+  amount decimal(12,2) [not null, default: 0]
+  discount decimal(12,2) [not null, default: 0]
+  tax_amount decimal(12,2) [not null, default: 0]
+  total_amount decimal(12,2) [not null, default: 0, note: 'amount - discount + tax']
+  currency varchar(10) [not null, default: 'INR']
+  payment_mode enum_payment_mode [not null, default: 'other']
+  payment_reference varchar(120)
+  status enum_transaction_status [not null, default: 'success']
+  paid_at datetime
+  remarks text
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+}
+
+// ------------------------------ tenant-side RBAC -----------------------------
+
+Table roles {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  name varchar(120) [not null]
+  slug varchar(120)
+  description text
+  is_system boolean [not null, default: false, note: '"Company Admin", created with the tenant; always full access']
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+}
+
+Table menus {
+  id int [pk, increment]
+  company_id int [ref: > companies.id, note: 'NULL = platform menu shared by every tenant']
+  parent_id int [ref: > menus.id]
+  name varchar(120) [not null]
+  slug varchar(120) [not null]
+  icon varchar(120)
+  route varchar(180)
+  sequence int [not null, default: 0]
+  is_system boolean [not null, default: false]
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+}
+
+Table role_permissions {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  role_id int [not null, ref: > roles.id]
+  menu_id int [not null, ref: > menus.id]
+  can_view boolean [not null, default: false]
+  can_create boolean [not null, default: false]
+  can_edit boolean [not null, default: false]
+  can_delete boolean [not null, default: false]
+  can_export boolean [not null, default: false]
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+}
+
+Table admins {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  branch_id int [ref: > branches.id, note: 'NULL = access to every branch']
+  role_id int [ref: > roles.id]
+  name varchar(150) [not null]
+  email varchar(160) [not null]
+  phone varchar(20)
+  password varchar(255) [not null, note: 'bcrypt']
+  avatar varchar(255)
+  is_company_admin boolean [not null, default: false, note: 'main admin auto-created with the company; cannot be deleted or disabled']
+  must_change_password boolean [not null, default: false]
+  last_login_at datetime
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+}
+
+// ---------------------------------- enums -----------------------------------
+
+Enum enum_status { active inactive }
+Enum enum_theme_mode { light dark }
+Enum enum_super_admin_role { super_admin staff }
+Enum enum_billing_cycle { monthly quarterly half_yearly yearly lifetime }
+// pending    queued ahead of time — starts on its own start date
+// active     running
+// suspended  paused; the term keeps its dates but access stops
+// expired    the term ran out
+// cancelled  ended early on purpose
+// superseded replaced mid-term by an upgrade or downgrade
+Enum enum_subscription_status { pending active suspended expired cancelled superseded }
+Enum enum_subscription_change_type { new renewal upgrade downgrade crossgrade reactivation trial }
+Enum enum_subscription_event {
+  created activated scheduled renewed
+  upgraded downgraded crossgraded
+  suspended resumed cancelled expired
+  reactivated superseded term_extended
+  auto_renew_on auto_renew_off payment_recorded
+}
+Enum enum_plan_request_status { pending approved rejected cancelled }
+Enum enum_plan_request_type { new upgrade downgrade renewal }
+Enum enum_transaction_status { pending success failed refunded }
+Enum enum_payment_mode { cash upi card net_banking cheque bank_transfer other }

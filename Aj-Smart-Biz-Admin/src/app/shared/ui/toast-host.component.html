@@ -1,0 +1,14 @@
+<div class="toast-host">
+  @for (toast of toastService.toasts(); track toast.id) {
+    <div class="toast toast-{{ toast.kind }}">
+      <span aria-hidden="true">{{ icon(toast.kind) }}</span>
+      <div class="grow">
+        <div class="strong">{{ toast.title }}</div>
+        @if (toast.detail) {
+          <div class="tiny muted">{{ toast.detail }}</div>
+        }
+      </div>
+      <button type="button" class="btn-link" (click)="toastService.dismiss(toast.id)" aria-label="Dismiss">✕</button>
+    </div>
+  }
+</div>

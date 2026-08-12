@@ -1,0 +1,617 @@
+@if (loading()) {
+  <div class="skeleton" style="height:520px"></div>
+} @else if (company(); as c) {
+  <app-page-header [title]="c.name" [subtitle]="c.code + ' · ' + c.email">
+    <a class="btn btn-ghost" routerLink="/companies">← All companies</a>
+    <a class="btn btn-ghost" [routerLink]="['/companies', c.id, 'edit']">Edit</a>
+    @if (c.activeSubscription; as active) {
+      <a class="btn btn-ghost" [routerLink]="['/subscriptions', active.id]">🗓️ Manage plan</a>
+    }
+    <button type="button" class="btn btn-primary" (click)="openPlanModal()">💳 Assign / renew plan</button>
+  </app-page-header>
+
+  <!-- Summary strip -->
+  <section class="grid grid-4" style="margin-bottom:20px">
+    <div class="card"><div class="card-body">
+      <div class="tiny muted">Status</div>
+      <div style="margin-top:6px"><app-status-badge [value]="c.status" /></div>
+    </div></div>
+    <div class="card"><div class="card-body">
+      <div class="tiny muted">Current plan</div>
+      <div class="strong" style="margin-top:6px;font-size:16px">
+        {{ c.activeSubscription?.plan?.name ?? c.activeSubscription?.planSnapshot?.name ?? 'No active plan' }}
+      </div>
+      @if (c.activeSubscription; as active) {
+        <!-- Live countdown to the end of the term, ticking off the server's reading. -->
+        <div style="margin-top:8px">
+          <app-plan-timer [timer]="active.timer" [live]="isLive(active)" [showBar]="false" />
+        </div>
+        <div class="tiny muted">ends {{ active.endDate | date: 'dd MMM yyyy' }}</div>
+      } @else {
+        <div class="tiny muted">Assign a plan to start the clock</div>
+      }
+    </div></div>
+    <div class="card"><div class="card-body">
+      <div class="tiny muted">Branches</div>
+      <div class="strong" style="margin-top:6px;font-size:20px">{{ c.summary?.totalBranches ?? 0 }}</div>
+      <div class="tiny muted">{{ c.summary?.activeBranches ?? 0 }} active · {{ c.summary?.totalAdmins ?? 0 }} admins</div>
+    </div></div>
+    <div class="card"><div class="card-body">
+      <div class="tiny muted">Lifetime paid</div>
+      <div class="strong" style="margin-top:6px;font-size:20px">{{ money(c.summary?.totalPaid ?? 0, c.currency) }}</div>
+      <div class="tiny muted">{{ c.summary?.transactionCount ?? 0 }} transactions</div>
+    </div></div>
+  </section>
+
+  <div class="card">
+    <div class="tabs">
+      <button type="button" [class.active]="tab() === 'overview'" (click)="tab.set('overview')">Overview</button>
+      <button type="button" [class.active]="tab() === 'branches'" (click)="tab.set('branches')">
+        Branches ({{ c.branches?.length ?? 0 }})
+      </button>
+      <button type="button" [class.active]="tab() === 'domains'" (click)="tab.set('domains')">
+        Domains ({{ domainCount() ?? c.domains?.length ?? 0 }})
+      </button>
+      <button type="button" [class.active]="tab() === 'billing'" (click)="tab.set('billing')">Plan &amp; transactions</button>
+      <button type="button" [class.active]="tab() === 'admins'" (click)="tab.set('admins')">
+        Admins ({{ c.admins?.length ?? 0 }})
+      </button>
+    </div>
+
+    <!-- ------------------------------ OVERVIEW ------------------------------ -->
+    @if (tab() === 'overview') {
+      <div class="card-body">
+        <dl class="dl">
+          <div class="dl-item"><dt>Legal name</dt><dd>{{ c.legalName || '—' }}</dd></div>
+          <div class="dl-item"><dt>Business type</dt><dd>{{ c.businessType?.name || '—' }}</dd></div>
+          <div class="dl-item"><dt>Theme</dt><dd>
+            @if (c.theme) {
+              <span class="row" style="gap:6px">
+                <span class="swatch" [style.background]="c.theme.primaryColor"></span>{{ c.theme.name }}
+              </span>
+            } @else { — }
+          </dd></div>
+          <div class="dl-item"><dt>Phone</dt><dd>{{ c.phone }}{{ c.alternatePhone ? ' / ' + c.alternatePhone : '' }}</dd></div>
+          <div class="dl-item"><dt>Website</dt><dd>
+            @if (c.website) { <a [href]="c.website" target="_blank" rel="noopener">{{ c.website }}</a> } @else { — }
+          </dd></div>
+          <div class="dl-item"><dt>GST / PAN</dt><dd>{{ c.gstNumber || '—' }} / {{ c.panNumber || '—' }}</dd></div>
+          <div class="dl-item"><dt>Address</dt><dd>{{ addressOf(c) }}</dd></div>
+          <div class="dl-item"><dt>State</dt><dd>{{ c.state?.name || '—' }}</dd></div>
+          <div class="dl-item"><dt>Currency / timezone</dt><dd>{{ c.currency }} · {{ c.timezone }}</dd></div>
+          <div class="dl-item"><dt>Created</dt><dd>{{ c.createdAt | date: 'dd MMM yyyy, HH:mm' }}</dd></div>
+        </dl>
+      </div>
+    }
+
+    <!-- ------------------------------ BRANCHES ------------------------------ -->
+    @if (tab() === 'branches') {
+      <div class="card-head">
+        <h3>Branches</h3>
+        <div class="row" style="gap:10px;align-items:center">
+          @if (branchLimit(); as limit) {
+            @if (!limit.unlimited) {
+              <span class="tiny muted nowrap">{{ limit.used }} / {{ limit.limit }} used</span>
+            }
+          }
+          <!-- Off once the plan has no room; the reason sits on the button and in the bar below. -->
+          <button
+            type="button"
+            class="btn btn-sm btn-primary"
+            [disabled]="!canAddBranch()"
+            [title]="canAddBranch() ? 'Add a branch' : (branchLimit()?.message ?? '')"
+            (click)="openBranchModal(null)"
+          >
+            ＋ Add branch
+          </button>
+        </div>
+      </div>
+      <div class="card-body tight">
+        <div style="padding:14px 16px 0">
+          <app-limit-notice
+            [line]="branchLimit()"
+            resource="branch"
+            actionLabel="Change plan"
+            (action)="tab.set('billing')"
+          />
+        </div>
+        @if (!c.branches?.length) {
+          <div class="empty"><div class="empty-icon">🏬</div><div>No branches yet</div></div>
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>Branch</th><th>Contact</th><th>Location</th><th>Contacts</th><th>Status</th><th class="text-right">Actions</th></tr>
+              </thead>
+              <tbody>
+                @for (branch of c.branches; track branch.id) {
+                  <tr>
+                    <td>
+                      <span class="strong">{{ branch.name }}</span>
+                      @if (branch.isMain) {
+                        <span class="badge badge-info" style="margin-left:6px">Head office</span>
+                      }
+                      <div class="tiny muted">{{ branch.code }}</div>
+                    </td>
+                    <td class="tiny">
+                      <div>{{ branch.phone || '—' }}</div>
+                      <div class="muted">{{ branch.email || '—' }}</div>
+                    </td>
+                    <td class="tiny muted">{{ branch.city || '—' }}{{ branch.state?.name ? ', ' + branch.state?.name : '' }}</td>
+                    <td class="tiny muted">{{ branch.contacts?.length ?? 0 }} contact(s)</td>
+                    <td><app-status-badge [value]="branch.status" /></td>
+                    <td>
+                      <div class="row-end">
+                        <button type="button" class="btn btn-sm btn-ghost" (click)="openBranchModal(branch)">Edit</button>
+                        <button type="button" class="btn btn-sm btn-danger" [disabled]="branch.isMain" (click)="removeBranch(branch)">
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- ------------------------------- DOMAINS ------------------------------ -->
+    @if (tab() === 'domains') {
+      <app-domain-manager
+        [basePath]="'/companies/' + c.id + '/domains'"
+        [branches]="branchOptions()"
+        (countChange)="domainCount.set($event)"
+      />
+    }
+
+    <!-- ------------------------------ BILLING ------------------------------- -->
+    @if (tab() === 'billing') {
+      <!-- The plan the company is living on, and the switch that turns it off. -->
+      <div class="card-body" style="border-bottom:1px solid var(--border)">
+        @if (c.activeSubscription; as active) {
+          <div class="plan-panel">
+            <div class="plan-facts">
+              <div class="plan-fact">
+                <div class="tiny muted">Current plan</div>
+                <div class="plan-fact-value">{{ active.plan?.name ?? active.planSnapshot?.name ?? '—' }}</div>
+                <div class="tiny muted">{{ active.plan?.billingCycle ?? active.planSnapshot?.billingCycle }}</div>
+              </div>
+              <div class="plan-fact">
+                <div class="tiny muted">Term</div>
+                <div class="plan-fact-value">{{ active.startDate | date: 'dd MMM yyyy' }}</div>
+                <div class="tiny muted">to {{ active.endDate | date: 'dd MMM yyyy' }}</div>
+              </div>
+              <div class="plan-fact">
+                <div class="tiny muted">Expires in</div>
+                <div style="margin-top:3px">
+                  <app-plan-timer [timer]="active.timer" [live]="isLive(active)" [showBar]="false" />
+                </div>
+              </div>
+              <div class="plan-fact">
+                <div class="tiny muted">Term value</div>
+                <div class="plan-fact-value">{{ money(active.totalAmount, active.currency) }}</div>
+                <div class="tiny muted">auto renew {{ active.autoRenew ? 'on' : 'off' }}</div>
+              </div>
+            </div>
+
+            <div style="text-align:right">
+              <div class="tiny muted">Plan status</div>
+              <div class="row" style="gap:10px;justify-content:flex-end;margin-top:6px">
+                <label
+                  class="switch"
+                  [title]="active.status === 'active' ? 'Deactivate the plan for this company' : 'Reactivate the plan'"
+                >
+                  <input
+                    type="checkbox"
+                    [checked]="active.status === 'active'"
+                    (change)="setPlanActive(active, active.status !== 'active')"
+                  />
+                  <span class="slider"></span>
+                </label>
+                <app-status-badge [value]="active.status" />
+              </div>
+              <p class="tiny muted" style="margin:8px 0 0;max-width:260px">
+                Switching a plan off suspends access without touching the term's dates or money. The company can be
+                switched back on at any time.
+              </p>
+              <div class="row" style="gap:8px;justify-content:flex-end;margin-top:10px">
+                <a class="btn btn-sm btn-ghost" [routerLink]="['/subscriptions', active.id]">All plan actions →</a>
+              </div>
+            </div>
+          </div>
+        } @else {
+          <div class="row-between" style="flex-wrap:wrap;gap:12px">
+            <div>
+              <span class="badge badge-warning">No active plan</span>
+              <div class="tiny muted" style="margin-top:6px">
+                This company has no plan running. Assign one to activate it — the term starts today unless you pick a
+                later start date.
+              </div>
+            </div>
+            <button type="button" class="btn btn-primary" (click)="openPlanModal()">＋ Assign &amp; activate a plan</button>
+          </div>
+        }
+      </div>
+
+      <!-- A queued renewal is the thing most likely to be asked about, so it leads. -->
+      @if (c.scheduledSubscription; as queued) {
+        <div class="card-body" style="border-bottom:1px solid var(--border)">
+          <div class="row-between" style="flex-wrap:wrap;gap:12px">
+            <div>
+              <span class="badge badge-info">Scheduled renewal</span>
+              <div class="strong" style="margin-top:6px">
+                {{ queued.plan?.name ?? queued.planSnapshot?.name }} · {{ money(queued.totalAmount, queued.currency) }}
+              </div>
+              <div class="tiny muted">
+                Starts {{ queued.startDate | date: 'dd MMM yyyy' }} and runs to
+                {{ queued.endDate | date: 'dd MMM yyyy' }}. It switches on by itself — nothing to do.
+              </div>
+            </div>
+            <div class="row" style="gap:8px">
+              <button type="button" class="btn btn-sm btn-ghost" (click)="startScheduled(queued.id)">▶️ Start now</button>
+              <a class="btn btn-sm btn-ghost" [routerLink]="['/subscriptions', queued.id]">Details</a>
+            </div>
+          </div>
+        </div>
+      }
+
+      <div class="card-head">
+        <h3>Subscription history</h3>
+        <a class="btn btn-sm btn-ghost" routerLink="/subscriptions">Open plan console →</a>
+      </div>
+      <div class="card-body tight">
+        @if (!c.subscriptions?.length) {
+          <div class="empty"><div class="empty-icon">💳</div><div>No plan has been assigned yet</div></div>
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Plan</th><th>Period</th><th>Expires in</th>
+                  <th class="text-right">Total</th><th>Auto renew</th><th>Status</th><th class="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (sub of c.subscriptions; track sub.id) {
+                  <tr>
+                    <td>
+                      <span class="strong">{{ sub.plan?.name ?? sub.planSnapshot?.name ?? '—' }}</span>
+                      @if (sub.changeType && sub.changeType !== 'new') {
+                        <div class="tiny muted">{{ sub.changeType }}</div>
+                      }
+                    </td>
+                    <td class="tiny muted nowrap">
+                      {{ sub.startDate | date: 'dd MMM yyyy' }} → {{ sub.endDate | date: 'dd MMM yyyy' }}
+                    </td>
+                    <td>
+                      <app-plan-timer [timer]="sub.timer" [live]="isLive(sub)" [showBar]="false" [showMeta]="false" />
+                    </td>
+                    <td class="text-right strong nowrap">{{ money(sub.totalAmount, sub.currency) }}</td>
+                    <td>
+                      @if (isLive(sub)) {
+                        <button type="button" class="btn btn-sm btn-ghost" (click)="toggleAutoRenew(sub)">
+                          {{ sub.autoRenew ? 'On' : 'Off' }}
+                        </button>
+                      } @else {
+                        <span class="tiny muted">{{ sub.autoRenew ? 'Yes' : 'No' }}</span>
+                      }
+                    </td>
+                    <td><app-status-badge [value]="sub.status" /></td>
+                    <td>
+                      <!-- Only the moves the API will accept from this status. -->
+                      <div class="row-end">
+                        <a class="btn btn-sm btn-ghost" [routerLink]="['/subscriptions', sub.id]">Details</a>
+                        @if (can(sub, 'active') && sub.status === 'suspended') {
+                          <button type="button" class="btn btn-sm btn-ghost" (click)="resumeSubscription(sub.id)">Resume</button>
+                        } @else if (can(sub, 'suspended')) {
+                          <button type="button" class="btn btn-sm btn-ghost" (click)="suspendSubscription(sub.id)">Suspend</button>
+                        }
+                        @if (can(sub, 'cancelled')) {
+                          <button type="button" class="btn btn-sm btn-danger" (click)="cancelSubscription(sub.id)">Cancel</button>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+
+      <div class="card-head" style="border-top:1px solid var(--border)">
+        <h3>Transactions</h3>
+        <button type="button" class="btn btn-sm btn-ghost" (click)="openPaymentModal()">＋ Record payment</button>
+      </div>
+      <div class="card-body tight">
+        @if (!c.transactions?.length) {
+          <div class="empty"><div class="empty-icon">🧾</div><div>No transactions recorded</div></div>
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>Invoice</th><th>Plan</th><th>Paid on</th><th>Mode</th><th class="text-right">Amount</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                @for (txn of c.transactions; track txn.id) {
+                  <tr>
+                    <td class="strong">{{ txn.invoiceNo }}</td>
+                    <td class="muted">{{ txn.plan?.name || '—' }}</td>
+                    <td class="tiny muted nowrap">{{ txn.paidAt | date: 'dd MMM yyyy' }}</td>
+                    <td class="tiny muted">{{ modeLabel(txn.paymentMode) }}</td>
+                    <td class="text-right nowrap">
+                      <span class="strong">{{ money(txn.totalAmount, txn.currency) }}</span>
+                      @if (+txn.discount > 0 || +txn.taxAmount > 0) {
+                        <div class="tiny muted">
+                          base {{ money(txn.amount, txn.currency) }}
+                          @if (+txn.discount > 0) { · −{{ money(txn.discount, txn.currency) }} }
+                          @if (+txn.taxAmount > 0) { · +{{ money(txn.taxAmount, txn.currency) }} tax }
+                        </div>
+                      }
+                    </td>
+                    <td><app-status-badge [value]="txn.status" /></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- ------------------------------- ADMINS ------------------------------- -->
+    @if (tab() === 'admins') {
+      <div class="card-body tight">
+        @if (!c.admins?.length) {
+          <div class="empty"><div class="empty-icon">👥</div><div>No admins yet</div></div>
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>Admin</th><th>Email</th><th>Role</th><th>Last login</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                @for (admin of c.admins; track admin.id) {
+                  <tr>
+                    <td>
+                      <div class="row">
+                        <span class="avatar">{{ initialsOf(admin.name) }}</span>
+                        <div>
+                          <span class="strong">{{ admin.name }}</span>
+                          @if (admin.isCompanyAdmin) {
+                            <span class="badge badge-info" style="margin-left:6px">Main admin</span>
+                          }
+                          <div class="tiny muted">{{ admin.phone || '—' }}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="muted">{{ admin.email }}</td>
+                    <td class="muted">{{ admin.role?.name || '—' }}</td>
+                    <td class="tiny muted nowrap">{{ admin.lastLoginAt ? (admin.lastLoginAt | date: 'dd MMM yyyy, HH:mm') : 'Never' }}</td>
+                    <td><app-status-badge [value]="admin.status" /></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <p class="tiny muted" style="padding:12px 16px;margin:0">
+            Admins are managed by the company itself from the Aj-Smart-Biz-Admin portal.
+          </p>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- ------------------------------ MODALS ------------------------------ -->
+  @if (branchModalOpen()) {
+    <app-modal
+      [title]="editingBranch() ? 'Edit branch' : 'Add branch'"
+      [closeOnBackdrop]="false"
+      (closed)="branchModalOpen.set(false)"
+    >
+      <form [formGroup]="branchForm" (ngSubmit)="saveBranch()" id="branch-form">
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="bname">Branch name <span class="req">*</span></label>
+            <input id="bname" class="input" formControlName="name" placeholder="Ring Road Branch" />
+            <app-field-error [control]="branchForm.controls.name" label="Branch name" />
+          </div>
+          <div class="field">
+            <label for="bcode">Branch code</label>
+            <input id="bcode" class="input" formControlName="code" placeholder="Auto-generated" />
+          </div>
+        </div>
+        <div class="grid grid-3">
+          <div class="field">
+            <label for="bphone">Phone</label>
+            <input id="bphone" class="input" formControlName="phone" />
+          </div>
+          <div class="field">
+            <label for="bemail">Email</label>
+            <input id="bemail" class="input" type="email" formControlName="email" />
+            <app-field-error [control]="branchForm.controls.email" label="Email" />
+          </div>
+          <div class="field">
+            <label for="bgst">GST number</label>
+            <input id="bgst" class="input" formControlName="gstNumber" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="baddr">Address</label>
+          <input id="baddr" class="input" formControlName="addressLine1" />
+        </div>
+        <div class="grid grid-3">
+          <div class="field">
+            <label for="bstate">State</label>
+            <select id="bstate" class="select" formControlName="stateId">
+              <option [ngValue]="null">Select…</option>
+              @for (option of states(); track option.id) {
+                <option [ngValue]="option.id">{{ option.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="field">
+            <label for="bcity">City</label>
+            <input id="bcity" class="input" formControlName="city" />
+          </div>
+          <div class="field">
+            <label for="bpin">Pincode</label>
+            <input id="bpin" class="input" formControlName="pincode" />
+          </div>
+        </div>
+        <div class="field" style="max-width:220px">
+          <label for="bstatus">Status</label>
+          <select id="bstatus" class="select" formControlName="status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </form>
+
+      <ng-container footer>
+        <button type="button" class="btn btn-ghost" (click)="branchModalOpen.set(false)">Cancel</button>
+        <button type="submit" form="branch-form" class="btn btn-primary" [disabled]="savingBranch()">
+          {{ savingBranch() ? 'Saving…' : editingBranch() ? 'Save changes' : 'Add branch' }}
+        </button>
+      </ng-container>
+    </app-modal>
+  }
+
+  @if (planModalOpen()) {
+    <app-modal title="Assign or renew plan" [subtitle]="c.name" [closeOnBackdrop]="false" (closed)="planModalOpen.set(false)">
+      <form [formGroup]="planForm" (ngSubmit)="assignPlan()" id="plan-assign-form">
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="pplan">Plan <span class="req">*</span></label>
+            <select id="pplan" class="select" formControlName="planId" (change)="syncAmountToPlan()">
+              <option [ngValue]="null">Select a plan…</option>
+              @for (plan of plans(); track plan.id) {
+                <option [ngValue]="plan.id">{{ plan.name }} — {{ money(plan.discountPrice ?? plan.price, plan.currency) }}</option>
+              }
+            </select>
+            <app-field-error [control]="planForm.controls.planId" label="Plan" />
+          </div>
+          <div class="field">
+            <label for="pstart">Start date</label>
+            <input id="pstart" class="input" type="date" formControlName="startDate" />
+            <span class="hint">Defaults to today</span>
+          </div>
+        </div>
+        <div class="grid grid-4">
+          <div class="field">
+            <label for="pamount">Amount</label>
+            <input id="pamount" class="input" type="number" min="0" step="0.01" formControlName="amount" />
+          </div>
+          <div class="field">
+            <label for="pdiscount">Discount</label>
+            <input id="pdiscount" class="input" type="number" min="0" step="0.01" formControlName="discount" />
+          </div>
+          <div class="field">
+            <label for="ptax">Tax</label>
+            <input id="ptax" class="input" type="number" min="0" step="0.01" formControlName="taxAmount" />
+          </div>
+          <div class="field">
+            <label for="pgrace">Grace days</label>
+            <input id="pgrace" class="input" type="number" min="0" max="90" formControlName="graceDays" />
+            <span class="hint">Access after the end date</span>
+          </div>
+        </div>
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="pmode">Record payment as</label>
+            <select id="pmode" class="select" formControlName="paymentMode">
+              <option value="">Do not record a payment</option>
+              <option value="cash">Cash</option>
+              <option value="upi">UPI</option>
+              <option value="card">Card</option>
+              <option value="net_banking">Net banking</option>
+              <option value="cheque">Cheque</option>
+              <option value="bank_transfer">Bank transfer</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="pref">Payment reference</label>
+            <input id="pref" class="input" formControlName="paymentReference" />
+          </div>
+        </div>
+        <label class="check">
+          <input type="checkbox" formControlName="autoRenew" />
+          Renew automatically at the end of the term
+        </label>
+        <p class="tiny muted" style="margin:12px 0 0">
+          Assigning a plan expires the currently running subscription.
+        </p>
+      </form>
+
+      <ng-container footer>
+        <button type="button" class="btn btn-ghost" (click)="planModalOpen.set(false)">Cancel</button>
+        <button type="submit" form="plan-assign-form" class="btn btn-primary" [disabled]="savingPlan()">
+          {{ savingPlan() ? 'Saving…' : 'Activate plan' }}
+        </button>
+      </ng-container>
+    </app-modal>
+  }
+
+  @if (paymentModalOpen()) {
+    <app-modal title="Record payment" [subtitle]="c.name" size="sm" [closeOnBackdrop]="false" (closed)="paymentModalOpen.set(false)">
+      <form [formGroup]="paymentForm" (ngSubmit)="savePayment()" id="payment-form">
+        <div class="field">
+          <label for="tamount">Amount <span class="req">*</span></label>
+          <input id="tamount" class="input" type="number" min="0" step="0.01" formControlName="amount" />
+          <app-field-error [control]="paymentForm.controls.amount" label="Amount" />
+        </div>
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="tdiscount">Discount</label>
+            <input id="tdiscount" class="input" type="number" min="0" step="0.01" formControlName="discount" />
+          </div>
+          <div class="field">
+            <label for="ttax">Tax</label>
+            <input id="ttax" class="input" type="number" min="0" step="0.01" formControlName="taxAmount" />
+          </div>
+        </div>
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="tmode">Payment mode</label>
+            <select id="tmode" class="select" formControlName="paymentMode">
+              <option value="cash">Cash</option>
+              <option value="upi">UPI</option>
+              <option value="card">Card</option>
+              <option value="net_banking">Net banking</option>
+              <option value="cheque">Cheque</option>
+              <option value="bank_transfer">Bank transfer</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="tstatus">Status</label>
+            <select id="tstatus" class="select" formControlName="status">
+              <option value="success">Success</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed</option>
+              <option value="refunded">Refunded</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="tref">Reference</label>
+          <input id="tref" class="input" formControlName="paymentReference" />
+        </div>
+        <div class="field">
+          <label for="tremarks">Remarks</label>
+          <textarea id="tremarks" class="textarea" formControlName="remarks"></textarea>
+        </div>
+      </form>
+
+      <ng-container footer>
+        <button type="button" class="btn btn-ghost" (click)="paymentModalOpen.set(false)">Cancel</button>
+        <button type="submit" form="payment-form" class="btn btn-primary" [disabled]="savingPayment()">
+          {{ savingPayment() ? 'Saving…' : 'Record payment' }}
+        </button>
+      </ng-container>
+    </app-modal>
+  }
+}

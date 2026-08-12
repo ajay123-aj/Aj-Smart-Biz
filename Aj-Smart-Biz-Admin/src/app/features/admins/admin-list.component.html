@@ -1,0 +1,239 @@
+<app-page-header title="Admin Management" subtitle="People who can sign in to your company workspace">
+  @if (adminLimit(); as limit) {
+    @if (!limit.unlimited) {
+      <span class="tiny muted nowrap" style="align-self:center">{{ limit.used }} / {{ limit.limit }} admins used</span>
+    }
+  }
+  <!-- Disabled, with the reason on the button, once the plan has no room left. -->
+  <button
+    type="button"
+    class="btn btn-primary"
+    *appCan="'admin-management'; action: 'canCreate'"
+    [disabled]="!canAddAdmin()"
+    [title]="canAddAdmin() ? 'Add an admin' : (adminLimit()?.message ?? '')"
+    (click)="openModal(null)"
+  >
+    ＋ Add admin
+  </button>
+</app-page-header>
+
+<!-- Says why the button is off, and offers the one thing that fixes it. -->
+<app-limit-notice [line]="adminLimit()" resource="admin" />
+
+<div class="card">
+  <div class="card-head">
+    <input class="input" style="max-width:260px" type="search" placeholder="Search name, email or phone…" (input)="onSearch($event)" />
+
+    <select class="select" style="width:auto" (change)="store.patch({ roleId: selectValue($event) })">
+      <option value="">All roles</option>
+      @for (role of roles(); track role.id) {
+        <option [value]="role.id">{{ role.name }}</option>
+      }
+    </select>
+
+    <select class="select" style="width:auto" (change)="store.patch({ branchId: selectValue($event) })">
+      <option value="">All branches</option>
+      @for (branch of branches(); track branch.id) {
+        <option [value]="branch.id">{{ branch.name }}</option>
+      }
+    </select>
+
+    <select class="select" style="width:auto" (change)="store.patch({ status: selectValue($event) })">
+      <option value="">All statuses</option>
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+  </div>
+
+  <div class="card-body tight">
+    <app-table-state
+      [loading]="store.loading()"
+      [empty]="!store.loading() && store.items().length === 0"
+      icon="👥"
+      title="No admins found"
+      message="Add a teammate and assign them a role to control what they can access."
+    />
+
+    @if (!store.loading() && store.items().length > 0) {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th class="sortable" (click)="store.toggleSort('name')">Admin{{ store.sortIcon('name') }}</th>
+              <th class="sortable" (click)="store.toggleSort('email')">Email{{ store.sortIcon('email') }}</th>
+              <th>Role</th>
+              <th>Branch</th>
+              <th>Last login</th>
+              <th>Status</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of store.items(); track row.id) {
+              <tr>
+                <td>
+                  <div class="row">
+                    <span class="avatar">{{ initialsOf(row.name) }}</span>
+                    <div>
+                      <span class="strong">{{ row.name }}</span>
+                      @if (row.isCompanyAdmin) {
+                        <span class="badge badge-info" style="margin-left:6px">Main admin</span>
+                      }
+                      @if (row.id === auth.user()?.id) {
+                        <span class="badge badge-muted" style="margin-left:4px">You</span>
+                      }
+                      <div class="tiny muted">{{ row.phone || '—' }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="muted">{{ row.email }}</td>
+                <td class="muted">{{ row.role?.name || '—' }}</td>
+                <td class="muted">{{ row.branch?.name || 'All branches' }}</td>
+                <td class="tiny muted nowrap">{{ row.lastLoginAt ? (row.lastLoginAt | date: 'dd MMM yyyy, HH:mm') : 'Never' }}</td>
+                <td><app-status-badge [value]="row.status" /></td>
+                <td>
+                  <div class="row-end">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-ghost"
+                      [disabled]="row.isCompanyAdmin || row.id === auth.user()?.id"
+                      (click)="toggleStatus(row)"
+                      *appCan="'admin-management'; action: 'canEdit'"
+                    >
+                      {{ row.status === 'active' ? 'Deactivate' : 'Activate' }}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="openReset(row)" *appCan="'admin-management'; action: 'canEdit'">
+                      Reset password
+                    </button>
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="openModal(row)" *appCan="'admin-management'; action: 'canEdit'">
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-danger"
+                      [disabled]="row.isCompanyAdmin || row.id === auth.user()?.id"
+                      (click)="remove(row)"
+                      *appCan="'admin-management'; action: 'canDelete'"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pager [meta]="store.meta()" (pageChange)="store.setPage($event)" (limitChange)="store.setLimit($event)" />
+    }
+  </div>
+</div>
+
+@if (modalOpen()) {
+  <app-modal [title]="editing() ? 'Edit admin' : 'Add admin'" size="sm" [closeOnBackdrop]="false" (closed)="modalOpen.set(false)">
+    <form [formGroup]="form" (ngSubmit)="save()" id="admin-form">
+      <div class="field">
+        <label for="name">Full name <span class="req">*</span></label>
+        <input id="name" class="input" formControlName="name" placeholder="Ramesh Patel" />
+        <app-field-error [control]="form.controls.name" label="Full name" />
+      </div>
+      <div class="field">
+        <label for="email">Login email <span class="req">*</span></label>
+        <input id="email" class="input" type="email" formControlName="email" />
+        <app-field-error [control]="form.controls.email" label="Login email" />
+      </div>
+      <div class="field">
+        <label for="phone">Phone</label>
+        <input id="phone" class="input" formControlName="phone" />
+      </div>
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="roleId">Role <span class="req">*</span></label>
+          <select id="roleId" class="select" formControlName="roleId">
+            <option [ngValue]="null">Select a role…</option>
+            @for (role of assignableRoles(); track role.id) {
+              <option [ngValue]="role.id">{{ role.name }}</option>
+            }
+          </select>
+          <app-field-error [control]="form.controls.roleId" label="Role" />
+        </div>
+        <div class="field">
+          <label for="branchId">Branch</label>
+          <select id="branchId" class="select" formControlName="branchId">
+            <option [ngValue]="null">All branches</option>
+            @for (branch of branches(); track branch.id) {
+              <option [ngValue]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      @if (!editing()) {
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" class="input" type="text" formControlName="password" autocomplete="new-password" />
+          <span class="hint">Leave blank to have one generated and shown once.</span>
+          <app-field-error [control]="form.controls.password" label="Password" />
+        </div>
+      } @else {
+        <div class="field" style="max-width:220px">
+          <label for="status">Status</label>
+          <select id="status" class="select" formControlName="status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      }
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+      <button type="submit" form="admin-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Create admin' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}
+
+@if (generated(); as creds) {
+  <app-modal
+    title="Admin created"
+    subtitle="Share these credentials — the password is shown only once"
+    size="sm"
+    [closeOnBackdrop]="false"
+    (closed)="generated.set(null)"
+  >
+    <div class="dl">
+      <div class="dl-item"><dt>Name</dt><dd>{{ creds.name }}</dd></div>
+      <div class="dl-item"><dt>Email</dt><dd>{{ creds.email }}</dd></div>
+      <div class="dl-item"><dt>Password</dt><dd><code>{{ creds.password }}</code></dd></div>
+    </div>
+    <p class="tiny muted" style="margin-top:14px">They will be asked to change it on first sign in.</p>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="copy(creds)">Copy</button>
+      <button type="button" class="btn btn-primary" (click)="generated.set(null)">Done</button>
+    </ng-container>
+  </app-modal>
+}
+
+@if (resetTarget(); as target) {
+  <app-modal title="Reset password" [subtitle]="target.name" size="sm" [closeOnBackdrop]="false" (closed)="resetTarget.set(null)">
+    <form [formGroup]="resetForm" (ngSubmit)="submitReset()" id="reset-form">
+      <div class="field">
+        <label for="newPassword">New password <span class="req">*</span></label>
+        <input id="newPassword" class="input" type="text" formControlName="newPassword" autocomplete="new-password" />
+        <span class="hint">Min 8 characters with an uppercase, a lowercase and a number.</span>
+        <app-field-error [control]="resetForm.controls.newPassword" label="New password" />
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="resetTarget.set(null)">Cancel</button>
+      <button type="submit" form="reset-form" class="btn btn-primary" [disabled]="resetting()">
+        {{ resetting() ? 'Saving…' : 'Reset password' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

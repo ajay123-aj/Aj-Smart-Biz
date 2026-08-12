@@ -1,0 +1,19 @@
+<div class="modal-backdrop" (click)="onBackdrop()">
+  <div class="modal modal-{{ size() }}" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <div>
+        <h3>{{ title() }}</h3>
+        @if (subtitle()) {
+          <div class="tiny muted">{{ subtitle() }}</div>
+        }
+      </div>
+      <button type="button" class="btn btn-icon btn-ghost" (click)="closed.emit()" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <ng-content />
+    </div>
+    <div class="modal-foot">
+      <ng-content select="[footer]" />
+    </div>
+  </div>
+</div>

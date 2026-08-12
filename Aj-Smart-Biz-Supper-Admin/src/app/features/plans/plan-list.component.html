@@ -1,0 +1,204 @@
+<app-page-header title="Plan Management" subtitle="Subscription plans companies can be placed on">
+  <button type="button" class="btn btn-primary" (click)="page.openCreate()">＋ Add plan</button>
+</app-page-header>
+
+<div class="card">
+  <div class="card-head">
+    <input class="input" style="max-width:280px" type="search" placeholder="Search plan name or code…" (input)="page.onSearch($event)" />
+    <select class="select" style="width:auto" (change)="page.onStatus($event)">
+      <option value="">All statuses</option>
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+  </div>
+
+  <div class="card-body tight">
+    <app-table-state
+      [loading]="page.store.loading()"
+      [empty]="!page.store.loading() && page.store.items().length === 0"
+      icon="💳"
+      title="No plans yet"
+      message="Create the first subscription plan to start onboarding companies."
+    />
+
+    @if (!page.store.loading() && page.store.items().length > 0) {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th class="sortable" (click)="page.store.toggleSort('name')">Plan{{ page.store.sortIcon('name') }}</th>
+              <th class="sortable text-right" (click)="page.store.toggleSort('price')">Price{{ page.store.sortIcon('price') }}</th>
+              <th>Billing</th>
+              <th>Limits</th>
+              <th class="text-right">Companies</th>
+              <th>Status</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of page.store.items(); track row.id) {
+              <tr>
+                <td>
+                  <span class="strong">{{ row.name }}</span>
+                  @if (row.isPopular) {
+                    <span class="badge badge-warning" style="margin-left:6px">Popular</span>
+                  }
+                  @if (row.description) {
+                    <div class="tiny muted">{{ row.description }}</div>
+                  }
+                </td>
+                <td class="text-right nowrap">
+                  <span class="strong">{{ money(row.discountPrice ?? row.price, row.currency) }}</span>
+                  @if (row.discountPrice) {
+                    <div class="tiny muted"><s>{{ money(row.price, row.currency) }}</s></div>
+                  }
+                </td>
+                <td class="muted nowrap">
+                  {{ cycleLabel(row.billingCycle) }}
+                  @if (row.trialDays > 0) {
+                    <div class="tiny">{{ row.trialDays }}-day trial</div>
+                  }
+                </td>
+                <td class="tiny muted nowrap">
+                  {{ row.maxBranches }} branches · {{ row.maxAdmins }} admins<br />
+                  {{ row.maxUsers }} users · {{ row.storageMb }} MB
+                </td>
+                <!-- What this plan is actually carrying today; deleting is blocked while it is in use. -->
+                <td class="text-right nowrap">
+                  <span class="strong">{{ row.usage?.companies ?? 0 }}</span>
+                  @if (row.usage?.expiringSoon) {
+                    <div class="tiny" style="color:var(--warning)">{{ row.usage?.expiringSoon }} expiring</div>
+                  }
+                </td>
+                <td>
+                  <!-- Status switch: flips the plan between active and inactive -->
+                  <label class="switch" [title]="row.status === 'active' ? 'Deactivate plan' : 'Activate plan'">
+                    <input type="checkbox" [checked]="row.status === 'active'" (change)="page.toggleStatus(row)" />
+                    <span class="slider"></span>
+                  </label>
+                  <app-status-badge [value]="row.status" />
+                </td>
+                <td>
+                  <div class="row-end">
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="page.openEdit(row)">Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" (click)="page.remove(row)">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pager [meta]="page.store.meta()" (pageChange)="page.store.setPage($event)" (limitChange)="page.store.setLimit($event)" />
+    }
+  </div>
+</div>
+
+@if (page.modalOpen()) {
+  <app-modal [title]="page.editing() ? 'Edit plan' : 'Add plan'" size="lg" [closeOnBackdrop]="false" (closed)="page.closeModal()">
+    <form [formGroup]="form" (ngSubmit)="page.save()" id="plan-form">
+      <div class="grid grid-3">
+        <div class="field">
+          <label for="name">Plan name <span class="req">*</span></label>
+          <input id="name" class="input" formControlName="name" placeholder="Starter" />
+          <app-field-error [control]="form.controls.name" label="Plan name" />
+        </div>
+        <div class="field">
+          <label for="code">Code</label>
+          <input id="code" class="input" formControlName="code" placeholder="starter" />
+        </div>
+        <div class="field">
+          <label for="currency">Currency</label>
+          <input id="currency" class="input" formControlName="currency" placeholder="INR" />
+        </div>
+      </div>
+
+      <div class="grid grid-4">
+        <div class="field">
+          <label for="price">Price <span class="req">*</span></label>
+          <input id="price" class="input" type="number" min="0" step="0.01" formControlName="price" />
+          <app-field-error [control]="form.controls.price" label="Price" />
+        </div>
+        <div class="field">
+          <label for="discountPrice">Discounted price</label>
+          <input id="discountPrice" class="input" type="number" min="0" step="0.01" formControlName="discountPrice" />
+          <span class="hint">Leave empty when there is no offer</span>
+        </div>
+        <div class="field">
+          <label for="billingCycle">Billing cycle</label>
+          <select id="billingCycle" class="select" formControlName="billingCycle">
+            @for (cycle of cycles; track cycle.value) {
+              <option [value]="cycle.value">{{ cycle.label }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label for="durationDays">Custom duration (days)</label>
+          <input id="durationDays" class="input" type="number" min="1" formControlName="durationDays" />
+          <span class="hint">Overrides the cycle length</span>
+        </div>
+      </div>
+
+      <div class="grid grid-4">
+        <div class="field">
+          <label for="trialDays">Trial days</label>
+          <input id="trialDays" class="input" type="number" min="0" formControlName="trialDays" />
+        </div>
+        <div class="field">
+          <label for="maxBranches">Max branches</label>
+          <input id="maxBranches" class="input" type="number" min="1" formControlName="maxBranches" />
+        </div>
+        <div class="field">
+          <label for="maxAdmins">Max admins</label>
+          <input id="maxAdmins" class="input" type="number" min="1" formControlName="maxAdmins" />
+        </div>
+        <div class="field">
+          <label for="maxUsers">Max users</label>
+          <input id="maxUsers" class="input" type="number" min="1" formControlName="maxUsers" />
+        </div>
+      </div>
+
+      <div class="grid grid-3">
+        <div class="field">
+          <label for="storageMb">Storage (MB)</label>
+          <input id="storageMb" class="input" type="number" min="1" formControlName="storageMb" />
+        </div>
+        <div class="field">
+          <label for="sequence">Display order</label>
+          <input id="sequence" class="input" type="number" formControlName="sequence" />
+        </div>
+        <div class="field">
+          <label for="status">Status</label>
+          <select id="status" class="select" formControlName="status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="description">Description</label>
+        <textarea id="description" class="textarea" formControlName="description" placeholder="Everything a single-branch shop needs"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="features">Features</label>
+        <textarea id="features" class="textarea" formControlName="features" placeholder="GST billing&#10;WhatsApp alerts&#10;Daily backups"></textarea>
+        <span class="hint">One feature per line</span>
+      </div>
+
+      <label class="check">
+        <input type="checkbox" formControlName="isPopular" />
+        Highlight this plan as most popular
+      </label>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="page.closeModal()">Cancel</button>
+      <button type="submit" form="plan-form" class="btn btn-primary" [disabled]="page.saving()">
+        {{ page.saving() ? 'Saving…' : page.editing() ? 'Save changes' : 'Create plan' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

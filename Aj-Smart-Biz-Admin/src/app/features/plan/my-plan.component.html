@@ -1,0 +1,413 @@
+<app-page-header title="My Plan" subtitle="The plan your company is on, what it includes and what has been paid" />
+
+@if (loading()) {
+  <div class="skeleton" style="height:460px"></div>
+} @else if (view(); as v) {
+  <!-- Anything that needs the tenant's attention goes above the fold. -->
+  @if (v.current; as current) {
+    @if (current.status === 'suspended') {
+      <div class="notice bad">
+        <strong>Your plan is currently suspended.</strong>
+        Access is limited until it is switched back on. Please contact your account manager.
+      </div>
+    } @else if (current.timer?.inGrace) {
+      <div class="notice bad">
+        <strong>Your term has ended.</strong>
+        You are inside a {{ current.graceDays }}-day grace period — renew now to avoid losing access.
+      </div>
+    } @else if (current.timer?.isExpiringSoon && !v.scheduled) {
+      <div class="notice warn">
+        <strong>Your plan expires in {{ current.timer?.daysRemaining }} day(s).</strong>
+        Contact your account manager to renew.
+      </div>
+    }
+  } @else {
+    <div class="notice bad">
+      <strong>No active plan.</strong>
+      Your company does not have a running subscription. Please contact your account manager.
+    </div>
+  }
+
+  @if (v.scheduled; as queued) {
+    <div class="notice info">
+      <strong>Renewal already booked.</strong>
+      {{ queued.plan?.name ?? queued.planSnapshot?.name }} starts on
+      {{ queued.startDate | date: 'dd MMM yyyy' }} and runs to {{ queued.endDate | date: 'dd MMM yyyy' }}. Nothing to do
+      — it switches on by itself.
+    </div>
+  }
+
+  <!-- ------------------------------ THE PLAN ----------------------------- -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-body">
+      @if (v.current; as current) {
+        <div class="hero">
+          <div>
+            <div class="row" style="gap:10px;align-items:center">
+              <span class="hero-plan">{{ planNameOf(current) }}</span>
+              <app-status-badge [value]="current.status" />
+              @if (current.isTrial) {
+                <span class="badge badge-info">Trial</span>
+              }
+            </div>
+
+            <div class="hero-facts">
+              <div>
+                <div class="tiny muted">Billing cycle</div>
+                <div class="fact-value">{{ cycleLabel(terms()?.billingCycle) }}</div>
+              </div>
+              <div>
+                <div class="tiny muted">Term</div>
+                <div class="fact-value">{{ current.startDate | date: 'dd MMM yyyy' }}</div>
+                <div class="tiny muted">to {{ current.endDate | date: 'dd MMM yyyy' }}</div>
+              </div>
+              <div>
+                <div class="tiny muted">Paid for this term</div>
+                <div class="fact-value">{{ money(current.totalAmount, current.currency) }}</div>
+              </div>
+              <div>
+                <div class="tiny muted">Auto renew</div>
+                <div class="fact-value">{{ current.autoRenew ? 'On' : 'Off' }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live countdown, ticking off the server's reading of time left. -->
+          <div style="text-align:right">
+            <div class="tiny muted" style="margin-bottom:6px">Expires in</div>
+            <app-plan-timer [timer]="current.timer" [live]="isLive(current)" />
+          </div>
+        </div>
+      } @else {
+        <div class="empty">
+          <div class="empty-icon">💳</div>
+          <div>No plan is active for your company</div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="grid grid-2" style="align-items:start;gap:20px">
+    <!-- ------------------------------- LIMITS ------------------------------ -->
+    <div class="card">
+      <div class="card-head"><h3>What your plan allows</h3></div>
+      <div class="card-body">
+        @if (usageRows().length) {
+          <div class="usage">
+            @for (row of usageRows(); track row.key) {
+              <div class="usage-item">
+                <div class="tiny muted">{{ row.label }}</div>
+                <div class="usage-value">
+                  @if (row.tracked) {
+                    {{ row.used }} <span class="tiny muted">of {{ row.unlimited ? '∞' : row.limit }}</span>
+                  } @else {
+                    {{ row.limit ?? '—' }}
+                  }
+                </div>
+
+                @if (row.tracked && !row.unlimited) {
+                  <span class="meter">
+                    <span class="meter-fill" [class.full]="row.atLimit" [style.width.%]="row.percent"></span>
+                  </span>
+                }
+
+                <div class="tiny" [style.color]="row.atLimit ? 'var(--danger)' : ''" style="margin-top:6px">
+                  {{ row.atLimit ? 'Limit reached — upgrade to add more' : row.hint }}
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="empty"><div>No limits recorded</div></div>
+        }
+
+        @if (features().length) {
+          <div class="divider"></div>
+          <div class="tiny muted" style="margin-bottom:6px">Included in your plan</div>
+          <ul class="feature-list">
+            @for (feature of features(); track feature) {
+              <li>{{ feature }}</li>
+            }
+          </ul>
+        }
+
+        <p class="tiny muted" style="margin:14px 0 0">
+          These are the terms as sold to you. If the platform edits the plan later, your current term keeps what you
+          bought.
+        </p>
+      </div>
+    </div>
+
+    <!-- ------------------------------ BILLING ------------------------------ -->
+    <div class="card">
+      <div class="card-head"><h3>Billing summary</h3></div>
+      <div class="card-body">
+        <dl class="dl">
+          <div class="dl-item">
+            <dt>Total paid</dt>
+            <dd class="strong">{{ money(v.billing.totalPaid, v.billing.currency) }}</dd>
+          </div>
+          <div class="dl-item">
+            <dt>Payments recorded</dt>
+            <dd>{{ v.billing.transactionCount }}</dd>
+          </div>
+          <div class="dl-item">
+            <dt>Terms so far</dt>
+            <dd>{{ v.history.length }}</dd>
+          </div>
+          @if (v.current?.graceDays) {
+            <div class="dl-item">
+              <dt>Grace period</dt>
+              <dd>{{ v.current?.graceDays }} day(s) after the end date</dd>
+            </div>
+          }
+        </dl>
+
+        <div class="divider"></div>
+        <p class="tiny muted" style="margin:0">
+          Plans and payments are managed by the platform. To renew, upgrade or change anything here, contact your
+          account manager.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------------------------- CHANGE PLAN ---------------------------- -->
+  <div class="card" style="margin-top:20px">
+    <div class="card-head">
+      <h3>Available plans</h3>
+      <span class="tiny muted">Pick a plan to request — your account manager applies it</span>
+    </div>
+    <div class="card-body">
+      @if (pendingRequest(); as open) {
+        <div class="notice info" style="margin-bottom:16px">
+          <span>
+            <strong>Request pending.</strong>
+            You have asked to move to <strong>{{ open.requestedPlan?.name }}</strong>. Nothing changes until it is
+            approved.
+          </span>
+          <button type="button" class="btn btn-sm btn-ghost" (click)="cancelRequest(open)">Withdraw</button>
+        </div>
+      }
+
+      @if (catalogue(); as cat) {
+        @if (!cat.plans.length) {
+          <div class="empty"><div class="empty-icon">💳</div><div>No plans are on offer right now</div></div>
+        } @else {
+          <div class="plan-grid">
+            @for (plan of cat.plans; track plan.id) {
+              <div class="plan-card" [class.current]="plan.isCurrent" [class.popular]="plan.isPopular && !plan.isCurrent">
+                <div class="row" style="gap:6px;align-items:center;flex-wrap:wrap">
+                  <span class="plan-name">{{ plan.name }}</span>
+                  @if (plan.isCurrent) {
+                    <span class="badge badge-success">Current</span>
+                  } @else if (plan.isPopular) {
+                    <span class="badge badge-warning">Popular</span>
+                  }
+                  @if (plan.change === 'upgrade') {
+                    <span class="chip up">Upgrade</span>
+                  } @else if (plan.change === 'downgrade') {
+                    <span class="chip down">Downgrade</span>
+                  }
+                </div>
+
+                <div class="plan-price">{{ money(plan.discountPrice ?? plan.price, plan.currency) }}</div>
+                <div class="tiny muted">per {{ cycleLabel(plan.billingCycle) }} term</div>
+
+                <div class="plan-limits">
+                  {{ plan.maxBranches }} branches · {{ plan.maxAdmins }} admins<br />
+                  {{ plan.maxUsers }} users · {{ plan.storageMb }} MB
+                </div>
+
+                @if (plan.features?.length) {
+                  <ul class="feature-mini">
+                    @for (feature of plan.features; track feature) {
+                      <li>{{ feature }}</li>
+                    }
+                  </ul>
+                }
+
+                <span class="spacer"></span>
+
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  [class.btn-primary]="!plan.isCurrent"
+                  [class.btn-ghost]="plan.isCurrent"
+                  [disabled]="plan.isCurrent || !!pendingRequest()"
+                  (click)="openRequest(plan)"
+                >
+                  {{ actionLabel(plan) }}
+                </button>
+              </div>
+            }
+          </div>
+        }
+      } @else {
+        <div class="skeleton" style="height:180px"></div>
+      }
+
+      <p class="tiny muted" style="margin:16px 0 0">
+        Requesting a plan does not change anything by itself and nothing is charged automatically — the platform
+        confirms the price with you and applies the change.
+      </p>
+    </div>
+  </div>
+
+  <!-- --------------------------- MY REQUESTS ----------------------------- -->
+  @if (requests().length) {
+    <div class="card" style="margin-top:20px">
+      <div class="card-head"><h3>Your plan requests</h3></div>
+      <div class="card-body tight">
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Requested</th><th>Plan</th><th>Type</th><th>Note</th><th>Status</th><th class="text-right"></th></tr>
+            </thead>
+            <tbody>
+              @for (request of requests(); track request.id) {
+                <tr>
+                  <td class="tiny muted nowrap">{{ request.createdAt | date: 'dd MMM yyyy, HH:mm' }}</td>
+                  <td>
+                    <span class="strong">{{ request.requestedPlan?.name ?? '—' }}</span>
+                    @if (request.currentPlan?.name) {
+                      <div class="tiny muted">from {{ request.currentPlan?.name }}</div>
+                    }
+                  </td>
+                  <td class="tiny muted">{{ cycleLabel(request.type) }}</td>
+                  <td class="tiny muted">
+                    {{ request.note || '—' }}
+                    @if (request.decisionNote) {
+                      <div class="tiny"><strong>Reply:</strong> {{ request.decisionNote }}</div>
+                    }
+                  </td>
+                  <td><app-status-badge [value]="request.status" /></td>
+                  <td class="text-right">
+                    @if (request.status === 'pending') {
+                      <button type="button" class="btn btn-sm btn-ghost" (click)="cancelRequest(request)">Withdraw</button>
+                    } @else if (request.decidedAt) {
+                      <span class="tiny muted nowrap">{{ request.decidedAt | date: 'dd MMM yyyy' }}</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ---------------------------- TRANSACTIONS --------------------------- -->
+  <div class="card" style="margin-top:20px">
+    <div class="card-head"><h3>Payment history</h3></div>
+    <div class="card-body tight">
+      <app-table-state
+        [empty]="v.transactions.length === 0"
+        icon="🧾"
+        title="No payments yet"
+        message="Payments recorded against your plan will appear here."
+      />
+
+      @if (v.transactions.length) {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Invoice</th><th>Plan</th><th>Paid on</th><th>Mode</th>
+                <th class="text-right">Amount</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (txn of v.transactions; track txn.id) {
+                <tr>
+                  <td class="strong">{{ txn.invoiceNo }}</td>
+                  <td class="muted">{{ txn.plan?.name || '—' }}</td>
+                  <td class="tiny muted nowrap">{{ txn.paidAt ? (txn.paidAt | date: 'dd MMM yyyy') : '—' }}</td>
+                  <td class="tiny muted">{{ modeLabel(txn.paymentMode) }}</td>
+                  <td class="text-right strong nowrap">{{ money(txn.totalAmount, txn.currency) }}</td>
+                  <td><app-status-badge [value]="txn.status" /></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- ------------------------------ HISTORY ------------------------------ -->
+  <div class="card" style="margin-top:20px">
+    <div class="card-head"><h3>Plan history</h3></div>
+    <div class="card-body tight">
+      @if (!v.history.length) {
+        <div class="empty"><div class="empty-icon">🗓️</div><div>No plan has been assigned yet</div></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Plan</th><th>Term</th><th>Started as</th><th class="text-right">Amount</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              @for (item of v.history; track item.id) {
+                <tr>
+                  <td class="strong">{{ planNameOf(item) }}</td>
+                  <td class="tiny muted nowrap">
+                    {{ item.startDate | date: 'dd MMM yyyy' }} → {{ item.endDate | date: 'dd MMM yyyy' }}
+                  </td>
+                  <td class="tiny muted">{{ cycleLabel(item.changeType) }}</td>
+                  <td class="text-right nowrap">{{ money(item.totalAmount, item.currency) }}</td>
+                  <td><app-status-badge [value]="item.status" /></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+}
+
+@if (requestFor(); as plan) {
+  <app-modal
+    [title]="'Request ' + plan.name"
+    subtitle="Your account manager confirms the price and applies the change"
+    size="sm"
+    [closeOnBackdrop]="false"
+    (closed)="requestFor.set(null)"
+  >
+    <dl class="dl">
+      <div class="dl-item"><dt>Plan</dt><dd class="strong">{{ plan.name }}</dd></div>
+      <div class="dl-item">
+        <dt>Price</dt>
+        <dd>{{ money(plan.discountPrice ?? plan.price, plan.currency) }} per {{ cycleLabel(plan.billingCycle) }} term</dd>
+      </div>
+      <div class="dl-item">
+        <dt>Limits</dt>
+        <dd>{{ plan.maxBranches }} branches · {{ plan.maxAdmins }} admins · {{ plan.maxUsers }} users</dd>
+      </div>
+    </dl>
+
+    <div class="field" style="margin-top:14px">
+      <label for="requestNote">Anything to add?</label>
+      <textarea
+        id="requestNote"
+        class="textarea"
+        [ngModel]="requestNote()"
+        (ngModelChange)="requestNote.set($event)"
+        placeholder="We are opening two more branches next month."
+      ></textarea>
+    </div>
+
+    <p class="tiny muted" style="margin:0">
+      Sending this changes nothing on your account and charges nothing. It reaches the platform as a request.
+    </p>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="requestFor.set(null)">Cancel</button>
+      <button type="button" class="btn btn-primary" [disabled]="sending()" (click)="sendRequest()">
+        {{ sending() ? 'Sending…' : 'Send request' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

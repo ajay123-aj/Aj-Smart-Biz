@@ -1,0 +1,251 @@
+@if (loading()) {
+  <div class="skeleton" style="height:520px"></div>
+} @else if (company(); as c) {
+  <app-page-header [title]="c.name" [subtitle]="c.code + ' · ' + c.email" />
+
+  <section class="grid grid-4" style="margin-bottom:20px">
+    <div class="card"><div class="card-body">
+      <div class="tiny muted">Status</div>
+      <div style="margin-top:6px"><app-status-badge [value]="c.status" /></div>
+    </div></div>
+    <div class="card"><div class="card-body">
+      <div class="tiny muted">Plan</div>
+      <div class="strong" style="margin-top:6px;font-size:16px">
+        {{ c.activeSubscription?.plan?.name ?? c.activeSubscription?.planSnapshot?.name ?? 'No active plan' }}
+      </div>
+      @if (c.subscriptionEndDate; as endDate) {
+        <div class="tiny muted">Renews {{ endDate | date: 'dd MMM yyyy' }} · {{ daysLeft(endDate) }} days left</div>
+      }
+    </div></div>
+    <div class="card"><div class="card-body">
+      <div class="tiny muted">Branches</div>
+      <div class="strong" style="margin-top:6px;font-size:20px">{{ c.branches?.length ?? 0 }}</div>
+    </div></div>
+    <div class="card"><div class="card-body">
+      <div class="tiny muted">Business type</div>
+      <div class="strong" style="margin-top:6px;font-size:16px">{{ c.businessType?.name || '—' }}</div>
+    </div></div>
+  </section>
+
+  <div class="card">
+    <div class="tabs">
+      <button type="button" [class.active]="tab() === 'profile'" (click)="tab.set('profile')">Company profile</button>
+      @if (canViewBranches()) {
+        <button type="button" [class.active]="tab() === 'branches'" (click)="tab.set('branches')">
+          Branches ({{ branchCount() ?? c.branches?.length ?? 0 }})
+        </button>
+      }
+      <button type="button" [class.active]="tab() === 'domains'" (click)="tab.set('domains')">
+        Domains ({{ domainCount() ?? c.domains?.length ?? 0 }})
+      </button>
+      <button type="button" [class.active]="tab() === 'subscription'" (click)="tab.set('subscription')">Plan &amp; billing</button>
+    </div>
+
+    @if (tab() === 'branches') {
+      <app-branch-manager (countChange)="branchCount.set($event)" />
+    }
+
+    @if (tab() === 'domains') {
+      <app-domain-manager
+        basePath="/my-company/domains"
+        [branches]="branchOptions()"
+        [canEdit]="canEdit()"
+        (countChange)="domainCount.set($event)"
+      />
+    }
+
+    @if (tab() === 'profile') {
+      <div class="card-body">
+        @if (!canEdit()) {
+          <p class="tiny muted" style="margin-top:0">
+            Only the main admin can edit the company profile. You are viewing it read only.
+          </p>
+        }
+
+        <form [formGroup]="form" (ngSubmit)="save()">
+          <div class="grid grid-3">
+            <div class="field">
+              <label for="name">Company name <span class="req">*</span></label>
+              <input id="name" class="input" formControlName="name" />
+              <app-field-error [control]="form.controls.name" label="Company name" />
+            </div>
+            <div class="field">
+              <label for="legalName">Legal name</label>
+              <input id="legalName" class="input" formControlName="legalName" />
+            </div>
+            <div class="field">
+              <label>Tenant code</label>
+              <input class="input" [value]="c.code" disabled />
+              <span class="hint">Assigned by the platform and cannot be changed</span>
+            </div>
+          </div>
+
+          <div class="grid grid-3">
+            <div class="field">
+              <label for="email">Email <span class="req">*</span></label>
+              <input id="email" class="input" type="email" formControlName="email" />
+              <app-field-error [control]="form.controls.email" label="Email" />
+            </div>
+            <div class="field">
+              <label for="phone">Phone <span class="req">*</span></label>
+              <input id="phone" class="input" formControlName="phone" />
+              <app-field-error [control]="form.controls.phone" label="Phone" />
+            </div>
+            <div class="field">
+              <label for="alternatePhone">Alternate phone</label>
+              <input id="alternatePhone" class="input" formControlName="alternatePhone" />
+            </div>
+          </div>
+
+          <div class="grid grid-3">
+            <div class="field">
+              <label for="website">Website</label>
+              <input id="website" class="input" formControlName="website" placeholder="https://…" />
+              <app-field-error [control]="form.controls.website" label="Website" />
+            </div>
+            <div class="field">
+              <label for="gstNumber">GST number</label>
+              <input id="gstNumber" class="input" formControlName="gstNumber" />
+            </div>
+            <div class="field">
+              <label for="panNumber">PAN</label>
+              <input id="panNumber" class="input" formControlName="panNumber" />
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Drives the login screen and the favicon on every page -->
+          <h4 style="margin-bottom:4px">Branding</h4>
+          <p class="tiny muted" style="margin:0 0 14px">
+            Shown on your login screen. The favicon becomes the icon in every browser tab of this workspace.
+          </p>
+
+          <div class="grid grid-2">
+            <div class="field">
+              <label>Company logo</label>
+              <app-image-upload formControlName="logo" label="Company logo" folder="company" />
+            </div>
+            <div class="field">
+              <label>Favicon</label>
+              <app-image-upload formControlName="favicon" label="Favicon" folder="company" variant="favicon" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="description">Description</label>
+            <textarea
+              id="description"
+              class="textarea"
+              formControlName="description"
+              placeholder="Billing, stock and reporting for every outlet."
+            ></textarea>
+            <span class="hint">One or two lines, shown under your company name on the login screen.</span>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="grid grid-2">
+            <div class="field">
+              <label for="addressLine1">Address line 1</label>
+              <input id="addressLine1" class="input" formControlName="addressLine1" />
+            </div>
+            <div class="field">
+              <label for="addressLine2">Address line 2</label>
+              <input id="addressLine2" class="input" formControlName="addressLine2" />
+            </div>
+          </div>
+
+          <div class="grid grid-3">
+            <div class="field">
+              <label for="stateId">State</label>
+              <select id="stateId" class="select" formControlName="stateId">
+                <option [ngValue]="null">Select…</option>
+                @for (option of states(); track option.id) {
+                  <option [ngValue]="option.id">{{ option.name }}</option>
+                }
+              </select>
+            </div>
+            <div class="field">
+              <label for="city">City</label>
+              <input id="city" class="input" formControlName="city" />
+            </div>
+            <div class="field">
+              <label for="pincode">Pincode</label>
+              <input id="pincode" class="input" formControlName="pincode" />
+            </div>
+          </div>
+
+          @if (canEdit()) {
+            <div class="row-end">
+              <button type="button" class="btn btn-ghost" (click)="reset()">Reset</button>
+              <button type="submit" class="btn btn-primary" [disabled]="saving()">
+                {{ saving() ? 'Saving…' : 'Save changes' }}
+              </button>
+            </div>
+          }
+        </form>
+      </div>
+    }
+
+    @if (tab() === 'subscription') {
+      <div class="card-head">
+        <h3>Subscription history</h3>
+        <!-- The full picture — limits, usage and the expiry countdown — lives on My Plan. -->
+        <a class="btn btn-sm btn-ghost" routerLink="/plan">💳 Open My Plan →</a>
+      </div>
+      <div class="card-body tight">
+        @if (!c.subscriptions?.length) {
+          <div class="empty"><div class="empty-icon">💳</div><div>No plan has been assigned yet</div></div>
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>Plan</th><th>Period</th><th class="text-right">Total</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                @for (sub of c.subscriptions; track sub.id) {
+                  <tr>
+                    <td class="strong">{{ sub.plan?.name ?? sub.planSnapshot?.name ?? '—' }}</td>
+                    <td class="tiny muted nowrap">{{ sub.startDate | date: 'dd MMM yyyy' }} → {{ sub.endDate | date: 'dd MMM yyyy' }}</td>
+                    <td class="text-right strong nowrap">{{ money(sub.totalAmount, sub.currency) }}</td>
+                    <td><app-status-badge [value]="sub.status" /></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+
+      <div class="card-head" style="border-top:1px solid var(--border)"><h3>Payments</h3></div>
+      <div class="card-body tight">
+        @if (transactions().length === 0) {
+          <div class="empty"><div class="empty-icon">🧾</div><div>No payments recorded</div></div>
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>Invoice</th><th>Plan</th><th>Paid on</th><th class="text-right">Amount</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                @for (txn of transactions(); track txn.id) {
+                  <tr>
+                    <td class="strong">{{ txn.invoiceNo }}</td>
+                    <td class="muted">{{ txn.plan?.name || '—' }}</td>
+                    <td class="tiny muted nowrap">{{ txn.paidAt | date: 'dd MMM yyyy' }}</td>
+                    <td class="text-right strong nowrap">{{ money(txn.totalAmount, txn.currency) }}</td>
+                    <td><app-status-badge [value]="txn.status" /></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        <p class="tiny muted" style="padding:12px 16px;margin:0">
+          Plans and payments are managed by the platform. Contact your account manager to upgrade.
+        </p>
+      </div>
+    }
+  </div>
+}

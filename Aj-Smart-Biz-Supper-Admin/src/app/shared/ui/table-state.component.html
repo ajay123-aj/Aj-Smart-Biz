@@ -1,0 +1,13 @@
+@if (loading()) {
+  <div style="padding:16px">
+    @for (row of skeletonRows; track row) {
+      <div class="skeleton" style="height:38px;margin-bottom:8px"></div>
+    }
+  </div>
+} @else if (empty()) {
+  <div class="empty">
+    <div class="empty-icon">{{ icon() }}</div>
+    <div class="strong">{{ title() }}</div>
+    <div class="tiny">{{ message() }}</div>
+  </div>
+}

@@ -1,0 +1,269 @@
+@if (loading()) {
+  <div class="skeleton" style="height:520px"></div>
+} @else if (record(); as row) {
+  <app-page-header
+    [title]="(row.plan?.name ?? row.planSnapshot?.name ?? 'Subscription') + ' · ' + (row.company?.name ?? '')"
+    [subtitle]="'Term ' + row.startDate + ' → ' + row.endDate"
+  >
+    <a class="btn btn-ghost" routerLink="/subscriptions">← All plans</a>
+    <a class="btn btn-ghost" [routerLink]="['/companies', row.companyId]">Open company</a>
+
+    @if (row.status === 'pending') {
+      <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="startNow()">▶️ Start now</button>
+    }
+    @if (row.status === 'suspended') {
+      <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="resume()">▶️ Resume</button>
+    }
+    @if (!(row.allowedTransitions ?? []).length) {
+      <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="reactivate()">♻️ Reactivate</button>
+    }
+  </app-page-header>
+
+  <!-- Where this term stands right now -->
+  <section class="grid grid-4" style="margin-bottom:20px">
+    <div class="card"><div class="card-body">
+      <div class="tiny muted">Status</div>
+      <div style="margin-top:6px"><app-status-badge [value]="row.status" /></div>
+      <div class="tiny muted" style="margin-top:6px">Started as {{ changeLabel(row.changeType) }}</div>
+    </div></div>
+
+    <div class="card"><div class="card-body">
+      <div class="tiny muted">{{ isLive(row) ? 'Expires in' : 'Term length' }}</div>
+      <div style="margin-top:8px">
+        <app-plan-timer [timer]="row.timer" [live]="isLive(row)" />
+      </div>
+    </div></div>
+
+    <div class="card"><div class="card-body">
+      <div class="tiny muted">Term value</div>
+      <div class="strong" style="margin-top:6px;font-size:20px">{{ money(row.totalAmount, row.currency) }}</div>
+      <div class="tiny muted">
+        base {{ money(row.amount, row.currency) }}
+        @if (+(row.discount ?? 0) > 0) { · −{{ money(row.discount, row.currency) }} }
+        @if (+(row.creditApplied ?? 0) > 0) { · credit {{ money(row.creditApplied, row.currency) }} }
+        @if (+(row.taxAmount ?? 0) > 0) { · +{{ money(row.taxAmount, row.currency) }} tax }
+      </div>
+    </div></div>
+
+    <div class="card"><div class="card-body">
+      <div class="tiny muted">Auto renew</div>
+      <div class="strong" style="margin-top:6px;font-size:16px">{{ row.autoRenew ? 'On' : 'Off' }}</div>
+      <button
+        type="button"
+        class="btn btn-sm btn-ghost"
+        style="margin-top:6px"
+        [disabled]="busy() || !isLive(row)"
+        (click)="toggleAutoRenew()"
+      >
+        {{ row.autoRenew ? 'Switch off' : 'Switch on' }}
+      </button>
+    </div></div>
+  </section>
+
+  <div class="grid grid-2" style="align-items:start;gap:20px">
+    <!-- --------------------------- PLAN DETAILS --------------------------- -->
+    <div class="card">
+      <div class="card-head"><h3>Plan details</h3></div>
+      <div class="card-body">
+        @if (terms(); as t) {
+          <dl class="dl">
+            <div class="dl-item"><dt>Plan</dt><dd>{{ t.name }}{{ t.code ? ' (' + t.code + ')' : '' }}</dd></div>
+            <div class="dl-item"><dt>Billing cycle</dt><dd>{{ t.billingCycle }}</dd></div>
+            <div class="dl-item"><dt>List price</dt><dd>
+              {{ money(t.price, row.currency) }}
+              @if (t.discountPrice) { <span class="tiny muted">· sold at {{ money(t.discountPrice, row.currency) }}</span> }
+            </dd></div>
+            <div class="dl-item"><dt>Trial</dt><dd>{{ row.isTrial ? 'Yes — this is a trial term' : (t.trialDays ? t.trialDays + ' trial days offered' : 'No') }}</dd></div>
+            <div class="dl-item"><dt>Grace period</dt><dd>{{ row.graceDays || 0 }} day(s) after the end date</dd></div>
+            <div class="dl-item"><dt>Plan status today</dt><dd><app-status-badge [value]="row.plan?.status" /></dd></div>
+          </dl>
+
+          <div class="divider"></div>
+
+          <p class="tiny muted" style="margin:0 0 10px">
+            Limits as they were sold. Editing the plan later never rewrites this term.
+          </p>
+          <div class="limits">
+            <div class="limit">
+              <div class="tiny muted">Branches</div>
+              <div class="limit-value">{{ t.maxBranches ?? '—' }}</div>
+            </div>
+            <div class="limit">
+              <div class="tiny muted">Admins</div>
+              <div class="limit-value">{{ t.maxAdmins ?? '—' }}</div>
+            </div>
+            <div class="limit">
+              <div class="tiny muted">Users</div>
+              <div class="limit-value">{{ t.maxUsers ?? '—' }}</div>
+            </div>
+            <div class="limit">
+              <div class="tiny muted">Storage</div>
+              <div class="limit-value">{{ t.storageMb ?? '—' }}<span class="tiny muted"> MB</span></div>
+            </div>
+          </div>
+
+          @if (features().length) {
+            <div class="divider"></div>
+            <div class="tiny muted" style="margin-bottom:6px">Features included</div>
+            <ul class="feature-list">
+              @for (feature of features(); track feature) {
+                <li>{{ feature }}</li>
+              }
+            </ul>
+          }
+        } @else {
+          <div class="empty"><div class="empty-icon">💳</div><div>No plan terms recorded</div></div>
+        }
+      </div>
+    </div>
+
+    <!-- ---------------------------- TERM & MOVES --------------------------- -->
+    <div class="card">
+      <div class="card-head"><h3>Term</h3></div>
+      <div class="card-body">
+        <dl class="dl">
+          <div class="dl-item"><dt>Starts</dt><dd>{{ row.startDate | date: 'dd MMM yyyy' }}</dd></div>
+          <div class="dl-item"><dt>Ends</dt><dd>{{ row.endDate | date: 'dd MMM yyyy' }}</dd></div>
+          <div class="dl-item"><dt>Activated</dt><dd>{{ row.activatedAt ? (row.activatedAt | date: 'dd MMM yyyy, HH:mm') : '—' }}</dd></div>
+          @if (row.suspendedAt) {
+            <div class="dl-item"><dt>Suspended</dt><dd>{{ row.suspendedAt | date: 'dd MMM yyyy, HH:mm' }}</dd></div>
+          }
+          @if (row.cancelledAt) {
+            <div class="dl-item"><dt>Cancelled</dt><dd>{{ row.cancelledAt | date: 'dd MMM yyyy, HH:mm' }}</dd></div>
+          }
+          @if (row.endedAt) {
+            <div class="dl-item"><dt>Closed</dt><dd>{{ row.endedAt | date: 'dd MMM yyyy, HH:mm' }}</dd></div>
+          }
+          @if (row.previousSubscription; as previous) {
+            <div class="dl-item"><dt>Replaced</dt><dd>
+              <a [routerLink]="['/subscriptions', previous.id]">
+                term #{{ previous.id }} ({{ previous.startDate }} → {{ previous.endDate }})
+              </a>
+            </dd></div>
+          }
+          @if (row.remarks) {
+            <div class="dl-item"><dt>Remarks</dt><dd>{{ row.remarks }}</dd></div>
+          }
+        </dl>
+
+        <div class="divider"></div>
+
+        <!-- Only the moves the API will actually accept from here. -->
+        <div class="tiny muted" style="margin-bottom:8px">What you can do next</div>
+        <div class="row" style="flex-wrap:wrap;gap:8px">
+          @if (can('active') && row.status === 'pending') {
+            <button type="button" class="btn btn-sm btn-primary" [disabled]="busy()" (click)="startNow()">▶️ Start now</button>
+          }
+          @if (can('active') && row.status === 'suspended') {
+            <button type="button" class="btn btn-sm btn-primary" [disabled]="busy()" (click)="resume()">▶️ Resume</button>
+          }
+          @if (can('suspended')) {
+            <button type="button" class="btn btn-sm btn-ghost" [disabled]="busy()" (click)="suspend()">⏸️ Suspend</button>
+          }
+          @if (can('expired')) {
+            <button type="button" class="btn btn-sm btn-ghost" [disabled]="busy()" (click)="expire()">⛔ Expire now</button>
+          }
+          @if (can('cancelled')) {
+            <button type="button" class="btn btn-sm btn-danger" [disabled]="busy()" (click)="cancel()">🚫 Cancel</button>
+          }
+          @if (!(row.allowedTransitions ?? []).length) {
+            <button type="button" class="btn btn-sm btn-primary" [disabled]="busy()" (click)="reactivate()">♻️ Reactivate on this plan</button>
+            <span class="tiny muted">This term is final — nothing else can change on it.</span>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ------------------------------- TRAIL ------------------------------- -->
+  <div class="card" style="margin-top:20px">
+    <div class="card-head"><h3>Transition history</h3></div>
+    <div class="card-body tight">
+      @if (!row.events?.length) {
+        <div class="empty"><div class="empty-icon">🧭</div><div>No transitions recorded yet</div></div>
+      } @else {
+        <ul class="trail">
+          @for (event of row.events; track event.id) {
+            <li>
+              <span class="trail-icon" aria-hidden="true">{{ eventIcon(event.type) }}</span>
+              <div class="trail-body">
+                <div class="trail-head">
+                  <span class="strong">{{ eventLabel(event.type) }}</span>
+                  <span class="tiny muted nowrap">{{ event.createdAt | date: 'dd MMM yyyy, HH:mm' }}</span>
+                </div>
+                @if (eventDetail(event); as detail) {
+                  <div class="tiny muted">{{ detail }}</div>
+                }
+                <div class="tiny muted">
+                  {{ event.actorName || 'Platform' }}
+                  @if (event.amount) { · {{ money(event.amount, row.currency) }} }
+                </div>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  </div>
+
+  <!-- ---------------------------- TRANSACTIONS --------------------------- -->
+  <div class="card" style="margin-top:20px">
+    <div class="card-head"><h3>Payments against this term</h3></div>
+    <div class="card-body tight">
+      @if (!row.transactions?.length) {
+        <div class="empty"><div class="empty-icon">🧾</div><div>No payment recorded for this term</div></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Invoice</th><th>Paid on</th><th>Mode</th><th class="text-right">Amount</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              @for (txn of row.transactions; track txn.id) {
+                <tr>
+                  <td class="strong">{{ txn.invoiceNo }}</td>
+                  <td class="tiny muted nowrap">{{ txn.paidAt | date: 'dd MMM yyyy' }}</td>
+                  <td class="tiny muted">{{ txn.paymentMode }}</td>
+                  <td class="text-right strong nowrap">{{ money(txn.totalAmount, txn.currency) }}</td>
+                  <td><app-status-badge [value]="txn.status" /></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- ------------------------- COMPANY PLAN HISTORY ---------------------- -->
+  <div class="card" style="margin-top:20px">
+    <div class="card-head"><h3>{{ row.company?.name }} · every term</h3></div>
+    <div class="card-body tight">
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Plan</th><th>Term</th><th>Started as</th><th class="text-right">Value</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody>
+            @for (item of row.companyTimeline; track item.id) {
+              <tr [style.background]="item.id === row.id ? 'var(--surface-2)' : ''">
+                <td class="strong">{{ item.plan?.name ?? item.planSnapshot?.name ?? '—' }}</td>
+                <td class="tiny muted nowrap">{{ item.startDate | date: 'dd MMM yyyy' }} → {{ item.endDate | date: 'dd MMM yyyy' }}</td>
+                <td class="tiny muted">{{ changeLabel(item.changeType) }}</td>
+                <td class="text-right nowrap">{{ money(item.totalAmount, item.currency) }}</td>
+                <td><app-status-badge [value]="item.status" /></td>
+                <td class="text-right">
+                  @if (item.id !== row.id) {
+                    <a class="btn btn-sm btn-ghost" [routerLink]="['/subscriptions', item.id]">Open</a>
+                  } @else {
+                    <span class="tiny muted">viewing</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+}

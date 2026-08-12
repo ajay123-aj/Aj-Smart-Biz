@@ -1,0 +1,24 @@
+@if (confirm.state(); as state) {
+  <div class="modal-backdrop" (click)="confirm.answer(false)">
+    <div class="modal modal-sm" (click)="$event.stopPropagation()" role="alertdialog" aria-modal="true">
+      <div class="modal-head">
+        <h3>{{ state.title }}</h3>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0 muted">{{ state.message }}</p>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" (click)="confirm.answer(false)">{{ state.cancelText }}</button>
+        <button
+          type="button"
+          class="btn"
+          [class.btn-danger]="state.danger"
+          [class.btn-primary]="!state.danger"
+          (click)="confirm.answer(true)"
+        >
+          {{ state.confirmText }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

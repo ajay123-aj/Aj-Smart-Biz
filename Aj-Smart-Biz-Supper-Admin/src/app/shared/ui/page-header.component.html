@@ -1,0 +1,11 @@
+<header class="row-between wrap" style="margin-bottom:20px">
+  <div>
+    <h1 style="font-size:22px">{{ title() }}</h1>
+    @if (subtitle()) {
+      <p class="muted mb-0" style="margin-top:4px">{{ subtitle() }}</p>
+    }
+  </div>
+  <div class="row wrap">
+    <ng-content />
+  </div>
+</header>
