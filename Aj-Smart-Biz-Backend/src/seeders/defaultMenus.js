@@ -23,4 +23,9 @@ module.exports = [
   { name: 'Role Management', slug: 'role-management', icon: 'shield', route: '/roles', sequence: 5 },
   { name: 'Menu Permission', slug: 'menu-permission', icon: 'list-checks', route: '/menu-permissions', sequence: 6 },
   { name: 'Admin Management', slug: 'admin-management', icon: 'users', route: '/admins', sequence: 7 },
+  /**
+   * Hero slides for the company's public website. Branch-aware: a slide may be
+   * company-wide or pinned to one branch.
+   */
+  { name: 'Slider Management', slug: 'slider-management', icon: 'image', route: '/sliders', sequence: 8 },
 ];

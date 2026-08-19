@@ -19,6 +19,10 @@ router.use(
   })
 );
 
+// Branding only — what a login screen needs. The admin consoles use this.
 router.get('/branding', controller.branding);
+
+// The full public profile — what a customer-facing website needs.
+router.get('/company-details', controller.companyDetails);
 
 module.exports = router;

@@ -4,6 +4,7 @@ const db = require('../models');
 const config = require('../config/env');
 const logger = require('../utils/logger');
 const defaultMenus = require('./defaultMenus');
+const defaultSliders = require('./defaultSliders');
 const { SUPER_ADMIN_ROLE, STATUS, PERMISSION_ACTIONS } = require('../constants');
 
 /**
@@ -166,11 +167,51 @@ async function ensureReferenceData() {
   });
 }
 
+/**
+ * Gives any company that has no slides at all the three defaults.
+ *
+ * New tenants get them during provisioning; this covers the ones that existed
+ * before the feature did, so nobody opens Slider Management to an empty screen
+ * or serves a website with no hero. A company that deleted every slide on
+ * purpose would get them back, which is the trade for never leaving a site
+ * blank — deactivating a slide, rather than deleting it, keeps it gone.
+ */
+async function ensureDefaultSliders() {
+  const companies = await db.Company.findAll({ attributes: ['id', 'name'] });
+  if (!companies.length) return;
+
+  const withSliders = await db.Slider.findAll({
+    attributes: ['companyId'],
+    group: ['companyId'],
+    raw: true,
+  });
+  const covered = new Set(withSliders.map((row) => row.companyId));
+
+  const rows = [];
+  companies.forEach((company) => {
+    if (covered.has(company.id)) return;
+    defaultSliders.forEach((slide) => {
+      rows.push({
+        ...slide,
+        title: slide.title.replace('{company}', company.name),
+        companyId: company.id,
+        branchId: null,
+        status: STATUS.ACTIVE,
+      });
+    });
+  });
+
+  if (!rows.length) return;
+  await db.Slider.bulkCreate(rows);
+  logger.info(`Seeded ${rows.length} default slide(s) across ${rows.length / defaultSliders.length} company(ies)`);
+}
+
 async function runBootstrap() {
   await ensureSuperAdmin();
   await ensureSystemMenus();
   await ensureSystemRolePermissions();
   await ensureReferenceData();
+  await ensureDefaultSliders();
 }
 
 module.exports = {
@@ -179,4 +220,5 @@ module.exports = {
   ensureSystemMenus,
   ensureSystemRolePermissions,
   ensureReferenceData,
+  ensureDefaultSliders,
 };

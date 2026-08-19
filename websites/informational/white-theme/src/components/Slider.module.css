@@ -1,0 +1,194 @@
+.slider {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.slider:focus-visible {
+  outline-offset: -4px;
+}
+
+/**
+ * The slide's own background photo, when it has one. Each slide gets its own
+ * layer so they cross-fade with the copy instead of cutting.
+ */
+.photo {
+  position: absolute;
+  inset: 0;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.55s ease;
+  pointer-events: none;
+}
+
+.photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.photoActive {
+  opacity: 1;
+}
+
+/* A soft brand tint behind the copy — the only colour on an otherwise white hero. */
+.wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(58rem 30rem at 82% -12%, color-mix(in srgb, var(--brand) 14%, transparent), transparent 70%),
+    radial-gradient(42rem 26rem at 6% 108%, color-mix(in srgb, var(--brand) 8%, transparent), transparent 68%);
+  transition: background 0.55s ease;
+}
+
+/**
+ * Over a photo the tint becomes a scrim instead: the copy is dark text on a
+ * white theme, so it needs the image held back on the side it sits on. Solid
+ * enough at the left edge to keep the headline readable over a busy photo,
+ * clearing by the middle so the image is still the thing you see.
+ */
+.washOverPhoto {
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.97) 0%,
+    rgba(255, 255, 255, 0.92) 34%,
+    rgba(255, 255, 255, 0.68) 56%,
+    rgba(255, 255, 255, 0.35) 78%,
+    rgba(255, 255, 255, 0.2) 100%
+  );
+}
+
+.stage {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  /* Every slide shares one cell, so the hero keeps the height of the tallest
+     and nothing jumps as they cross-fade. */
+  grid-template-areas: 'slide';
+  align-items: center;
+  min-height: min(74vh, 620px);
+  padding-block: 96px 120px;
+}
+
+.slide {
+  grid-area: slide;
+  max-width: 760px;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+  pointer-events: none;
+}
+
+.active {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.title {
+  font-size: clamp(2.2rem, 5.4vw, 3.75rem);
+  letter-spacing: -0.03em;
+}
+
+.body {
+  margin-top: 20px;
+  max-width: 60ch;
+  font-size: clamp(1.02rem, 1.5vw, 1.2rem);
+  color: var(--text-muted);
+}
+
+.actions {
+  margin-top: 34px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* ---------------------------- controls ---------------------------- */
+
+.controls {
+  position: absolute;
+  left: 24px;
+  bottom: 44px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.arrow {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.05rem;
+  transition: border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.arrow:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+  box-shadow: var(--shadow-sm);
+}
+
+.dots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: width 0.22s ease, background-color 0.22s ease;
+}
+
+.dotActive {
+  width: 30px;
+  background: var(--brand);
+}
+
+/**
+ * Where the artwork turns portrait, the scrim turns vertical with it: heavy
+ * behind the copy, clearing below. A flat wash at the strength the headline
+ * needs erases the picture entirely, which is a poor return on a company having
+ * uploaded a mobile crop at all.
+ *
+ * 768px, not 640: a phone held in landscape and a small tablet are both "mobile
+ * view" to the person looking at them. Must match the `media` on the <source>
+ * in Slider.tsx.
+ */
+@media (max-width: 768px) {
+  .washOverPhoto {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(255, 255, 255, 0.93) 52%,
+      rgba(255, 255, 255, 0.72) 74%,
+      rgba(255, 255, 255, 0.42) 100%
+    );
+  }
+}
+
+@media (max-width: 640px) {
+  .stage {
+    min-height: 0;
+    padding-block: 64px 104px;
+  }
+
+  .controls {
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 36px;
+  }
+}

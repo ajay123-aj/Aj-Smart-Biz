@@ -7,6 +7,7 @@ const planRequestController = require('../controllers/planRequest.controller');
 const planRequestSchema = require('../validators/planRequest.validator');
 const branchRoutes = require('./branch.routes');
 const domainRoutes = require('./companyDomain.routes');
+const sliderRoutes = require('./slider.routes');
 const validate = require('../middlewares/validate');
 const schema = require('../validators/company.validator');
 const { companyAdminOnly, requirePermission } = require('../middlewares/auth');
@@ -54,6 +55,13 @@ router.get('/transactions', requirePermission('company-details', 'canView'), (re
 // Branches + branch contacts of the caller's own company. The per-action
 // checks live in the branch controller; the menu gate is applied here.
 router.use('/branches', requirePermission('branch-management', 'canView'), branchRoutes);
+
+/**
+ * Hero slides for the company's public website. Gated by its own menu, so a
+ * role can be given the website content without the rest of the company
+ * settings. Per-action rights are enforced below.
+ */
+router.use('/sliders', requirePermission('slider-management', 'canView'), sliderRoutes);
 
 /**
  * Domains that resolve to this company (and optionally one of its branches).

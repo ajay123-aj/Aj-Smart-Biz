@@ -4,6 +4,7 @@ const router = require('express').Router();
 const controller = require('../controllers/company.controller');
 const branchRoutes = require('./branch.routes');
 const domainRoutes = require('./companyDomain.routes');
+const sliderRoutes = require('./slider.routes');
 const subscriptionController = require('../controllers/subscription.controller');
 const validate = require('../middlewares/validate');
 const schema = require('../validators/company.validator');
@@ -45,5 +46,6 @@ router.post('/:id/transactions', validate(schema.transactionCreate), controller.
 // Branches and domains of a company
 router.use('/:companyId/branches', branchRoutes);
 router.use('/:companyId/domains', domainRoutes);
+router.use('/:companyId/sliders', sliderRoutes);
 
 module.exports = router;

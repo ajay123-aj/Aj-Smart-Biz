@@ -1,0 +1,276 @@
+<app-page-header
+  title="Slider Management"
+  subtitle="Hero slides on your public website — company-wide, or for one branch"
+>
+  <button
+    type="button"
+    class="btn btn-primary"
+    (click)="openModal(null)"
+    *appCan="'slider-management'; action: 'canCreate'"
+  >
+    ＋ Add slide
+  </button>
+</app-page-header>
+
+<div class="card">
+  <div class="card-head">
+    <input
+      class="input"
+      style="max-width:280px"
+      type="search"
+      placeholder="Search slide title…"
+      (input)="onSearch($event)"
+    />
+
+    <select class="select" style="width:auto" (change)="onBranchFilter(selectValue($event))">
+      <option value="">All slides</option>
+      <option value="none">Company-wide only</option>
+      @for (branch of branches(); track branch.id) {
+        <option [value]="branch.id">{{ branch.name }}</option>
+      }
+    </select>
+
+    <select class="select" style="width:auto" (change)="store.patch({ status: selectValue($event) })">
+      <option value="">All statuses</option>
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+  </div>
+
+  <div class="card-body tight">
+    <app-table-state
+      [loading]="store.loading()"
+      [empty]="!store.loading() && store.items().length === 0"
+      icon="🖼️"
+      title="No slides found"
+      message="Add a slide to change what your website's hero shows."
+    />
+
+    @if (!store.loading() && store.items().length > 0) {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:64px">Order</th>
+              <th style="width:112px">Image</th>
+              <th class="sortable" (click)="store.toggleSort('title')">Slide{{ store.sortIcon('title') }}</th>
+              <th>Shows on</th>
+              <th>Button</th>
+              <th>Status</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of store.items(); track row.id; let first = $first; let last = $last) {
+              <tr>
+                <td>
+                  <div class="seq">
+                    <span class="seq-num">{{ row.sequence }}</span>
+                    @if (canReorder()) {
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-ghost"
+                        title="Move up"
+                        [disabled]="first || reordering()"
+                        (click)="move(row, -1)"
+                        *appCan="'slider-management'; action: 'canEdit'"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-ghost"
+                        title="Move down"
+                        [disabled]="last || reordering()"
+                        (click)="move(row, 1)"
+                        *appCan="'slider-management'; action: 'canEdit'"
+                      >
+                        ↓
+                      </button>
+                    }
+                  </div>
+                </td>
+
+                <td>
+                  @if (imageUrl(row.image); as src) {
+                    <img class="thumb" [src]="src" [alt]="row.title" />
+                  } @else {
+                    <div class="thumb-empty" title="No image — the slide shows text only">🖼️</div>
+                  }
+                  @if (row.mobileImage) {
+                    <span class="tiny muted" title="This slide has its own mobile artwork">📱 mobile</span>
+                  }
+                </td>
+
+                <td>
+                  <div class="slide-title">
+                    @if (row.eyebrow) {
+                      <span class="tiny muted">{{ row.eyebrow }}</span>
+                    }
+                    <span class="strong">{{ row.title }}</span>
+                    @if (row.subtitle) {
+                      <span class="slide-sub">{{ row.subtitle }}</span>
+                    }
+                  </div>
+                </td>
+
+                <td>
+                  @if (row.branch) {
+                    <span class="badge badge-info">{{ row.branch.name }}</span>
+                  } @else {
+                    <span class="muted">All branches</span>
+                  }
+                </td>
+
+                <td class="muted">
+                  @if (row.ctaLabel && row.ctaUrl) {
+                    {{ row.ctaLabel }} <span class="tiny">→ {{ row.ctaUrl }}</span>
+                  } @else {
+                    —
+                  }
+                </td>
+
+                <td><app-status-badge [value]="row.status" /></td>
+
+                <td>
+                  <div class="row-end">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-ghost"
+                      (click)="toggleStatus(row)"
+                      *appCan="'slider-management'; action: 'canEdit'"
+                    >
+                      {{ row.status === 'active' ? 'Deactivate' : 'Activate' }}
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-ghost"
+                      (click)="openModal(row)"
+                      *appCan="'slider-management'; action: 'canEdit'"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-danger"
+                      (click)="remove(row)"
+                      *appCan="'slider-management'; action: 'canDelete'"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (!canReorder()) {
+        <p class="tiny muted" style="padding:10px 14px 0">
+          Pick a single branch (or <strong>Company-wide only</strong>) to reorder slides — order is kept per list.
+        </p>
+      }
+
+      <app-pager [meta]="store.meta()" (pageChange)="store.setPage($event)" (limitChange)="store.setLimit($event)" />
+    }
+  </div>
+</div>
+
+@if (modalOpen()) {
+  <app-modal
+    [title]="editing() ? 'Edit slide' : 'Add slide'"
+    size="md"
+    [closeOnBackdrop]="false"
+    (closed)="modalOpen.set(false)"
+  >
+    <form [formGroup]="form" (ngSubmit)="save()" id="slider-form">
+      <div class="field">
+        <label for="branchId">Shows on</label>
+        <select id="branchId" class="select" formControlName="branchId">
+          <option value="">All branches (company-wide)</option>
+          @for (branch of branches(); track branch.id) {
+            <option [value]="branch.id">{{ branch.name }}</option>
+          }
+        </select>
+        <p class="tiny muted mb-0">
+          A branch site shows its own slides. If it has none, it falls back to the company-wide ones.
+        </p>
+      </div>
+
+      <div class="field">
+        <label for="eyebrow">Eyebrow</label>
+        <input id="eyebrow" class="input" formControlName="eyebrow" placeholder="Welcome" />
+      </div>
+
+      <div class="field">
+        <label for="title">Title <span class="req">*</span></label>
+        <input id="title" class="input" formControlName="title" placeholder="Work that holds up" />
+        <app-field-error [control]="form.controls.title" label="Title" />
+      </div>
+
+      <div class="field">
+        <label for="subtitle">Subtitle</label>
+        <textarea
+          id="subtitle"
+          class="textarea"
+          formControlName="subtitle"
+          placeholder="One or two lines explaining the headline."
+        ></textarea>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="field">
+          <label>Desktop image</label>
+          <app-image-upload
+            formControlName="image"
+            label="Desktop image"
+            folder="slider"
+            hint="Wide — 1600×900 or larger · PNG, JPG or WEBP"
+          />
+        </div>
+        <div class="field">
+          <label>Mobile image</label>
+          <app-image-upload
+            formControlName="mobileImage"
+            label="Mobile image"
+            folder="slider"
+            hint="Portrait — 800×1000 or similar"
+          />
+        </div>
+      </div>
+      <p class="tiny muted">
+        Both are optional. With no desktop image the slide shows on the plain white hero; with no mobile
+        image phones reuse the desktop one.
+      </p>
+
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="ctaLabel">Button text</label>
+          <input id="ctaLabel" class="input" formControlName="ctaLabel" placeholder="Get in touch" />
+        </div>
+        <div class="field">
+          <label for="ctaUrl">Button link</label>
+          <input id="ctaUrl" class="input" formControlName="ctaUrl" placeholder="#contact" />
+        </div>
+      </div>
+      <p class="tiny muted">The button appears only when both text and link are filled in.</p>
+
+      <div class="field" style="max-width:220px">
+        <label for="status">Status</label>
+        <select id="status" class="select" formControlName="status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+      <p class="tiny muted mb-0">Only active slides appear on the website.</p>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+      <button type="submit" form="slider-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Create slide' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

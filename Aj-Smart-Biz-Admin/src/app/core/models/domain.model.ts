@@ -106,6 +106,30 @@ export interface Role extends AuditFields {
   adminCount?: number;
 }
 
+/* -------------------------------- website ------------------------------- */
+
+/**
+ * A hero slide on the company's public website.
+ *
+ * `branchId` null means the slide belongs to the whole company and shows on
+ * every site the tenant serves; set, it belongs to that branch alone.
+ */
+export interface Slider extends AuditFields {
+  companyId: number;
+  branchId?: number | null;
+  branch?: { id: number; name: string; code: string } | null;
+  title: string;
+  eyebrow?: string | null;
+  subtitle?: string | null;
+  /** Wide artwork for desktop. */
+  image?: string | null;
+  /** Optional portrait crop for phones; falls back to `image` when empty. */
+  mobileImage?: string | null;
+  ctaLabel?: string | null;
+  ctaUrl?: string | null;
+  sequence: number;
+}
+
 /** One row of the role permission grid. */
 export interface PermissionRow extends PermissionFlags {
   menuId: number;

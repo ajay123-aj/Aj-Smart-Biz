@@ -66,6 +66,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admins/admin-list.component').then((m) => m.AdminListComponent),
       },
       {
+        path: 'sliders',
+        canActivate: [permissionGuard('slider-management')],
+        title: 'Slider Management',
+        loadComponent: () => import('./features/sliders/slider-list.component').then((m) => m.SliderListComponent),
+      },
+      {
         path: 'profile',
         title: 'My Profile',
         loadComponent: () => import('./features/profile/profile.component').then((m) => m.ProfileComponent),

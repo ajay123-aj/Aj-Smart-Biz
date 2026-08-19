@@ -15,6 +15,7 @@ const ICONS: Record<string, string> = {
   'role-management': '🛡️',
   'menu-permission': '🔐',
   'admin-management': '👥',
+  'slider-management': '🖼️',
 };
 
 @Component({

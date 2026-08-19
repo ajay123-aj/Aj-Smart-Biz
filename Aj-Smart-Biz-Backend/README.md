@@ -21,7 +21,8 @@ The API listens on `http://localhost:4000/api/v1`. On first boot it will:
 1. `CREATE DATABASE IF NOT EXISTS` (MySQL only),
 2. sync every table,
 3. create the root super admin and print its credentials,
-4. seed the seven system menus, a few Indian states, business types and a default theme.
+4. seed the eight system menus, a few Indian states, business types and a default theme,
+5. give any company without slides the three default hero slides.
 
 ```
 npm start              # NODE_ENV=production, reads .env.production
@@ -142,6 +143,7 @@ The root account cannot be deleted, deactivated or demoted, and nobody can delet
 | GET/PUT | `/my-company` | `company-details` — writes are main-admin only, and `status`/`code`/plan fields are ignored |
 | GET | `/my-company/subscriptions`, `/my-company/transactions` | `company-details` |
 | * | `/my-company/branches`, `/my-company/branches/:branchId/contacts` | `branch-management` |
+| * | `/my-company/sliders` | `slider-management` — each verb carries its own action right, so view-only roles cannot edit |
 | * | `/roles` | `role-management` |
 | GET/PUT | `/roles/:roleId/permissions` | `menu-permission` — `PUT` replaces the whole matrix |
 | * | `/menus` (+ `/menus/tree`) | `menu-permission` — platform menus are read only for tenants |
@@ -152,13 +154,30 @@ No token; the login screen calls this before anyone has signed in.
 
 | Method | Route | Notes |
 | --- | --- | --- |
-| GET | `/public/branding` | Tenant branding for the requesting host |
+| GET | `/public/branding` | Tenant branding for the requesting host — what a login screen needs |
+| GET | `/public/company-details` | The tenant's full public profile, its hero slides, and whether its plan still entitles it to be served |
 
 The tenant is resolved from the request **Host** (`X-Forwarded-Host` behind a
 proxy): first an active row in `company_domain`, then the leading label of the
 host against `companies.code` — so `acme.ajsmartbiz.com` reaches the company with
 code `ACME` even when no domain was configured. `?domain=` overrides the host,
 which is how the app previews a tenant on `localhost`.
+
+`/company-details` resolves the host exactly the same way and adds the rest of
+the public profile: legal name, business type, contact details, address, locale,
+the branch the domain is pinned to, the head office, every active branch, and the
+hero slides for that host, and a `service` flag.
+
+`service` is `{ active, reason }`, where `reason` is `expired`, `suspended` or
+`no_plan` — the same set `quota.service` blocks branch and admin creation with,
+so a company refused a branch in the console cannot have its website carry on
+serving. It is deliberately coarse: no plan name, price, dates or renewal amount
+reach a public endpoint. A website renders a holding page from it. It
+returns **only what a company publishes about itself** — no GST or PAN number, no
+plan, subscription, transaction or admin data, no counts — and, like
+`/branding`, answers an unknown *or inactive* tenant with platform defaults
+rather than an error, so neither route can be walked to enumerate tenants. It is
+what the websites in [`../websites/`](../websites/) launch with.
 
 When the matched domain is pinned to a branch, the response carries that
 branch's `logo` and `favicon` (falling back to the company's when the branch has

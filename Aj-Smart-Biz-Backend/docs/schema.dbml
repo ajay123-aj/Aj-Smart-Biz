@@ -216,6 +216,34 @@ Table company_domain {
   Note: 'GET /public/branding resolves the request Host here first, then falls back to matching the leading label against companies.code'
 }
 
+Table sliders {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  branch_id int [ref: > branches.id, note: 'branch this slide is for; NULL = every branch of the company']
+  title varchar(180) [not null]
+  eyebrow varchar(120) [note: 'small line above the title, e.g. "Welcome"']
+  subtitle text
+  image varchar(255) [note: 'wide artwork for desktop; relative upload path, e.g. /uploads/slider/hero.jpg']
+  mobile_image varchar(255) [note: 'optional portrait crop for narrow screens; falls back to image when empty']
+  cta_label varchar(80) [note: 'button text; the button renders only when label and url are both set']
+  cta_url varchar(255)
+  sequence int [not null, default: 0, note: 'low numbers first; ties broken by id']
+  status enum_status [not null, default: 'active', note: 'only active slides reach the website']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    branch_id
+    status
+    sequence
+  }
+  Note: 'Hero slides on the tenant public website. Every company is seeded with three. A branch-pinned domain serves that branch slides; a branch with none falls back to the company-wide ones (branch_id NULL) - the same fallback logo and favicon follow.'
+}
+
 Table branch_contacts {
   id int [pk, increment]
   branch_id int [not null, ref: > branches.id]

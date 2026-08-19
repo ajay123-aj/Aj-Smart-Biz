@@ -6,6 +6,7 @@ const ApiError = require('../utils/ApiError');
 const config = require('../config/env');
 const passwordUtil = require('../utils/password');
 const { generateUniqueCode, slugify } = require('./code.service');
+const defaultSliders = require('../seeders/defaultSliders');
 const { activateSubscription } = require('./subscription.service');
 const { PERMISSION_ACTIONS, STATUS } = require('../constants');
 
@@ -106,6 +107,22 @@ async function createCompany(payload, actorId) {
     );
 
     await grantFullPermissions({ companyId: company.id, roleId: role.id, actorId, transaction });
+
+    /**
+     * Three company-wide hero slides, so the tenant's website has a working
+     * carousel before anyone opens Slider Management. Ordinary rows from here
+     * on — the company edits or deletes them like any other.
+     */
+    await db.Slider.bulkCreate(
+      defaultSliders.map((slide) => ({
+        ...slide,
+        title: slide.title.replace('{company}', company.name),
+        companyId: company.id,
+        branchId: null,
+        createdBy: actorId ?? null,
+      })),
+      { transaction }
+    );
 
     const adminEmail = (mainAdmin?.email || company.email).toLowerCase();
     if (!(await assertEmailFree(db.Admin, adminEmail, {}, transaction))) {

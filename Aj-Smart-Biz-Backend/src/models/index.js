@@ -10,6 +10,7 @@ const Company = require('./company.model')(sequelize);
 const Branch = require('./branch.model')(sequelize);
 const BranchContact = require('./branchContact.model')(sequelize);
 const CompanyDomain = require('./companyDomain.model')(sequelize);
+const Slider = require('./slider.model')(sequelize);
 const CompanySubscription = require('./companySubscription.model')(sequelize);
 const SubscriptionEvent = require('./subscriptionEvent.model')(sequelize);
 const PlanRequest = require('./planRequest.model')(sequelize);
@@ -41,6 +42,13 @@ BranchContact.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
 BranchContact.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 
 // Company -> domains (optionally pinned to one of its branches)
+// Website hero slides. Deleting a company or a branch takes its slides with it;
+// a company-wide slide (branch_id NULL) survives any branch being removed.
+Company.hasMany(Slider, { foreignKey: 'companyId', as: 'sliders', onDelete: 'CASCADE' });
+Slider.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(Slider, { foreignKey: 'branchId', as: 'sliders', onDelete: 'CASCADE' });
+Slider.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+
 Company.hasMany(CompanyDomain, { foreignKey: 'companyId', as: 'domains', onDelete: 'CASCADE' });
 CompanyDomain.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 CompanyDomain.belongsTo(Branch, { foreignKey: 'subCompanyId', as: 'branch' });
@@ -127,6 +135,7 @@ const db = {
   Branch,
   BranchContact,
   CompanyDomain,
+  Slider,
   CompanySubscription,
   SubscriptionEvent,
   PlanRequest,

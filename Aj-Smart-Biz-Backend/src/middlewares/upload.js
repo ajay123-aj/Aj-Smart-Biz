@@ -9,7 +9,7 @@ const ApiError = require('../utils/ApiError');
 const logger = require('../utils/logger');
 
 /** Sub-folders callers may upload into; anything else is rejected. */
-const FOLDERS = ['branch', 'company', 'avatar', 'misc'];
+const FOLDERS = ['branch', 'company', 'slider', 'avatar', 'misc'];
 
 const MIME_EXTENSIONS = {
   'image/png': '.png',

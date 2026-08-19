@@ -7,6 +7,7 @@ A multi-tenant business platform in three projects.
 | [Aj-Smart-Biz-Backend](Aj-Smart-Biz-Backend/) | Node.js · Express · Sequelize · MySQL | 4000 | One API serving both consoles |
 | [Aj-Smart-Biz-Supper-Admin](Aj-Smart-Biz-Supper-Admin/) | Angular 22 | 4200 | Platform console — companies, plans, billing, masters |
 | [Aj-Smart-Biz-Admin](Aj-Smart-Biz-Admin/) | Angular 22 | 4300 | Company workspace — branches, roles, permissions, admins |
+| [websites](websites/) | Next.js 15 | 4400+ | Tenant-facing public websites, one template per business type |
 
 ---
 
@@ -173,9 +174,9 @@ the company built itself are left exactly as configured.
 ## Data model
 
 18 tables — platform masters (states, business types, themes, plans), tenants
-(companies, branches, branch contacts, company domains), billing (subscriptions,
-subscription events, plan requests, transactions) and identity (super admins,
-roles, menus, role permissions, admins).
+(companies, branches, branch contacts, company domains, sliders), billing
+(subscriptions, subscription events, plan requests, transactions) and identity
+(super admins, roles, menus, role permissions, admins).
 
 The full schema is in [`Aj-Smart-Biz-Backend/docs/schema.dbml`](Aj-Smart-Biz-Backend/docs/schema.dbml)
 — paste it into dbdiagram.io to view it or diff it against your own diagram.
@@ -208,6 +209,79 @@ branch's own logo and favicon are served, so `surat.acme.com` and `acme.com` can
 look different. The endpoint is public but returns branding fields only, and an
 unknown *or inactive* tenant gets platform defaults rather than an error, so it
 cannot be used to enumerate tenants.
+
+The public websites in [`websites/`](websites/) resolve their tenant the same
+way, through a second endpoint built for them: `GET
+/public/company-details?domain=<host>`. Where `/branding` returns just enough to
+paint a login screen, this one returns the whole public profile — legal name,
+business type, contact details, address, locale, the branch a domain is pinned
+to, the head office and every active branch — while still withholding GST, PAN,
+plan and admin data. A site reads the host it was served on, calls it before
+rendering, and brands itself from the answer. Both endpoints live in the
+backend; the websites define no API of their own. One deployment per business
+type serves every company of that type — there is no per-tenant build.
+
+## Website content: sliders
+
+The hero on a tenant's website is theirs to edit. **Slider Management** in the
+company workspace lists every slide with its image, copy, button and order, and
+each slide is either **company-wide** or pinned to **one branch**.
+
+Which slides a site shows follows the same fallback its logo already does:
+
+```
+branch-pinned domain ──► that branch's slides
+                          └─ none of its own? ──► the company-wide slides
+company-wide domain  ──► the company-wide slides
+```
+
+So `surat.acme.com` can run its own campaign without the head office losing
+theirs, and a new branch site is never blank. Only `active` slides reach the
+website, and the order is the one set in the admin — reordering sends the whole
+list in a single call, so a shuffle cannot be left half-applied.
+
+Every company starts with **three default slides**, created during provisioning
+and backfilled on boot for tenants that predate the feature, so no website ever
+serves an empty carousel. They are ordinary rows from that moment on.
+
+A slide carries **two optional artworks**: a wide one for desktop and a portrait
+crop for phones, because cropping a landscape hero to a phone's width throws away
+its subject. The page renders them as a `<picture>`, so the browser picks one and
+downloads only that one; a slide with no mobile artwork reuses the desktop file,
+and a slide with no artwork at all sits on the plain white hero. Either way the
+template lays a scrim over the image — weighted to the left on desktop, to the
+top on a phone — so the headline stays readable without erasing the picture.
+
+## When a plan lapses, the website stops
+
+A tenant's plan is what pays for its website, so `/public/company-details`
+reports whether the platform will still serve it:
+
+```
+service: { active: false, reason: "expired" | "suspended" | "no_plan" }
+```
+
+Those are the platform's own reasons — the identical set `quota.service` refuses
+branch and admin creation with — so a company blocked in the console cannot have
+its public site carry on as though nothing happened.
+
+The site then renders a **holding page instead of its content**, not a banner
+over it. Both the page and the layout make that decision: skipping the content in
+the layout alone still leaves it readable in the streamed RSC payload, which
+would defeat the point. The tenant's logo, name and real contact details stay, so
+a visitor who followed a link sees "back shortly" rather than "wrong address",
+and the page is `noindex` so a week's lapse cannot leave *This website is
+offline* as the company's search result.
+
+The wording lives in the template, in `src/config/site.ts`, one block per
+reason — a lapsed plan reads differently from a company that was never put on one
+("coming soon", not "renew"). Nothing on the page names a plan, a price or a
+date: the API does not return them, and a company's billing position is not its
+customers' business.
+
+**This is retroactive.** Any company without a running subscription — including
+one that simply never had a plan assigned — gets the holding page as soon as this
+is deployed. Check `subscriptions` before shipping it at a live tenant.
 
 ## Verification
 
