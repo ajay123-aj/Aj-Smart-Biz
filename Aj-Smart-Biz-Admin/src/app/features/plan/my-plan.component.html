@@ -121,6 +121,23 @@
           <div class="empty"><div>No limits recorded</div></div>
         }
 
+        <!--
+          Functionality first, and separately: these are enforced grants you can
+          actually switch on, where the list below is the plan's marketing copy.
+        -->
+        @if (grantedFunctionalities().length) {
+          <div class="divider"></div>
+          <div class="tiny muted" style="margin-bottom:6px">Functionality included</div>
+          <div class="grant-badges">
+            @for (name of grantedFunctionalities(); track name) {
+              <span class="badge badge-info">{{ name }}</span>
+            }
+          </div>
+          <p class="tiny muted" style="margin:8px 0 0">
+            Switch these on under <strong>Company Details → Functionality</strong> to put them on your website.
+          </p>
+        }
+
         @if (features().length) {
           <div class="divider"></div>
           <div class="tiny muted" style="margin-bottom:6px">Included in your plan</div>
@@ -218,6 +235,15 @@
                   {{ plan.maxBranches }} branches · {{ plan.maxAdmins }} admins<br />
                   {{ plan.maxUsers }} users · {{ plan.storageMb }} MB
                 </div>
+
+                <!-- What moving to this plan would actually unlock. -->
+                @if (functionalityNames(plan.functionalities).length) {
+                  <div class="grant-badges" style="margin-bottom:10px">
+                    @for (name of functionalityNames(plan.functionalities); track name) {
+                      <span class="badge badge-info">{{ name }}</span>
+                    }
+                  </div>
+                }
 
                 @if (plan.features?.length) {
                   <ul class="feature-mini">

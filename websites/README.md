@@ -45,6 +45,20 @@ the pinned branch, the head office, every active branch, and the hero slides the
 company manages in **Slider Management** — already ordered and already resolved
 branch-wise. No GST or PAN number, no plan, subscription or admin data.
 
+## Running a template
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Development. Watches files — use this while editing. |
+| `npm run preview` | `build` then `start`. Use this to look at a production build. |
+| `npm start` | Serves the **existing** `.next` build. Does **not** rebuild. |
+
+> **`npm start` serves a snapshot.** `next start` loads the build that exists
+> when it boots and never looks at your source again, so editing a component
+> and reloading the page shows nothing — the API data changes, the markup does
+> not. That is `npm run preview`'s whole reason for existing. In development,
+> `npm run dev` avoids the problem entirely.
+
 ## Ports
 
 | App | Port |

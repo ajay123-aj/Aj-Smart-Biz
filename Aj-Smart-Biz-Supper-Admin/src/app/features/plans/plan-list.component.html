@@ -30,6 +30,7 @@
               <th class="sortable text-right" (click)="page.store.toggleSort('price')">Price{{ page.store.sortIcon('price') }}</th>
               <th>Billing</th>
               <th>Limits</th>
+              <th>Functionality</th>
               <th class="text-right">Companies</th>
               <th>Status</th>
               <th class="text-right">Actions</th>
@@ -62,6 +63,18 @@
                 <td class="tiny muted nowrap">
                   {{ row.maxBranches }} branches · {{ row.maxAdmins }} admins<br />
                   {{ row.maxUsers }} users · {{ row.storageMb }} MB
+                </td>
+                <!-- What the plan grants, as opposed to the free-text features. -->
+                <td>
+                  @if (grantNames(row).length) {
+                    <div class="grant-badges">
+                      @for (name of grantNames(row); track name) {
+                        <span class="badge badge-info">{{ name }}</span>
+                      }
+                    </div>
+                  } @else {
+                    <span class="tiny muted">—</span>
+                  }
                 </td>
                 <!-- What this plan is actually carrying today; deleting is blocked while it is in use. -->
                 <td class="text-right nowrap">
@@ -184,8 +197,40 @@
 
       <div class="field">
         <label for="features">Features</label>
-        <textarea id="features" class="textarea" formControlName="features" placeholder="GST billing&#10;WhatsApp alerts&#10;Daily backups"></textarea>
-        <span class="hint">One feature per line</span>
+        <textarea id="features" class="textarea" formControlName="features" placeholder="GST billing&#10;Daily backups&#10;Priority support"></textarea>
+        <span class="hint">One per line. Marketing copy for the pricing table — nothing here is enforced.</span>
+      </div>
+
+      <!--
+        Functionality, unlike the free-text features above, is enforced: a company
+        can only switch on what its plan grants here, and the grant is frozen onto
+        the subscription when the plan is activated, so editing a plan never
+        revokes a feature a running term was already sold.
+      -->
+      <div class="field">
+        <label>Functionality this plan includes</label>
+        @if (functionalities().length === 0) {
+          <p class="tiny muted mb-0">The functionality catalogue could not be loaded.</p>
+        } @else {
+          <div class="grant-grid">
+            @for (feature of functionalities(); track feature.key) {
+              <label class="grant" [class.grant-on]="grants(feature.key)">
+                <input
+                  type="checkbox"
+                  [checked]="grants(feature.key)"
+                  (change)="toggleGrant(feature.key, checked($event))"
+                />
+                <span class="grant-body">
+                  <span class="grant-name">{{ feature.name }}</span>
+                  <span class="grant-summary">{{ feature.summary }}</span>
+                </span>
+              </label>
+            }
+          </div>
+          <span class="hint">
+            Granting it lets a company switch it on. It only reaches their website once they do.
+          </span>
+        }
       </div>
 
       <label class="check">

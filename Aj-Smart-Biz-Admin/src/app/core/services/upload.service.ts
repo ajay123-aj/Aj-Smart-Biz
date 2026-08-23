@@ -4,7 +4,8 @@ import { Observable, filter, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api.model';
 
-export type UploadFolder = 'branch' | 'company' | 'slider' | 'avatar' | 'misc';
+/** Mirrors `FOLDERS` in the API's upload middleware, which rejects anything else. */
+export type UploadFolder = 'branch' | 'company' | 'slider' | 'team' | 'gallery' | 'avatar' | 'misc';
 
 export interface UploadedFile {
   /** Stored in the database, e.g. `/uploads/branch/abc.png`. */

@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { tap } from 'rxjs';
 import { CompanyService } from '../../core/services/company.service';
+import { CompanyContextService } from './company-context.service';
 import { CrudFactory, MASTER_PATHS } from '../../core/services/crud.service';
 import { ConfirmService } from '../../core/services/confirm.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -24,6 +25,7 @@ import { TableStateComponent } from '../../shared/ui/table-state.component';
 @Component({
   selector: 'app-branch-manager',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'card' },
   imports: [
     ReactiveFormsModule,
     RouterLink,
@@ -39,6 +41,8 @@ import { TableStateComponent } from '../../shared/ui/table-state.component';
   templateUrl: './branch-manager.component.html',
   styles: [
     `
+      :host { display: block; }
+
       .logo-cell {
         width: 34px; height: 34px; flex-shrink: 0;
         border-radius: 8px; overflow: hidden;
@@ -52,8 +56,16 @@ import { TableStateComponent } from '../../shared/ui/table-state.component';
   ],
 })
 export class BranchManagerComponent {
-  /** Emitted after every load so the host tab can show a live count. */
+  /** Emitted after every load, for a host that wants a live count. */
   readonly countChange = output<number>();
+
+  /**
+   * Optional because this component is the Branches page under Company Details
+   * but need not always be: when the section context is there, the count goes
+   * into it so the summary card on Profile stays right after a branch is added
+   * or removed.
+   */
+  private readonly ctx = inject(CompanyContextService, { optional: true });
 
   private readonly fb = inject(FormBuilder);
   private readonly companies = inject(CompanyService);
@@ -63,7 +75,12 @@ export class BranchManagerComponent {
   private readonly uploads = inject(UploadService);
 
   readonly store = new ListStore<Branch>((query) =>
-    this.companies.listBranches(query).pipe(tap((result) => this.countChange.emit(result.meta.total)))
+    this.companies.listBranches(query).pipe(
+      tap((result) => {
+        this.countChange.emit(result.meta.total);
+        this.ctx?.branchCount.set(result.meta.total);
+      })
+    )
   );
   readonly states = signal<Option[]>([]);
   readonly modalOpen = signal(false);

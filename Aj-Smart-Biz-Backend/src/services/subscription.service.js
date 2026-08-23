@@ -191,6 +191,9 @@ const snapshotOf = (plan) => ({
   maxUsers: plan.maxUsers,
   storageMb: plan.storageMb,
   features: plan.features,
+  // Frozen with the limits, and for the same reason: a plan that drops
+  // WhatsApp tomorrow must not switch it off under a term already sold.
+  functionalities: plan.functionalities,
 });
 
 /**

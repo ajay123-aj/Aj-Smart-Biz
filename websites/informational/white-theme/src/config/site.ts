@@ -20,73 +20,123 @@ export interface Slide {
   secondaryCta?: NavLink;
 }
 
-export interface Highlight {
-  title: string;
-  body: string;
-}
-
+/**
+ * The nav.
+ *
+ * Every entry is a real route now. The two anchor links this bar used to carry
+ * pointed at the template's own "what we do" and "why us" sections, which are
+ * gone — nothing on the site is the template's words any more.
+ */
+/**
+ * The menu the template would use on its own.
+ *
+ * The API sends the real one — named by the tenant, with the pages they are
+ * not publishing already removed — so this is only the shape of it, and the
+ * fallback in `FALLBACK_COMPANY` for when there is no tenant to ask.
+ */
 export const NAV_LINKS: NavLink[] = [
-  { label: 'Home', href: '#home' },
-  { label: 'About', href: '#about' },
-  { label: 'What we do', href: '#services' },
-  { label: 'Why us', href: '#why' },
-  { label: 'Contact', href: '#contact' },
+  { label: 'Home', href: '/' },
+  { label: 'About us', href: '/about' },
+  { label: 'Contact', href: '/contact' },
 ];
+
+/** The band that closes the home page and sends people to `/contact`. */
+/**
+ * The band that closes every page. One block of copy, because the band is one
+ * component — see `CtaBand`. It said something different on each page before,
+ * which is how the two of them drifted apart.
+ */
+export const CTA_BAND = {
+  eyebrow: 'Next step',
+  title: 'Tell {company} what you need',
+  body: 'A short message is enough to start. We will come back with questions, a scope and a number — usually within a working day.',
+  button: 'Contact us →',
+} as const;
+
+/**
+ * Copy for the Contact page. Its heading and intro come from the tenant's own
+ * Contact settings; these are the labels around them.
+ */
+export const CONTACT_PAGE = {
+  metaTitle: 'Contact',
+  formTitle: 'Send us a message',
+  formLede: 'Fill this in and it opens in your own app, ready to send — nothing is stored here.',
+  detailsTitle: 'Reach us directly',
+  shareLabel: 'Know someone who needs us?',
+  locationsEyebrow: 'Where to find us',
+  locationsTitle: 'Our locations',
+  mapLink: 'Open in maps →',
+} as const;
+
+/** Copy for the About page. Everything factual on it comes from the API. */
+export const ABOUT_PAGE = {
+  metaTitle: 'About us',
+
+  storyEyebrow: 'The story',
+  storyTitle: 'How we got here',
+  /** When the tenant has written nothing and the profile yielded nothing either. */
+  emptyStory: 'There is more to say about {company} than fits here — get in touch and ask.',
+
+} as const;
 
 export const SLIDES: Slide[] = [
   {
     eyebrow: 'Welcome',
     title: '{company}',
     body: '{tagline}',
-    primaryCta: { label: 'Get in touch', href: '#contact' },
-    secondaryCta: { label: 'What we do', href: '#services' },
+    primaryCta: { label: 'Get in touch', href: '/contact' },
+    secondaryCta: { label: 'About us', href: '/about' },
   },
   {
     eyebrow: 'Built on trust',
     title: 'Work that holds up',
     body: 'Every engagement starts with understanding what you actually need, and ends with something you can rely on long after we have handed it over.',
-    primaryCta: { label: 'About us', href: '#about' },
-    secondaryCta: { label: 'Why us', href: '#why' },
+    primaryCta: { label: 'About us', href: '/about' },
+    secondaryCta: { label: 'Talk to us', href: '/contact' },
   },
   {
     eyebrow: 'Here when you need us',
     title: 'People, not ticket numbers',
     body: 'You get the same team that built it — reachable, accountable and quick to answer, whether the question is small or serious.',
-    primaryCta: { label: 'Talk to us', href: '#contact' },
+    primaryCta: { label: 'Talk to us', href: '/contact' },
   },
 ];
 
 /** Auto-advance interval for the slider, in milliseconds. */
 export const SLIDE_INTERVAL_MS = 6000;
 
-export const SERVICES: Highlight[] = [
-  {
-    title: 'Consulting',
-    body: 'A clear read on where you are and what to do next, written in plain language and costed honestly.',
-  },
-  {
-    title: 'Implementation',
-    body: 'We build and roll out what was agreed, on the timeline that was agreed, and tell you early when something changes.',
-  },
-  {
-    title: 'Support',
-    body: 'Ongoing care after go-live — monitoring, small changes and a straight answer whenever you call.',
-  },
-];
 
-export const WHY_US: Highlight[] = [
-  { title: 'Fixed, honest pricing', body: 'You know the number before work starts. No line items appear later.' },
-  { title: 'One team throughout', body: 'The people who scoped the work are the people who deliver it.' },
-  { title: 'Documented handover', body: 'Nothing is left in someone\u2019s head. You own what we build, in full.' },
-  { title: 'Answered the same day', body: 'Questions get a reply within business hours, not a queue position.' },
-];
 
-export const STATS: { value: string; label: string }[] = [
-  { value: '12+', label: 'Years in business' },
-  { value: '250+', label: 'Projects delivered' },
-  { value: '98%', label: 'Clients who stay' },
-  { value: '24h', label: 'Typical reply time' },
-];
+/**
+ * About copy for a host that resolved to no tenant at all.
+ *
+ * A real company that has not bought the About functionality does NOT get this
+ * — it gets a section built from its own profile instead, because inventing
+ * prose about a real business is worse than saying less. See `AboutSection`.
+ */
+export const ABOUT_FALLBACK = {
+  eyebrow: 'About us',
+  title: 'Who {company} is',
+  lead: 'Straightforward work, delivered when we said it would be.',
+  paragraphs: [
+    'We are a small team that prefers finishing things to announcing them. Work is scoped honestly, priced once, and handed over documented — so what you get on the last day is what you were shown on the first.',
+    'Most of our work comes from people we have already worked with. That is the only marketing metric we pay attention to.',
+  ],
+};
+
+/** Headings for the Team section. The people themselves come from the API. */
+export const TEAM_COPY = {
+  eyebrow: 'Our team',
+  title: 'The people you will be working with',
+  lede: 'Small enough that you will know everyone by name, and reach them directly.',
+};
+
+/** Headings for the Gallery section. The pictures come from the API. */
+export const GALLERY_COPY = {
+  eyebrow: 'Our work',
+  title: 'A look at what we have made',
+  lede: 'A selection of recent work. Every piece here was made for someone.',
+};
 
 /**
  * Shown only when a host resolved to no tenant at all — a real company's own

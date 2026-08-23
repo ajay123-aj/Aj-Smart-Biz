@@ -11,6 +11,13 @@ const Branch = require('./branch.model')(sequelize);
 const BranchContact = require('./branchContact.model')(sequelize);
 const CompanyDomain = require('./companyDomain.model')(sequelize);
 const Slider = require('./slider.model')(sequelize);
+const CompanyFunctionality = require('./companyFunctionality.model')(sequelize);
+const CompanyWhatsapp = require('./companyWhatsapp.model')(sequelize);
+const CompanyAbout = require('./companyAbout.model')(sequelize);
+const CompanyContact = require('./companyContact.model')(sequelize);
+const CompanyStat = require('./companyStat.model')(sequelize);
+const CompanyTeamMember = require('./companyTeamMember.model')(sequelize);
+const CompanyGalleryItem = require('./companyGalleryItem.model')(sequelize);
 const CompanySubscription = require('./companySubscription.model')(sequelize);
 const SubscriptionEvent = require('./subscriptionEvent.model')(sequelize);
 const PlanRequest = require('./planRequest.model')(sequelize);
@@ -48,6 +55,46 @@ Company.hasMany(Slider, { foreignKey: 'companyId', as: 'sliders', onDelete: 'CAS
 Slider.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Branch.hasMany(Slider, { foreignKey: 'branchId', as: 'sliders', onDelete: 'CASCADE' });
 Slider.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+
+// Optional functionality: the tenant's switch per feature, and the typed
+// WhatsApp numbers the `whatsapp` feature publishes. Both belong to the company
+// rather than to a plan, so a downgrade parks the setup instead of losing it.
+Company.hasMany(CompanyFunctionality, { foreignKey: 'companyId', as: 'functionalities', onDelete: 'CASCADE' });
+CompanyFunctionality.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(CompanyWhatsapp, { foreignKey: 'companyId', as: 'whatsappNumbers', onDelete: 'CASCADE' });
+CompanyWhatsapp.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+
+// Website content the tenant writes: the About stat band, the Team section and
+// the Gallery. Each is gated by its own functionality but owned by the company,
+// so losing a plan parks the content rather than deleting it.
+// All four are branch-aware the way sliders are: a row pinned to a branch shows
+// on that branch's site, and `branch_id NULL` is the company-wide copy every
+// other site falls back to. Deleting a branch takes its own rows with it; the
+// company-wide ones survive.
+Company.hasMany(CompanyAbout, { foreignKey: 'companyId', as: 'aboutCopies', onDelete: 'CASCADE' });
+CompanyAbout.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(CompanyAbout, { foreignKey: 'branchId', as: 'aboutCopies', onDelete: 'CASCADE' });
+CompanyAbout.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+
+Company.hasMany(CompanyContact, { foreignKey: 'companyId', as: 'contactCopies', onDelete: 'CASCADE' });
+CompanyContact.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(CompanyContact, { foreignKey: 'branchId', as: 'contactCopies', onDelete: 'CASCADE' });
+CompanyContact.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+
+Company.hasMany(CompanyStat, { foreignKey: 'companyId', as: 'stats', onDelete: 'CASCADE' });
+CompanyStat.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(CompanyStat, { foreignKey: 'branchId', as: 'stats', onDelete: 'CASCADE' });
+CompanyStat.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+
+Company.hasMany(CompanyTeamMember, { foreignKey: 'companyId', as: 'teamMembers', onDelete: 'CASCADE' });
+CompanyTeamMember.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(CompanyTeamMember, { foreignKey: 'branchId', as: 'teamMembers', onDelete: 'CASCADE' });
+CompanyTeamMember.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+
+Company.hasMany(CompanyGalleryItem, { foreignKey: 'companyId', as: 'galleryItems', onDelete: 'CASCADE' });
+CompanyGalleryItem.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(CompanyGalleryItem, { foreignKey: 'branchId', as: 'galleryItems', onDelete: 'CASCADE' });
+CompanyGalleryItem.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
 
 Company.hasMany(CompanyDomain, { foreignKey: 'companyId', as: 'domains', onDelete: 'CASCADE' });
 CompanyDomain.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
@@ -136,6 +183,13 @@ const db = {
   BranchContact,
   CompanyDomain,
   Slider,
+  CompanyFunctionality,
+  CompanyWhatsapp,
+  CompanyAbout,
+  CompanyContact,
+  CompanyStat,
+  CompanyTeamMember,
+  CompanyGalleryItem,
   CompanySubscription,
   SubscriptionEvent,
   PlanRequest,

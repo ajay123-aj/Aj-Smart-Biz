@@ -15,7 +15,7 @@ module.exports = [
     title: '{company}',
     subtitle: 'Straightforward work, delivered when we said it would be.',
     ctaLabel: 'Get in touch',
-    ctaUrl: '#contact',
+    ctaUrl: '/contact',
     sequence: 1,
   },
   {
@@ -23,8 +23,8 @@ module.exports = [
     title: 'Work that holds up',
     subtitle:
       'Every engagement starts with understanding what you actually need, and ends with something you can rely on.',
-    ctaLabel: 'What we do',
-    ctaUrl: '#services',
+    ctaLabel: 'About us',
+    ctaUrl: '/about',
     sequence: 2,
   },
   {
@@ -32,7 +32,7 @@ module.exports = [
     title: 'People, not ticket numbers',
     subtitle: 'You get the same team that built it — reachable, accountable and quick to answer.',
     ctaLabel: 'Talk to us',
-    ctaUrl: '#contact',
+    ctaUrl: '/contact',
     sequence: 3,
   },
 ];

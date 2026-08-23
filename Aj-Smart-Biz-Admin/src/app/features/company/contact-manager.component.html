@@ -1,0 +1,173 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:340px"></div>
+  } @else {
+    <app-feature-gate [feature]="feature()" />
+
+    <div class="note">
+      <span class="note-icon" aria-hidden="true">ℹ️</span>
+      <span>
+        These settings decide how your Contact page reads. The addresses, phone numbers and opening hours
+        on it come from your company profile and your branches.
+      </span>
+    </div>
+
+    @if (feature()?.granted && !canEdit()) {
+      <p class="tiny muted" style="margin-top:0">
+        Only the main admin can change what your website says. You are viewing this read only.
+      </p>
+    }
+
+    <!-- Which site these settings are for. -->
+    @if (feature()?.granted && branches().length > 0) {
+      <div class="scope-bar">
+        <label class="scope-label" for="contact-scope">Editing the Contact page for</label>
+        <select
+          id="contact-scope"
+          class="select"
+          style="width:auto"
+          [disabled]="!writable()"
+          (change)="onScope(selectValue($event))"
+        >
+          <option value="">All branches (company-wide)</option>
+          @for (branch of branches(); track branch.id) {
+            <option [value]="branch.id" [selected]="scope() === branch.id">{{ branch.name }}</option>
+          }
+        </select>
+
+        @if (scope() && !overridden()) {
+          <span class="scope-note">
+            Inheriting the company-wide settings — saving here gives {{ scopeName() }} its own.
+          </span>
+        } @else if (scope()) {
+          <span class="scope-note scope-note-own">{{ scopeName() }} has its own settings.</span>
+          @if (writable()) {
+            <button type="button" class="btn btn-sm btn-ghost" (click)="clearOverride()">
+              Use the company-wide settings
+            </button>
+          }
+        }
+      </div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="contact-nav">Menu name</label>
+          <input id="contact-nav" class="input" formControlName="navLabel" placeholder="Contact" maxlength="40" />
+          <span class="hint">What this page is called in your website's menu</span>
+        </div>
+        <div class="field">
+          <label for="contact-eyebrow">Eyebrow</label>
+          <input id="contact-eyebrow" class="input" formControlName="eyebrow" placeholder="Contact" />
+          <span class="hint">The small line above the heading</span>
+        </div>
+        <div class="field">
+          <label for="contact-title">Heading</label>
+          <input id="contact-title" class="input" formControlName="title" placeholder="Talk to {company}" />
+          <span class="hint"><code>&#123;company&#125;</code> is replaced with your company name</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="contact-lead">Opening line</label>
+        <input
+          id="contact-lead"
+          class="input"
+          formControlName="lead"
+          placeholder="Tell us what you need and we will come back with questions, a scope and a number."
+        />
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- --------------------------- the enquiry form --------------------------- -->
+      <div class="switch-row">
+        <label class="switch" [title]="writable() ? 'Show or hide the form' : 'You cannot change this'">
+          <input
+            type="checkbox"
+            [checked]="form.controls.showForm.value"
+            [disabled]="!writable()"
+            (change)="toggle('showForm', checked($event))"
+          />
+          <span class="track"></span>
+        </label>
+        <div class="switch-body">
+          <div class="switch-name">Show an enquiry form</div>
+          <p class="switch-hint">
+            The form has <strong>no inbox behind it</strong>. A visitor fills it in and the button opens
+            their own WhatsApp or mail app with the message ready to send — so nothing is stored here, and
+            no enquiry ends up sitting unread in a screen nobody has built.
+          </p>
+        </div>
+      </div>
+
+      @if (form.controls.showForm.value) {
+        <div class="field" style="margin-top:18px">
+          <label>Where should the form send people?</label>
+          <div class="target-grid">
+            <label class="target" [class.target-on]="targetIs('email')">
+              <input type="radio" [checked]="targetIs('email')" [disabled]="!writable()" (change)="setTarget('email')" />
+              <span>
+                <span class="target-name">Email</span>
+                <span class="target-hint">Opens their mail app, addressed to your company email</span>
+              </span>
+            </label>
+            <label class="target" [class.target-on]="targetIs('whatsapp')">
+              <input type="radio" [checked]="targetIs('whatsapp')" [disabled]="!writable()" (change)="setTarget('whatsapp')" />
+              <span>
+                <span class="target-name">WhatsApp</span>
+                <span class="target-hint">Opens WhatsApp to your <strong>Inquiry</strong> number</span>
+              </span>
+            </label>
+          </div>
+          @if (targetIs('whatsapp')) {
+            <span class="hint">
+              Needs the WhatsApp functionality switched on with a number set — without one the form is
+              hidden rather than shown with a button that goes nowhere.
+            </span>
+          }
+        </div>
+
+        <div class="field">
+          <label for="contact-note">Small print under the form</label>
+          <input
+            id="contact-note"
+            class="input"
+            formControlName="formNote"
+            placeholder="We usually reply within one working day."
+          />
+        </div>
+      }
+
+      <!-- ----------------------------- locations ----------------------------- -->
+      <div class="switch-row">
+        <label class="switch" [title]="writable() ? 'Show or hide your locations' : 'You cannot change this'">
+          <input
+            type="checkbox"
+            [checked]="form.controls.showLocations.value"
+            [disabled]="!writable()"
+            (change)="toggle('showLocations', checked($event))"
+          />
+          <span class="track"></span>
+        </label>
+        <div class="switch-body">
+          <div class="switch-name">Show your locations</div>
+          <p class="switch-hint">
+            A card per branch with its address, hours and a link that opens the visitor's own maps. Comes
+            from <strong>Branches</strong> — edit the details there.
+          </p>
+        </div>
+      </div>
+
+      @if (writable()) {
+        <div class="row-end" style="margin-top:20px">
+          <button type="button" class="btn btn-ghost" (click)="reset()">Reset</button>
+          <button type="submit" class="btn btn-primary" [disabled]="saving()">
+            {{ saving() ? 'Saving…' : 'Save contact page' }}
+          </button>
+        </div>
+      }
+    </form>
+  }
+</div>

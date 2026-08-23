@@ -1,6 +1,8 @@
-import { NAV_LINKS } from '@/config/site';
-import { displayUrl, telHref, toFileUrl, type CompanyDetails } from '@/lib/company';
+import Link from 'next/link';
+
+import { displayUrl, navOf, telHref, toFileUrl, type CompanyDetails } from '@/lib/company';
 import { siteContact } from '@/lib/contact';
+import WhatsAppButton from './WhatsAppButton';
 import styles from './Footer.module.css';
 
 /**
@@ -42,10 +44,11 @@ export default function Footer({ company }: { company: CompanyDetails }) {
 
         <nav className={styles.column} aria-label="Footer">
           <h3 className={styles.columnTitle}>Explore</h3>
-          {NAV_LINKS.map((link) => (
-            <a key={link.href} className={styles.link} href={link.href}>
+          {/* The same menu the header renders, from the same place. */}
+          {navOf(company).map((link) => (
+            <Link key={link.key} className={styles.link} href={link.href}>
               {link.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
@@ -68,6 +71,25 @@ export default function Footer({ company }: { company: CompanyDetails }) {
           ) : null}
           {contact.address ? <span className={styles.muted}>{contact.address}</span> : null}
           {contact.hours ? <span className={styles.muted}>{contact.hours}</span> : null}
+
+          {/* Plain variant: a green pill in a footer column would shout. Both
+              render nothing at all unless the tenant is entitled to WhatsApp. */}
+          <WhatsAppButton
+            company={company}
+            type="contact"
+            label="WhatsApp us"
+            variant="plain"
+            className={styles.link}
+          />
+          <WhatsAppButton
+            company={company}
+            type="support"
+            label="WhatsApp support"
+            variant="plain"
+            className={styles.link}
+            /* Only when it is a different number — otherwise it is the line above. */
+            exact
+          />
         </div>
 
         {/* Only worth a column of its own once there is more than the head office. */}

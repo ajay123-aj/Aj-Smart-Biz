@@ -51,6 +51,12 @@ export const MASTER_PATHS = {
   plans: '/masters/plans',
 } as const;
 
+/**
+ * Not a master table — the platform defines these in code — so it has no CRUD
+ * client, just the one read both consoles make to name the functionality keys.
+ */
+export const FUNCTIONALITY_CATALOGUE_PATH = '/masters/functionalities';
+
 /** Factory so a feature can do `crud.for<Plan>(MASTER_PATHS.plans)`. */
 @Injectable({ providedIn: 'root' })
 export class CrudFactory {

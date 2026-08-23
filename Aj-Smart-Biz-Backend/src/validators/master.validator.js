@@ -1,7 +1,7 @@
 'use strict';
 
 const { Joi, idParam, listQuery, statusBody, hexColor, status } = require('./common');
-const { BILLING_CYCLE } = require('../constants');
+const { BILLING_CYCLE, FUNCTIONALITY_VALUES } = require('../constants');
 
 /**
  * Update schemas are written without `.default()` on purpose: Joi injects
@@ -88,6 +88,10 @@ const planFields = {
   maxUsers: Joi.number().integer().min(1),
   storageMb: Joi.number().integer().min(1),
   features: Joi.array().items(Joi.string().max(200)).allow(null),
+  // Enforced, unlike `features`: only a key the platform actually
+  // implements may be granted, so a typo cannot sell a feature that does
+  // not exist. `unique()` keeps the snapshot honest.
+  functionalities: Joi.array().items(Joi.string().valid(...FUNCTIONALITY_VALUES)).unique().allow(null),
   isPopular: Joi.boolean(),
   sequence: Joi.number().integer(),
   status,

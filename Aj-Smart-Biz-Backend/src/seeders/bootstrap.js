@@ -3,9 +3,9 @@
 const db = require('../models');
 const config = require('../config/env');
 const logger = require('../utils/logger');
-const defaultMenus = require('./defaultMenus');
+const { menus: defaultMenus } = require('./defaultMenus');
 const defaultSliders = require('./defaultSliders');
-const { SUPER_ADMIN_ROLE, STATUS, PERMISSION_ACTIONS } = require('../constants');
+const { SUPER_ADMIN_ROLE, STATUS, PERMISSION_ACTIONS, FUNCTIONALITY } = require('../constants');
 
 /**
  * Runs on every boot: if no root super admin exists it is created from the
@@ -59,13 +59,20 @@ async function ensureSuperAdmin() {
 async function ensureSystemMenus() {
   let inserted = 0;
   let updated = 0;
+  const rows = new Map();
 
   for (const menu of defaultMenus) {
+    // `parent` is a slug, not a column; it is resolved to `parentId` below,
+    // once every row is guaranteed to exist.
+    const { parent, ...columns } = menu;
+
     // eslint-disable-next-line no-await-in-loop
     const [row, created] = await db.Menu.findOrCreate({
       where: { slug: menu.slug, companyId: null },
-      defaults: { ...menu, companyId: null, isSystem: true, status: STATUS.ACTIVE },
+      defaults: { ...columns, companyId: null, isSystem: true, status: STATUS.ACTIVE },
     });
+    rows.set(menu.slug, row);
+
     if (created) {
       inserted += 1;
       continue;
@@ -73,7 +80,7 @@ async function ensureSystemMenus() {
 
     const patch = {};
     ['name', 'icon', 'route', 'sequence'].forEach((field) => {
-      const next = menu[field] ?? null;
+      const next = columns[field] ?? null;
       if ((row[field] ?? null) !== next) patch[field] = next;
     });
     if (!row.isSystem) patch.isSystem = true;
@@ -85,8 +92,25 @@ async function ensureSystemMenus() {
     }
   }
 
+  /**
+   * Nesting, in a second pass. Doing it here rather than inline means a child
+   * may be listed before its parent, and means an install that predates the
+   * submenus gets them attached rather than left flat at the top level.
+   */
+  let nested = 0;
+  for (const menu of defaultMenus) {
+    const row = rows.get(menu.slug);
+    const parentId = menu.parent ? rows.get(menu.parent)?.id ?? null : null;
+    if (!row || (row.parentId ?? null) === parentId) continue;
+
+    // eslint-disable-next-line no-await-in-loop
+    await row.update({ parentId });
+    nested += 1;
+  }
+
   if (inserted) logger.info(`Seeded ${inserted} system menu(s)`);
   if (updated) logger.info(`Updated ${updated} system menu(s)`);
+  if (nested) logger.info(`Re-parented ${nested} system menu(s)`);
 }
 
 /**
@@ -206,12 +230,105 @@ async function ensureDefaultSliders() {
   logger.info(`Seeded ${rows.length} default slide(s) across ${rows.length / defaultSliders.length} company(ies)`);
 }
 
+/**
+ * Moves any About copy still living on `company_functionalities.settings` into
+ * its own `company_about` row.
+ *
+ * About started as a single blob per tenant, which was fine until it became
+ * branch-aware — a company can now have one copy per branch, and that is a
+ * table, not a JSON field. This runs once per company: it writes the
+ * company-wide row (`branch_id NULL`) and clears the old blob, so a tenant that
+ * wrote its About before the change does not open the screen to empty fields.
+ *
+ * Safe to run repeatedly — a company that already has a company-wide row is
+ * skipped, so it never overwrites copy edited since the move.
+ */
+async function ensureAboutRows() {
+  const legacy = await db.CompanyFunctionality.findAll({
+    where: { key: FUNCTIONALITY.ABOUT_US },
+    attributes: ['id', 'companyId', 'settings'],
+  });
+  if (!legacy.length) return;
+
+  let moved = 0;
+  for (const row of legacy) {
+    const settings = row.settings;
+    // Nothing worth keeping: no blob, or a blob with every field empty.
+    const hasCopy =
+      settings && typeof settings === 'object' &&
+      ['eyebrow', 'title', 'lead', 'body'].some((field) => settings[field]);
+    if (!hasCopy) continue;
+
+    // eslint-disable-next-line no-await-in-loop
+    const existing = await db.CompanyAbout.findOne({
+      where: { companyId: row.companyId, branchId: null },
+      attributes: ['id'],
+    });
+
+    if (!existing) {
+      // eslint-disable-next-line no-await-in-loop
+      await db.CompanyAbout.create({
+        companyId: row.companyId,
+        branchId: null,
+        eyebrow: settings.eyebrow ?? null,
+        title: settings.title ?? null,
+        lead: settings.lead ?? null,
+        body: settings.body ?? null,
+      });
+      moved += 1;
+    }
+
+    // Cleared either way: the blob is no longer read, and leaving it behind
+    // would look like a second source of truth to anyone reading the table.
+    // eslint-disable-next-line no-await-in-loop
+    await row.update({ settings: null });
+  }
+
+  if (moved) logger.info(`Moved ${moved} About copy/copies into company_about`);
+}
+
+/**
+ * Repoints slide buttons that still aim at sections the template no longer has.
+ *
+ * The websites used to be one page of anchors. About and Contact are real pages
+ * now, and the template's own "what we do" and "why us" sections are gone — so
+ * a slide seeded with `#services` is a button that scrolls nowhere. Nothing in
+ * the tenant's own writing is touched: only these five exact anchor values are
+ * rewritten, and a slide pointing anywhere else is left alone.
+ *
+ * This edits tenant rows, which is not something a boot task should normally
+ * do. It is justified here because the links were broken *by* the template
+ * change rather than by the tenant, and a dead button on a live website is not
+ * something to leave sitting until somebody notices.
+ */
+const DEAD_SLIDE_LINKS = {
+  '#services': '/about',
+  '#why': '/about',
+  '#about': '/about',
+  '#contact': '/contact',
+  '#home': '/',
+};
+
+async function ensureSlideLinks() {
+  let moved = 0;
+
+  for (const [from, to] of Object.entries(DEAD_SLIDE_LINKS)) {
+    // eslint-disable-next-line no-await-in-loop
+    const [count] = await db.Slider.update({ ctaUrl: to }, { where: { ctaUrl: from } });
+    moved += count;
+  }
+
+  if (moved) logger.info(`Repointed ${moved} slide button(s) from removed page anchors`);
+}
+
 async function runBootstrap() {
   await ensureSuperAdmin();
   await ensureSystemMenus();
   await ensureSystemRolePermissions();
   await ensureReferenceData();
   await ensureDefaultSliders();
+  await ensureAboutRows();
+  await ensureSlideLinks();
 }
 
 module.exports = {
@@ -221,4 +338,6 @@ module.exports = {
   ensureSystemRolePermissions,
   ensureReferenceData,
   ensureDefaultSliders,
+  ensureAboutRows,
+  ensureSlideLinks,
 };

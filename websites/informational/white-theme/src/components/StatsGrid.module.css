@@ -1,0 +1,136 @@
+/* ------------------------------------------------------------------ *
+ * The figures, as cards.
+ *
+ * The same object the other cards on the site are — frosted panel, ghosted
+ * numeral, accent rule filling on hover — so there is one card and not
+ * several. They were an open strip of dividers before, which read as a table
+ * rather than as something to look at.
+ *
+ * This was written into the About stylesheet. It lives here now because the
+ * same row also closes the home page.
+ * ------------------------------------------------------------------ */
+
+.stats {
+  display: grid;
+  /* Auto-fit rather than a fixed four: the company decides how many figures it
+     has, and three or five must not leave a hole in the row. */
+  grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+}
+
+.stat {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  /* The value is second in the DOM so a screen reader reads "label, value";
+     reversing here puts the figure on top where the eye wants it. */
+  flex-direction: column-reverse;
+  gap: 6px;
+  padding: 28px 26px 30px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease,
+    background-color 0.22s ease;
+}
+
+.stat:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-hover);
+}
+
+/* A hairline that fills across the top on hover — the card acknowledging you. */
+.stat::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  width: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.stat:hover::after {
+  transform: scaleX(1);
+}
+
+.index {
+  position: absolute;
+  top: 6px;
+  right: 14px;
+  font-size: 3.4rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  color: color-mix(in srgb, var(--accent) 13%, transparent);
+  pointer-events: none;
+}
+
+.value {
+  margin: 0;
+  font-size: clamp(1.8rem, 3vw, 2.35rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+  /* Ink, not brand: a row of saturated numbers would out-shout the heading. */
+  color: var(--text);
+}
+
+.label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+/* ------------------------------ responsive ------------------------------ */
+
+/*
+ * Tablet. `auto-fit` is right on a wide screen and wrong here: at this width it
+ * resolves to three columns, so a company with four figures gets a row of three
+ * and one stranded underneath. Two columns divide four, six and eight evenly.
+ */
+@media (max-width: 1024px) {
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+}
+
+/*
+ * Phone. Still two up rather than stacking: four figures in a column is most of
+ * a screen scrolled past. Smaller type keeps a pair legible on the narrowest
+ * phones.
+ */
+@media (max-width: 560px) {
+  .stats {
+    gap: 12px;
+  }
+
+  .stat {
+    padding: 20px 18px 22px;
+  }
+
+  .value {
+    font-size: 1.6rem;
+  }
+
+  .label {
+    font-size: 0.74rem;
+  }
+
+  .index {
+    font-size: 2.4rem;
+    top: 4px;
+    right: 10px;
+  }
+}

@@ -1,0 +1,224 @@
+/* ------------------------------------------------------------------ *
+ * Team.
+ *
+ * Photo-forward: the picture is the card, and the copy sits on it. The earlier
+ * version put a 72px avatar on a mostly-empty white tile, which made a page of
+ * real people look like a list of placeholders.
+ * ------------------------------------------------------------------ */
+
+/*
+ * `auto-fit` with a capped, centred card.
+ *
+ * `auto-fill` left the tracks it could not fill sitting empty, so a team of
+ * three ended halfway across the page with a hole beside it. `auto-fit`
+ * collapses those tracks and the remaining ones share the width, which spreads
+ * a small team evenly instead. The cap stops that becoming the opposite
+ * problem: without it, two people would be two portraits half a page wide.
+ */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  justify-items: center;
+  gap: 24px;
+}
+
+.card {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  /* Portrait, so a row of faces reads as a row of portraits. */
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  box-shadow: var(--shadow);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s ease;
+}
+
+.card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-lg);
+}
+
+.photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.card:hover .photo {
+  transform: scale(1.05);
+}
+
+/*
+ * No photograph is the common case for a new tenant, so it gets a designed
+ * treatment rather than a grey hole: the initial, large, on a deep brand
+ * ground.
+ *
+ * Dark rather than light on purpose. The name sits on a scrim built for a
+ * photograph, and over a pale tile that scrim reads as a black bar stuck to the
+ * bottom of the card. On a dark ground it is part of the same object.
+ */
+.photoFallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 5rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: color-mix(in srgb, var(--accent-soft) 70%, transparent);
+  background:
+    radial-gradient(110% 80% at 50% 12%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 68%),
+    linear-gradient(165deg, var(--brand) 0%, var(--brand-strong) 100%);
+}
+
+/*
+ * The scrim only exists over the lower half, where the copy is. A full overlay
+ * would grey out the face, which is the one thing the card is for.
+ */
+.body {
+  position: relative;
+  padding: 84px 22px 22px;
+  color: #fff;
+  /*
+    Tall and long-tailed. A short steep scrim reads as a bar across the bottom
+    of the picture; this one starts fading two-thirds of the way up, so the
+    copy sits in shade rather than on a panel.
+  */
+  background: linear-gradient(
+    to top,
+    rgba(18, 18, 20, 0.94) 0%,
+    rgba(18, 18, 20, 0.82) 32%,
+    rgba(18, 18, 20, 0.5) 62%,
+    rgba(18, 18, 20, 0.18) 84%,
+    transparent 100%
+  );
+}
+
+.name {
+  font-size: 1.12rem;
+  letter-spacing: -0.015em;
+}
+
+.role {
+  margin-top: 3px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-soft);
+}
+
+/*
+ * The bio is held back until hover on a pointer device: three lines of prose
+ * on every card turns a portrait wall into a wall of text. Touch devices have
+ * no hover, so there it simply shows — see the media query below.
+ */
+.bio {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.82);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.link {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+  transition: border-color 0.16s ease, color 0.16s ease;
+}
+
+.link:hover {
+  color: var(--accent-soft);
+  border-bottom-color: currentColor;
+}
+
+@media (hover: hover) and (min-width: 641px) {
+  .reveal {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease,
+      margin-top 0.35s ease;
+  }
+
+  .card:hover .reveal,
+  .card:focus-within .reveal {
+    /* Generous enough for three clamped lines plus the links row. */
+    max-height: 12rem;
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+  }
+
+  .body {
+    padding: 18px 16px 16px;
+  }
+}
+
+/*
+ * Tablet. Three people would otherwise fall two-and-one, which reads as a
+ * mistake rather than a row; a slightly narrower card keeps a small team on one
+ * line at this width.
+ */
+@media (max-width: 1024px) and (min-width: 641px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 18px;
+  }
+}
+
+/*
+ * Phone. Two up rather than one: a column of 3:4 portraits is an enormous
+ * amount of scrolling for a team of three, and a face is still recognisable at
+ * half the width. The portrait is squarer here so a pair fits on one screen.
+ */
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .card {
+    aspect-ratio: 4 / 5;
+    border-radius: var(--radius);
+  }
+
+  .body {
+    padding: 14px 13px 13px;
+  }
+
+  /*
+   * No bio at this size. Three clamped lines of prose over a portrait 170px
+   * wide is clutter rather than information, and it pushed the scrim so far up
+   * the card that the face behind it was mostly gone. A phone needs the face,
+   * the name and the role.
+   */
+  .reveal {
+    display: none;
+  }
+}

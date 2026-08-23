@@ -2,8 +2,10 @@ import type { Metadata } from 'next';
 import type { CSSProperties, ReactNode } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { WhatsAppFab } from '@/components/WhatsAppButton';
+import { ShareFab } from '@/components/ShareButton';
 import { getCompanyDetails } from '@/lib/company.server';
-import { toFileUrl, type CompanyDetails } from '@/lib/company';
+import { fillCompany, shareLinkOf, toFileUrl, type CompanyDetails } from '@/lib/company';
 import './globals.css';
 
 /** Shown until — and unless — the tenant uploads a favicon of its own. */
@@ -42,8 +44,16 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * Maps the company's theme onto the white theme's brand variables. Only the
- * accent changes — the surfaces stay white, which is the point of this template.
+ * Maps the company's theme onto the template's brand variables.
+ *
+ * Only the tenant's own colours move. The surfaces, radii, shadows and type
+ * scale in `globals.css` are the template's design and stay put — that is what
+ * keeps every site built on this theme recognisably the same theme, and it is
+ * why a tenant cannot accidentally repaint the whole page by picking a colour.
+ *
+ * `accentColor` drives the hairline-and-eyebrow accent rather than a background
+ * tint: it is a small, high-contrast role, so an arbitrary colour cannot make
+ * body text unreadable the way a surface colour could.
  */
 function themeVariables(company: CompanyDetails): CSSProperties {
   const theme = company.theme;
@@ -52,7 +62,7 @@ function themeVariables(company: CompanyDetails): CSSProperties {
   return {
     '--brand': theme.primaryColor,
     '--brand-strong': theme.secondaryColor || theme.primaryColor,
-    ...(theme.accentColor ? { '--brand-soft': `${theme.accentColor}1a` } : {}),
+    ...(theme.accentColor ? { '--accent': theme.accentColor } : {}),
   } as CSSProperties;
 }
 
@@ -75,6 +85,15 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
    */
   const served = company.service.active;
 
+  /**
+   * The floating actions. Both are absent unless the tenant is actually
+   * entitled to them, and each component returns null on its own, so this needs
+   * no condition beyond knowing whether the WhatsApp bubble is taking the
+   * corner — the share bubble sits above it when it is.
+   */
+  const share = shareLinkOf(company);
+  const hasWhatsapp = Boolean(company.features?.whatsapp);
+
   return (
     <html lang="en">
       <body style={themeVariables(company)}>
@@ -86,6 +105,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <Header company={company} />
             <main id="main">{children}</main>
             <Footer company={company} />
+            <WhatsAppFab company={company} />
+            <ShareFab
+              share={share}
+              message={share ? fillCompany(share.message, company) : ''}
+              raised={hasWhatsapp}
+            />
           </>
         ) : (
           children

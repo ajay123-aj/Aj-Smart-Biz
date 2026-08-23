@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { SLIDES, SLIDE_INTERVAL_MS, type Slide } from '@/config/site';
-import { toFileUrl, type CompanyDetails, type CompanySlide } from '@/lib/company';
+import { hasSection, toFileUrl, type CompanyDetails, type CompanySlide } from '@/lib/company';
 import styles from './Slider.module.css';
 
 /** What the carousel actually renders, whichever source it came from. */
@@ -65,9 +65,19 @@ const fromTemplate = (slide: Slide, company: CompanyDetails): HeroSlide => ({
  * auto-advances for a visitor who has asked for reduced motion.
  */
 export default function Slider({ company }: { company: CompanyDetails }) {
-  const slides: HeroSlide[] = company.sliders.length
+  /**
+   * A button aimed at a page this tenant is not publishing would 404, so it is
+   * dropped rather than shown. It catches both the template's own slides and
+   * the ones seeded into a tenant's Slider Management, which point at
+   * `/contact` too.
+   */
+  const reachable = (cta: HeroSlide['primary']) =>
+    cta && hasSection(company, cta.href) ? cta : null;
+
+  const slides: HeroSlide[] = (company.sliders.length
     ? company.sliders.map(fromApi)
-    : SLIDES.map((slide) => fromTemplate(slide, company));
+    : SLIDES.map((slide) => fromTemplate(slide, company))
+  ).map((slide) => ({ ...slide, primary: reachable(slide.primary), secondary: reachable(slide.secondary) }));
 
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);

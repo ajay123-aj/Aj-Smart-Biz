@@ -91,12 +91,63 @@ export interface Plan extends AuditFields {
   maxAdmins: number;
   maxUsers: number;
   storageMb: number;
+  /** Marketing copy for the pricing table — free text, one line each. */
   features?: string[] | null;
+  /**
+   * Optional functionality this plan GRANTS, as `FunctionalityKey`s.
+   *
+   * Unlike `features`, these are enforced: a company can only switch on what its
+   * plan lists here, and the value is frozen onto the subscription at
+   * activation, so editing a plan never revokes a feature a running term was
+   * sold.
+   */
+  functionalities?: FunctionalityKey[] | null;
   isPopular: boolean;
   sequence: number;
   /** Attached by the API so the plan list can show what each plan is carrying. */
   usage?: { companies: number; expiringSoon: number };
 }
+
+/* --------------------------- optional functionality --------------------------- */
+
+/** A key the platform implements. Mirrors `FUNCTIONALITY` in the API. */
+export type FunctionalityKey = 'whatsapp' | 'share_link' | 'about_us' | 'team' | 'gallery' | 'contact_page';
+
+/** What a WhatsApp number is for, and therefore which button it lands on. */
+export type WhatsappType = 'inquiry' | 'contact' | 'support' | 'orders';
+
+export type ShareChannel = 'copy' | 'whatsapp' | 'facebook' | 'x' | 'linkedin' | 'telegram' | 'email';
+
+/** One entry of `GET /masters/functionalities` — the platform's own list. */
+export interface FunctionalityMeta {
+  key: FunctionalityKey;
+  name: string;
+  icon: string;
+  summary: string;
+  description: string;
+  sequence: number;
+}
+
+export interface WhatsappTypeMeta {
+  key: WhatsappType;
+  name: string;
+  /** Where on the website this number is used. */
+  placement: string;
+  defaultMessage: string;
+  sequence: number;
+}
+
+/**
+ * `GET /masters/functionalities` — read by both consoles so neither hard-codes a
+ * list that could drift from the API's.
+ */
+export interface FunctionalityCatalogue {
+  functionalities: FunctionalityMeta[];
+  whatsappTypes: WhatsappTypeMeta[];
+  shareChannels: ShareChannel[];
+  shareDefaults: { headline: string; message: string; channels: ShareChannel[] };
+}
+
 
 export interface Option {
   id: number;

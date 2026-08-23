@@ -4,13 +4,25 @@
   color: var(--text);
 }
 
+/*
+  Flex rather than grid, because the number of columns is not fixed: the
+  locations column only exists once a company has more than one branch.
+
+  `repeat(auto-fit, …)` cannot do this job here — following a `1.6fr` track it
+  resolves to a single repetition, which put every link column on its own row.
+  With flex the about block takes the space it needs and the link columns share
+  what is left, at three columns or four.
+*/
 .top {
-  display: grid;
-  /* The about block leads; each remaining column takes an equal share, so the
-     footer works with and without the locations column. */
-  grid-template-columns: 1.6fr repeat(auto-fit, minmax(150px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 48px;
   padding-block: 64px 48px;
+}
+
+.about {
+  flex: 1 1 300px;
+  min-width: 0;
 }
 
 /* ------------------------------ about ------------------------------ */
@@ -66,6 +78,10 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
+  /* Wide enough for an email address before it wraps, narrow enough that three
+     of them still fit beside the about block. */
+  flex: 0 1 210px;
+  min-width: 0;
 }
 
 .columnTitle {
@@ -112,18 +128,22 @@
 
 @media (max-width: 900px) {
   .top {
-    grid-template-columns: 1fr 1fr;
     gap: 40px;
   }
 
+  /* The about block takes the full row and the link columns pair up under it. */
   .about {
-    grid-column: 1 / -1;
+    flex-basis: 100%;
+  }
+
+  .column {
+    flex: 1 1 160px;
   }
 }
 
 @media (max-width: 560px) {
   .top {
-    grid-template-columns: 1fr;
+    flex-direction: column;
     padding-block: 48px 36px;
   }
 }

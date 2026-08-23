@@ -16,10 +16,44 @@
     <nav class="nav">
       <span class="nav-group-label">Menu</span>
       @for (item of navItems(); track item.slug) {
-        <a class="nav-item" [routerLink]="item.route" routerLinkActive="active" (click)="navOpen.set(false)">
-          <span class="nav-icon" aria-hidden="true">{{ item.icon }}</span>
-          {{ item.name }}
-        </a>
+        @if (item.children.length) {
+          <!-- A section: the header opens it, the children are the links. Its
+               own route is reachable through the first child, so the header
+               never has to be both a link and a toggle. -->
+          <button
+            type="button"
+            class="nav-item nav-parent"
+            [class.open]="isOpen(item)"
+            [class.within]="within(item)"
+            (click)="toggleGroup(item)"
+            [attr.aria-expanded]="isOpen(item)"
+          >
+            <span class="nav-icon" aria-hidden="true">{{ item.icon }}</span>
+            {{ item.name }}
+            <span class="nav-caret" aria-hidden="true">▸</span>
+          </button>
+
+          @if (isOpen(item)) {
+            <div class="nav-children">
+              @for (child of item.children; track child.slug) {
+                <a
+                  class="nav-child"
+                  [routerLink]="child.route"
+                  routerLinkActive="active"
+                  (click)="navOpen.set(false)"
+                >
+                  <span class="nav-icon" aria-hidden="true">{{ child.icon }}</span>
+                  {{ child.name }}
+                </a>
+              }
+            </div>
+          }
+        } @else {
+          <a class="nav-item" [routerLink]="item.route" routerLinkActive="active" (click)="navOpen.set(false)">
+            <span class="nav-icon" aria-hidden="true">{{ item.icon }}</span>
+            {{ item.name }}
+          </a>
+        }
       } @empty {
         <p class="tiny muted" style="padding:10px">
           No menus have been granted to your role yet. Ask your company admin for access.

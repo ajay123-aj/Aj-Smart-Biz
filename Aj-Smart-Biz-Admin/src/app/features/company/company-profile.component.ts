@@ -1,42 +1,41 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { CompanyContextService } from './company-context.service';
 import { CompanyService } from '../../core/services/company.service';
 import { CrudFactory, MASTER_PATHS } from '../../core/services/crud.service';
 import { AuthService } from '../../core/services/auth.service';
 import { BrandingService } from '../../core/services/branding.service';
 import { ToastService } from '../../core/services/toast.service';
 import { messageOf } from '../../core/interceptors/auth.interceptor';
-import { Company, Option, Transaction } from '../../core/models/domain.model';
-import { cleanPayload, daysBetween, formatMoney, touchAll } from '../../shared/utils';
-import { BranchManagerComponent } from './branch-manager.component';
-import { DomainManagerComponent } from '../../shared/domain-manager.component';
+import { Company, Option } from '../../core/models/domain.model';
+import { cleanPayload, daysBetween, touchAll } from '../../shared/utils';
 import { FieldErrorComponent } from '../../shared/ui/field-error.component';
 import { ImageUploadComponent } from '../../shared/ui/image-upload.component';
-import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 
-type Tab = 'profile' | 'branches' | 'domains' | 'subscription';
-
+/**
+ * The company's own record: name, contact, branding and address.
+ *
+ * The first of the Company Details sections and the one `/company` lands on.
+ * Everything else under Company Details is about the public website; this is
+ * the tenant itself, so it also carries the summary cards.
+ */
 @Component({
-  selector: 'app-company-details',
+  selector: 'app-company-profile',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ReactiveFormsModule,
     DatePipe,
-    RouterLink,
-    PageHeaderComponent,
     StatusBadgeComponent,
     FieldErrorComponent,
     ImageUploadComponent,
-    DomainManagerComponent,
-    BranchManagerComponent,
   ],
-  templateUrl: './company-details.component.html',
+  templateUrl: './company-profile.component.html',
 })
-export class CompanyDetailsComponent {
+export class CompanyProfileComponent {
+  readonly ctx = inject(CompanyContextService);
   private readonly fb = inject(FormBuilder);
   private readonly companies = inject(CompanyService);
   private readonly crud = inject(CrudFactory);
@@ -44,24 +43,8 @@ export class CompanyDetailsComponent {
   private readonly auth = inject(AuthService);
   private readonly branding = inject(BrandingService);
 
-  readonly company = signal<Company | null>(null);
-  readonly transactions = signal<Transaction[]>([]);
   readonly states = signal<Option[]>([]);
-  readonly loading = signal(true);
   readonly saving = signal(false);
-  readonly tab = signal<Tab>('profile');
-  /** Live counts from the panels; the company payload only has the initial ones. */
-  readonly domainCount = signal<number | null>(null);
-  readonly branchCount = signal<number | null>(null);
-  /** Branch management is a tab here rather than a sidebar entry. */
-  readonly canViewBranches = computed(() => this.auth.can('branch-management'));
-
-  /** The API only lets the main admin write the company profile and its domains. */
-  readonly canEdit = computed(() => this.auth.isCompanyAdmin());
-  /** Branches a domain can be pinned to. */
-  readonly branchOptions = computed(() =>
-    (this.company()?.branches ?? []).map((branch) => ({ id: branch.id, name: branch.name }))
-  );
 
   readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.minLength(2)]],
@@ -84,26 +67,15 @@ export class CompanyDetailsComponent {
 
   constructor() {
     this.crud.for<Option>(MASTER_PATHS.states).dropdown().subscribe((rows) => this.states.set(rows));
-    this.load();
-    this.companies.transactions({ limit: 50 }).subscribe({
-      next: (result) => this.transactions.set(result.items),
-      error: () => undefined,
-    });
-  }
 
-  private load(): void {
-    this.loading.set(true);
-    this.companies.get().subscribe({
-      next: (company) => {
-        this.company.set(company);
-        this.patch(company);
-        if (!this.canEdit()) this.form.disable();
-        this.loading.set(false);
-      },
-      error: (error: HttpErrorResponse) => {
-        this.loading.set(false);
-        this.toast.error('Could not load the company', messageOf(error));
-      },
+    /**
+     * The context may already hold the company, or may still be fetching it —
+     * this screen can be entered either way, so it fills the form from the
+     * signal rather than from a load of its own.
+     */
+    effect(() => {
+      const company = this.ctx.company();
+      if (company) this.patch(company);
     });
   }
 
@@ -126,10 +98,11 @@ export class CompanyDetailsComponent {
       city: company.city ?? '',
       pincode: company.pincode ?? '',
     });
+    if (!this.ctx.canEdit()) this.form.disable();
   }
 
   reset(): void {
-    const company = this.company();
+    const company = this.ctx.company();
     if (company) this.patch(company);
   }
 
@@ -145,10 +118,10 @@ export class CompanyDetailsComponent {
     this.companies.update(payload as Record<string, unknown>).subscribe({
       next: (company) => {
         this.saving.set(false);
-        this.company.set(company);
+        this.ctx.set(company);
         // Repaint the tab icon, title and sidebar logo right away rather than
-        // waiting for the next sign-in.
-        // Keep the admin's branch in front of the company, as it is after login.
+        // waiting for the next sign-in. Keep the admin's branch in front of the
+        // company, as it is after login.
         this.branding.applyCompany(company, this.auth.user()?.branch);
         this.toast.success('Company details updated');
       },
@@ -157,10 +130,6 @@ export class CompanyDetailsComponent {
         this.toast.error('Could not update the company', messageOf(error));
       },
     });
-  }
-
-  money(value: number | string, currency = 'INR'): string {
-    return formatMoney(value, currency);
   }
 
   daysLeft(endDate: string): number {

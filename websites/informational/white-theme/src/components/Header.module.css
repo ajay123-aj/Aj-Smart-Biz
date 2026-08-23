@@ -93,9 +93,20 @@
   background: var(--surface-sunken);
 }
 
+/*
+  Sized down from the default pill so the header keeps its height. It sits
+  before the primary CTA rather than after it: the CTA is still the action the
+  page is asking for, and WhatsApp is the alternative to it.
+*/
+.navWhatsapp {
+  margin-left: 8px;
+  padding: 10px 18px;
+  font-size: 0.9rem;
+}
+
 .navCta {
-  margin-left: 10px;
-  padding: 10px 20px;
+  margin-left: 8px;
+  padding: 11px 22px;
 }
 
 /* ------------------------------ mobile ------------------------------ */
@@ -171,6 +182,8 @@
     font-size: 1rem;
   }
 
+  /* In the mobile sheet both actions become full-width rows. */
+  .navWhatsapp,
   .navCta {
     margin: 10px 0 0;
     width: 100%;

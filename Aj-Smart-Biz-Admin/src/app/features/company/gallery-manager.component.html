@@ -1,0 +1,159 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:280px"></div>
+  } @else {
+    <app-feature-gate [feature]="feature()" />
+
+    <div class="row-between" style="align-items:flex-start;gap:12px">
+      <div>
+        <h4 style="margin:0 0 4px">Pictures of your work</h4>
+        <p class="tiny muted" style="margin:0 0 16px;max-width:64ch">
+          Shown as a grid in the order below. Titles and captions are optional &mdash; a wall of good
+          photographs needs no commentary.
+        </p>
+      </div>
+      <div class="row-end" style="gap:8px">
+        <!-- Same branch fallback as the sliders: a branch site shows its own
+             images, or the company-wide ones when it has none. -->
+        @if (feature()?.granted && branches().length > 0) {
+          <select class="select" style="width:auto" (change)="onBranchFilter(selectValue($event))">
+            <option value="">All images</option>
+            <option value="none">Company-wide only</option>
+            @for (branch of branches(); track branch.id) {
+              <option [value]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+        }
+        @if (writable()) {
+          <button type="button" class="btn btn-sm btn-primary" (click)="open(null)">＋ Add image</button>
+        }
+      </div>
+    </div>
+
+    @if (!feature()?.granted) {
+      <div class="empty-note">The Gallery section is not part of your plan.</div>
+    } @else if (items().length === 0) {
+      <div class="empty-note">
+        No images yet &mdash; the Gallery section stays off your website until you add one.
+      </div>
+    } @else {
+      <div class="grid-cards">
+        @for (row of items(); track row.id; let first = $first; let last = $last) {
+          <article class="shot" [class.shot-inactive]="row.status !== 'active'">
+            @if (imageUrl(row.image); as src) {
+              <img class="shot-img" [src]="src" [alt]="row.altText || row.title || ''" />
+            }
+
+            <div class="shot-body">
+              @if (row.title) {
+                <div class="shot-title">{{ row.title }}</div>
+              } @else {
+                <div class="shot-untitled">Untitled</div>
+              }
+              @if (row.caption) {
+                <p class="shot-caption">{{ row.caption }}</p>
+              }
+              <div style="margin-top:8px">
+                <app-status-badge [value]="row.status" />
+                @if (row.branch) {
+                  <span class="badge badge-info" style="margin-left:4px">{{ row.branch.name }}</span>
+                }
+              </div>
+              <!-- What a screen reader gets, so the fallback is visible here too. -->
+              <p class="shot-caption" style="margin-top:6px">Alt: {{ altOf(row) }}</p>
+            </div>
+
+            @if (writable()) {
+              <div class="shot-foot">
+                <span class="seq-num">{{ row.sequence }}</span>
+                <button type="button" class="btn btn-sm btn-ghost" title="Move up"
+                        [disabled]="first || reordering()" (click)="move(row, -1)">↑</button>
+                <button type="button" class="btn btn-sm btn-ghost" title="Move down"
+                        [disabled]="last || reordering()" (click)="move(row, 1)">↓</button>
+                <span class="spacer"></span>
+                <button type="button" class="btn btn-sm btn-ghost" (click)="toggle(row)">
+                  {{ row.status === 'active' ? 'Hide' : 'Show' }}
+                </button>
+                <button type="button" class="btn btn-sm btn-ghost" (click)="open(row)">Edit</button>
+                <button type="button" class="btn btn-sm btn-danger" (click)="remove(row)">Delete</button>
+              </div>
+            }
+          </article>
+        }
+      </div>
+      <p class="tiny muted" style="margin:14px 0 0">Only active images appear on the website.</p>
+    }
+  }
+</div>
+
+@if (modalOpen()) {
+  <app-modal
+    [title]="editing() ? 'Edit image' : 'Add image'"
+    size="md"
+    [closeOnBackdrop]="false"
+    (closed)="modalOpen.set(false)"
+  >
+    <form [formGroup]="form" (ngSubmit)="save()" id="gallery-form">
+      <div class="field">
+        <label for="gal-branch">Shows on</label>
+        <select id="gal-branch" class="select" formControlName="branchId">
+          <option value="">All branches (company-wide)</option>
+          @for (branch of branches(); track branch.id) {
+            <option [value]="branch.id">{{ branch.name }}</option>
+          }
+        </select>
+        <p class="tiny muted mb-0">
+          A branch site shows its own. If it has none, it falls back to the company-wide ones.
+        </p>
+      </div>
+
+      <div class="field">
+        <label>Image <span class="req">*</span></label>
+        <app-image-upload
+          formControlName="image"
+          label="Gallery image"
+          folder="gallery"
+          hint="Landscape works best — 1200×900 or larger · PNG, JPG or WEBP"
+        />
+        <app-field-error [control]="form.controls.image" label="Image" />
+      </div>
+
+      <div class="field">
+        <label for="gal-title">Title</label>
+        <input id="gal-title" class="input" formControlName="title" placeholder="Oak collage frame" />
+        <span class="hint">Optional</span>
+      </div>
+
+      <div class="field">
+        <label for="gal-caption">Caption</label>
+        <textarea id="gal-caption" class="textarea" formControlName="caption"
+                  placeholder="Seven-photo collage in solid oak, made for a family in Surat."></textarea>
+      </div>
+
+      <div class="field">
+        <label for="gal-alt">Alt text</label>
+        <input id="gal-alt" class="input" formControlName="altText"
+               placeholder="A seven-photo oak collage frame on a white wall" />
+        <span class="hint">
+          Describes the picture to someone who cannot see it. Left empty it falls back to the title; with
+          neither, the image is treated as decorative.
+        </span>
+      </div>
+
+      <div class="field" style="max-width:220px">
+        <label for="gal-status">Status</label>
+        <select id="gal-status" class="select" formControlName="status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+      <button type="submit" form="gallery-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Add image' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

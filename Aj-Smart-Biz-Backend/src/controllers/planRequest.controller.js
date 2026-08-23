@@ -18,7 +18,9 @@ const {
 const PLAN_ATTRIBUTES = [
   'id', 'name', 'code', 'description', 'price', 'discountPrice', 'currency', 'billingCycle',
   'durationDays', 'trialDays', 'maxBranches', 'maxAdmins', 'maxUsers', 'storageMb',
-  'features', 'isPopular', 'sequence', 'status',
+  // `functionalities` alongside `features`: the tenant's plan catalogue shows
+  // what moving to a plan would actually unlock, not just its marketing lines.
+  'features', 'functionalities', 'isPopular', 'sequence', 'status',
 ];
 
 const requestInclude = () => [

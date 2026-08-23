@@ -3,7 +3,8 @@
 // Paste into https://dbdiagram.io to view or diff against your own diagram.
 //
 // Conventions
-//  - every table is paranoid: deleted_at IS NULL means "live"
+//  - every table is paranoid: deleted_at IS NULL means "live" — except
+//    company_functionalities, which carries a real unique index (see its note)
 //  - created_at / updated_at are maintained by Sequelize
 //  - created_by / updated_by hold the acting super admin or admin id
 //  - uniqueness (company code, emails, role names) is enforced in the service
@@ -89,7 +90,8 @@ Table plans {
   max_admins int [not null, default: 1]
   max_users int [not null, default: 5]
   storage_mb int [not null, default: 1024]
-  features json [note: 'string array']
+  features json [note: 'string array of marketing copy for the pricing table']
+  functionalities json [note: 'string array of enum_functionality keys this plan GRANTS; enforced, unlike features, and snapshotted onto the subscription at activation']
   is_popular boolean [not null, default: false]
   sequence int [not null, default: 0]
   status enum_status [not null, default: 'active']
@@ -242,6 +244,177 @@ Table sliders {
     sequence
   }
   Note: 'Hero slides on the tenant public website. Every company is seeded with three. A branch-pinned domain serves that branch slides; a branch with none falls back to the company-wide ones (branch_id NULL) - the same fallback logo and favicon follow.'
+}
+
+Table company_functionalities {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  key enum_functionality [not null]
+  settings json [note: 'per-feature config; share_link keeps headline/message/channels here, whatsapp keeps its numbers in their own table']
+  status enum_status [not null, default: 'active', note: 'the tenant own on/off switch']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+
+  Indexes {
+    (company_id, key) [unique]
+    status
+  }
+  Note: 'The tenant switch for one optional functionality. THE ONE TABLE THAT IS NOT PARANOID: it holds exactly one row per (company, feature) and a soft-deleted row would occupy that unique slot invisibly, so re-enabling a feature would fail on a duplicate key nobody can see. Nothing deletes these rows - switching off sets status. A missing row means never switched on. What actually reaches a website is plan grant AND this switch AND the plan still being served, decided in services/functionality.service.js.'
+}
+
+Table company_about {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  branch_id int [ref: > branches.id, note: 'branch this copy is for; NULL = the company-wide copy every other site falls back to']
+  nav_label varchar(40) [note: 'What the About page is called in the website menu. NULL uses the template default. Branch-scoped like the rest of the row.']
+  eyebrow varchar(80)
+  title varchar(160) [note: '{company} is filled in by the website']
+  lead varchar(400)
+  body text [note: 'blank lines separate paragraphs']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    branch_id
+  }
+  Note: 'The About page prose, per company or per branch. Started life on company_functionalities.settings and moved here when it became branch-aware - a JSON blob keyed by branch is a table with extra steps. Legacy blobs are copied into a company-wide row on boot (ensureAboutRows). No unique index on (company_id, branch_id): the table is paranoid, and a soft-deleted row would hold the slot invisibly - the write path findOrCreate on that pair is what keeps it to one row per scope.'
+}
+
+Table company_contact {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  branch_id int [ref: > branches.id, note: 'branch these settings are for; NULL = the company-wide ones every other site falls back to']
+  nav_label varchar(40) [note: 'What the Contact page is called in the website menu. NULL uses the template default.']
+  eyebrow varchar(80)
+  title varchar(160) [note: '{company} is filled in by the website']
+  lead varchar(400)
+  show_form boolean [not null, default: true]
+  form_target enum_contact_form_target [not null, default: 'email', note: 'where the enquiry form hands its message off']
+  form_note varchar(300) [note: 'small print under the form']
+  show_locations boolean [not null, default: true]
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    branch_id
+  }
+  Note: 'How the website Contact page reads. Gated behind the contact_page functionality on the same rule as about_us/team/gallery: the plan grants it, the company switches it on, and only then does the website serve the page and link to it. This row decides its wording and what appears on it. The enquiry form has no server behind it: the visitor fills it in and the button opens their own WhatsApp or mail app with the message ready, so the platform never stores other people enquiries. Addresses, phones and hours still come from companies and branches.'
+}
+
+Table company_stats {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  branch_id int [ref: > branches.id, note: 'branch these figures are for; NULL = the whole company. Branch-first with a company-wide fallback, exactly as sliders resolve.']
+  label varchar(120) [not null, note: 'the wording under the figure, e.g. "Years in business" - the company own, not the template']
+  mode enum_stat_mode [not null, default: 'fixed']
+  value varchar(40) [note: 'the figure itself, for fixed cards; ignored by since_date ones']
+  since_date date [note: 'what a since_date card counts from; ignored by fixed ones']
+  unit enum_stat_unit [not null, default: 'years']
+  prefix varchar(8) [note: 'wrapped around the number, e.g. prefix "" + suffix "+" renders 14+']
+  suffix varchar(8)
+  sequence int [not null, default: 0]
+  status enum_status [not null, default: 'active', note: 'only active figures reach the website']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    branch_id
+    status
+    sequence
+  }
+  Note: 'The About section stat band. A since_date card is computed on every page render, so "Years in business" is right next year without anyone editing it - which a hardcoded "12+" never is. Four defaults are seeded the first time a company switches About on, counting from the company record own creation date until the tenant corrects it.'
+}
+
+Table company_team_members {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  branch_id int [ref: > branches.id, note: 'branch these people are for; NULL = the whole company. Branch-first with a company-wide fallback, exactly as sliders resolve.']
+  name varchar(150) [not null]
+  role varchar(120) [note: 'job title as it reads on the card']
+  bio varchar(600) [note: 'a line or two; the card clamps anything longer']
+  photo varchar(255) [note: 'relative upload path, e.g. /uploads/team/asha.jpg']
+  email varchar(160) [note: 'PUBLISHED on the website - deliberately separate from the person admin login']
+  phone varchar(20)
+  linkedin_url varchar(255)
+  sequence int [not null, default: 0]
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    branch_id
+    status
+    sequence
+  }
+  Note: 'People listed on the website Team section. NOT a view over admins: the people a business publishes and the people who can sign in are different sets, and conflating them would either expose accounts or force fake ones.'
+}
+
+Table company_gallery_items {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  branch_id int [ref: > branches.id, note: 'branch these images are for; NULL = the whole company. Branch-first with a company-wide fallback, exactly as sliders resolve.']
+  image varchar(255) [not null, note: 'relative upload path; the only required field']
+  title varchar(150)
+  caption varchar(400)
+  alt_text varchar(200) [note: 'falls back to the title; with neither the image is treated as decorative']
+  sequence int [not null, default: 0]
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    branch_id
+    status
+    sequence
+  }
+  Note: 'Images in the website Gallery section, in the order the company arranged them.'
+}
+
+Table company_whatsapp_numbers {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  type enum_whatsapp_type [not null]
+  country_code varchar(6) [not null, default: '91', note: 'digits only, no +']
+  number varchar(20) [not null, note: 'national subscriber number, digits only; a pasted +91/0091/leading-0 prefix is stripped on write so the country code is never doubled']
+  label varchar(80) [note: 'overrides the type name on the button, e.g. "Wholesale desk"']
+  default_message varchar(300) [note: 'pre-filled into the chat; empty opens WhatsApp with a blank box']
+  sequence int [not null, default: 0]
+  status enum_status [not null, default: 'active', note: 'only active numbers reach the website']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    type
+    status
+    sequence
+  }
+  Note: 'WhatsApp numbers a company publishes, tagged with what each is for so the website puts the right one on the right button. First active number wins its type; a type left empty falls back to contact, so one number makes every button work. Rows survive the plan losing the functionality - a downgrade must not delete a tenant phone numbers.'
 }
 
 Table branch_contacts {
@@ -411,7 +584,7 @@ Table roles {
 Table menus {
   id int [pk, increment]
   company_id int [ref: > companies.id, note: 'NULL = platform menu shared by every tenant']
-  parent_id int [ref: > menus.id]
+  parent_id int [ref: > menus.id, note: 'Set for the Company Details submenus (profile, branches, domains, functionality, slider, about, team, gallery, contact, subscription), which render nested in the admin sidebar. All but branch-management and slider-management follow their parent permission and are left out of the role matrix. The about/team/gallery/contact entries are also withheld entirely when the subscription does not grant their functionality.']
   name varchar(120) [not null]
   slug varchar(120) [not null]
   icon varchar(120)
@@ -470,6 +643,17 @@ Enum enum_status { active inactive }
 Enum enum_theme_mode { light dark }
 Enum enum_super_admin_role { super_admin staff }
 Enum enum_billing_cycle { monthly quarterly half_yearly yearly lifetime }
+// Optional functionality. A plan grants it, a company switches it on, and the
+// plan must still be served before it reaches the public website.
+Enum enum_functionality { whatsapp share_link about_us team gallery contact_page }
+// How a stat card produces its figure: typed by the company, or counted
+// from a date at render time so it can never go stale.
+Enum enum_stat_mode { fixed since_date }
+Enum enum_stat_unit { years months days }
+// Where the Contact page enquiry form hands its message off. No server involved.
+Enum enum_contact_form_target { email whatsapp }
+// What a WhatsApp number is for, and therefore which button it lands on.
+Enum enum_whatsapp_type { inquiry contact support orders }
 // pending    queued ahead of time — starts on its own start date
 // active     running
 // suspended  paused; the term keeps its dates but access stops

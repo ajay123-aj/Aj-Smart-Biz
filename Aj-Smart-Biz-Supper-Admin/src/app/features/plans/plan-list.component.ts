@@ -1,9 +1,16 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { CrudFactory, MASTER_PATHS } from '../../core/services/crud.service';
+import { ApiService } from '../../core/services/api.service';
+import { CrudFactory, FUNCTIONALITY_CATALOGUE_PATH, MASTER_PATHS } from '../../core/services/crud.service';
 import { ConfirmService } from '../../core/services/confirm.service';
 import { ToastService } from '../../core/services/toast.service';
-import { BillingCycle, Plan } from '../../core/models/domain.model';
+import {
+  BillingCycle,
+  FunctionalityCatalogue,
+  FunctionalityKey,
+  FunctionalityMeta,
+  Plan,
+} from '../../core/models/domain.model';
 import { CrudPage } from '../../shared/crud-page';
 import { formatMoney } from '../../shared/utils';
 import { FieldErrorComponent } from '../../shared/ui/field-error.component';
@@ -49,6 +56,29 @@ const CYCLES: { value: BillingCycle; label: string }[] = [
       }
       .switch input:checked + .slider { background: var(--success); }
       .switch input:checked + .slider::before { transform: translateX(17px); }
+
+      /* Functionality grants — a card per feature rather than a bare checkbox
+         list, because each one needs a line explaining what it does. */
+      .grant-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 10px;
+        margin-bottom: 6px;
+      }
+      .grant {
+        display: flex; gap: 10px; align-items: flex-start;
+        padding: 12px 14px; cursor: pointer;
+        border: 1px solid var(--border); border-radius: 10px;
+        background: var(--surface);
+        transition: border-color .15s, background .15s, box-shadow .15s;
+      }
+      .grant:hover { border-color: var(--border-strong); }
+      .grant-on { border-color: var(--primary); background: var(--primary-soft, rgba(37, 99, 235, .06)); }
+      .grant input { margin-top: 3px; flex: none; }
+      .grant-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      .grant-name { font-weight: 600; }
+      .grant-summary { font-size: 12px; color: var(--text-3); line-height: 1.45; }
+      .grant-badges { display: flex; flex-wrap: wrap; gap: 4px; }
     `,
   ],
 })
@@ -72,6 +102,11 @@ export class PlanListComponent {
     maxUsers: [5, [Validators.min(1)]],
     storageMb: [1024, [Validators.min(1)]],
     features: [''],
+    /**
+     * The keys this plan grants. One array control rather than a checkbox per
+     * feature, so the catalogue can grow without the form changing shape.
+     */
+    functionalities: [[] as FunctionalityKey[]],
     isPopular: [false],
     sequence: [0],
     status: ['active'],
@@ -98,6 +133,7 @@ export class PlanListComponent {
       maxUsers: row?.maxUsers ?? 5,
       storageMb: row?.storageMb ?? 1024,
       features: (row?.features ?? []).join('\n'),
+      functionalities: [...(row?.functionalities ?? [])],
       isPopular: row?.isPopular ?? false,
       sequence: row?.sequence ?? 0,
       status: row?.status ?? 'active',
@@ -111,12 +147,52 @@ export class PlanListComponent {
         .split('\n')
         .map((line) => line.trim())
         .filter(Boolean),
+      // Sent even when empty — that is how a functionality is taken off a plan.
+      functionalities: [...((raw['functionalities'] as FunctionalityKey[]) ?? [])],
     }),
     initialQuery: { sortBy: 'sequence', sortOrder: 'asc' },
   });
 
+  /** The platform's own list, so this screen never hard-codes the features. */
+  readonly functionalities = signal<FunctionalityMeta[]>([]);
+
   constructor() {
     this.page.load();
+    inject(ApiService)
+      .get<FunctionalityCatalogue>(FUNCTIONALITY_CATALOGUE_PATH)
+      .subscribe({
+        next: (catalogue) => this.functionalities.set(catalogue.functionalities ?? []),
+        // The rest of the plan form still works; only the grant picker is empty.
+        error: () => this.functionalities.set([]),
+      });
+  }
+
+  /** Whether the plan currently open in the form grants `key`. */
+  grants(key: FunctionalityKey): boolean {
+    return (this.form.controls.functionalities.value ?? []).includes(key);
+  }
+
+  /**
+   * Ticking a box rewrites the whole array rather than mutating it in place: the
+   * control has to see a new reference before it marks itself dirty.
+   */
+  toggleGrant(key: FunctionalityKey, checked: boolean): void {
+    const current = this.form.controls.functionalities.value ?? [];
+    const next = checked ? [...new Set([...current, key])] : current.filter((entry) => entry !== key);
+    this.form.controls.functionalities.setValue(next);
+    this.form.controls.functionalities.markAsDirty();
+  }
+
+  checked(event: Event): boolean {
+    return (event.target as HTMLInputElement).checked;
+  }
+
+  /** What a plan grants, by name, for the list column. */
+  grantNames(row: Plan): string[] {
+    const keys = row.functionalities ?? [];
+    return this.functionalities()
+      .filter((entry) => keys.includes(entry.key))
+      .map((entry) => entry.name);
   }
 
   money(value: number | string | null | undefined, currency = 'INR'): string {

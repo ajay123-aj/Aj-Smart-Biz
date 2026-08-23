@@ -8,6 +8,7 @@ const planRequestSchema = require('../validators/planRequest.validator');
 const branchRoutes = require('./branch.routes');
 const domainRoutes = require('./companyDomain.routes');
 const sliderRoutes = require('./slider.routes');
+const functionalityRoutes = require('./functionality.routes');
 const validate = require('../middlewares/validate');
 const schema = require('../validators/company.validator');
 const { companyAdminOnly, requirePermission } = require('../middlewares/auth');
@@ -62,6 +63,29 @@ router.use('/branches', requirePermission('branch-management', 'canView'), branc
  * settings. Per-action rights are enforced below.
  */
 router.use('/sliders', requirePermission('slider-management', 'canView'), sliderRoutes);
+
+/**
+ * Optional functionality — WhatsApp, the share button — and the typed WhatsApp
+ * numbers that go with it. They live on a tab of Company Details rather than a
+ * menu of their own, so they are gated by that menu.
+ *
+ * Reading is open to anyone who can view the company; writing changes what the
+ * tenant publishes to the public internet, so it is the main admin's alone —
+ * the same split the domain manager below uses, and for the same reason.
+ */
+const websiteSettingsGuard = [
+  requirePermission('company-details', 'canView'),
+  (req, res, next) => (req.method === 'GET' ? next() : companyAdminOnly(req, res, next)),
+];
+
+router.use('/functionalities', ...websiteSettingsGuard, functionalityRoutes.functionalities);
+router.use('/whatsapp-numbers', ...websiteSettingsGuard, functionalityRoutes.whatsapp);
+/** The About copy, its stat band, the Team section and the Gallery — same guard, same reason. */
+router.use('/about', ...websiteSettingsGuard, functionalityRoutes.about);
+router.use('/contact', ...websiteSettingsGuard, functionalityRoutes.contact);
+router.use('/stats', ...websiteSettingsGuard, functionalityRoutes.stats);
+router.use('/team', ...websiteSettingsGuard, functionalityRoutes.team);
+router.use('/gallery', ...websiteSettingsGuard, functionalityRoutes.gallery);
 
 /**
  * Domains that resolve to this company (and optionally one of its branches).

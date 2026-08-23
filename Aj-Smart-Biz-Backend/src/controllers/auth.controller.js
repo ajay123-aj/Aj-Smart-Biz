@@ -7,6 +7,8 @@ const { success } = require('../utils/response');
 const { issueTokens, verifyRefreshToken } = require('../utils/jwt');
 const { AUTH_SCOPE, STATUS, PERMISSION_ACTIONS } = require('../constants');
 const { Op } = require('sequelize');
+const { MENU_INHERITS_PARENT, MENU_FUNCTIONALITY } = require('../seeders/defaultMenus');
+const functionalityService = require('../services/functionality.service');
 
 const publicSuperAdmin = (row) => ({
   id: row.id,
@@ -131,10 +133,16 @@ const me = asyncHandler(async (req, res) => {
     return success(res, { message: 'Profile fetched', data: { user: publicSuperAdmin(req.user) } });
   }
 
-  const menus = await db.Menu.findAll({
-    where: { companyId: { [Op.or]: [null, req.auth.companyId] }, status: STATUS.ACTIVE },
-    order: [['sequence', 'ASC'], ['id', 'ASC']],
-  });
+  const [menus, functionalities] = await Promise.all([
+    db.Menu.findAll({
+      where: { companyId: { [Op.or]: [null, req.auth.companyId] }, status: STATUS.ACTIVE },
+      order: [['sequence', 'ASC'], ['id', 'ASC']],
+    }),
+    functionalityService.getFunctionalities(req.auth.companyId),
+  ]);
+
+  /** What the plan pays for. Switched-off features are still granted. */
+  const granted = new Set(functionalities.items.filter((item) => item.granted).map((item) => item.key));
 
   let permissionMap = {};
   if (req.auth.isCompanyAdmin) {
@@ -154,8 +162,29 @@ const me = asyncHandler(async (req, res) => {
     }, {});
   }
 
+  /**
+   * A submenu that is not grantable on its own follows its parent: it is part
+   * of one screen, and the permission that opens that screen opens all of it.
+   * `branch-management` is not in that set, so it still decides for itself.
+   */
+  const byId = new Map(menus.map((menu) => [menu.id, menu]));
+  const canSee = (menu) => {
+    /**
+     * A screen the plan does not pay for is left out entirely, whatever the
+     * role may view: there is nothing behind it for this tenant yet.
+     */
+    const needs = MENU_FUNCTIONALITY[menu.slug];
+    if (needs && !granted.has(needs)) return false;
+
+    if (MENU_INHERITS_PARENT.has(menu.slug) && menu.parentId) {
+      const parent = byId.get(menu.parentId);
+      if (parent) return Boolean(permissionMap[parent.slug]?.canView);
+    }
+    return Boolean(permissionMap[menu.slug]?.canView);
+  };
+
   const visibleMenus = menus
-    .filter((menu) => permissionMap[menu.slug]?.canView)
+    .filter(canSee)
     .map((menu) => ({
       id: menu.id,
       parentId: menu.parentId,

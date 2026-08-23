@@ -1,0 +1,251 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:320px"></div>
+  } @else {
+    <app-feature-gate [feature]="feature()" />
+
+    @if (!canEdit()) {
+      <p class="tiny muted" style="margin-top:0">
+        Only the main admin can change what your website says. You are viewing this read only.
+      </p>
+    }
+
+    <!--
+      Which site this copy is for. A branch with nothing of its own inherits the
+      company-wide copy rather than showing an empty section, and the banner
+      below says so — "nothing here" and "the same as everyone" look identical
+      otherwise.
+    -->
+    @if (feature()?.granted && branches().length > 0) {
+      <div class="scope-bar">
+        <label class="scope-label" for="about-scope">Editing About for</label>
+        <select
+          id="about-scope"
+          class="select"
+          style="width:auto"
+          [disabled]="!canEdit()"
+          (change)="onScope(selectValue($event))"
+        >
+          <option value="">All branches (company-wide)</option>
+          @for (branch of branches(); track branch.id) {
+            <option [value]="branch.id" [selected]="scope() === branch.id">{{ branch.name }}</option>
+          }
+        </select>
+
+        @if (scope() && !overridden()) {
+          <span class="scope-note">
+            Inheriting the company-wide copy — saving here gives {{ scopeName() }} its own.
+          </span>
+        } @else if (scope()) {
+          <span class="scope-note scope-note-own">{{ scopeName() }} has its own copy.</span>
+          @if (writable()) {
+            <button type="button" class="btn btn-sm btn-ghost" (click)="clearOverride()">
+              Use the company-wide copy
+            </button>
+          }
+        }
+      </div>
+    }
+
+    <!-- ------------------------------ the copy ------------------------------ -->
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="about-nav">Menu name</label>
+          <input id="about-nav" class="input" formControlName="navLabel" placeholder="About us" maxlength="40" />
+          <span class="hint">What this page is called in your website's menu</span>
+        </div>
+        <div class="field">
+          <label for="about-eyebrow">Eyebrow</label>
+          <input id="about-eyebrow" class="input" formControlName="eyebrow" placeholder="About us" />
+          <span class="hint">The small line above the heading</span>
+        </div>
+        <div class="field">
+          <label for="about-title">Heading</label>
+          <input id="about-title" class="input" formControlName="title" placeholder="Who {company} is" />
+          <span class="hint"><code>&#123;company&#125;</code> is replaced with your company name</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="about-lead">Opening line</label>
+        <input id="about-lead" class="input" formControlName="lead" placeholder="Straightforward work, delivered when we said it would be." />
+        <span class="hint">Set larger than the rest, so keep it to one sentence</span>
+      </div>
+
+      <div class="field">
+        <label for="about-body">Body</label>
+        <textarea
+          id="about-body"
+          class="textarea"
+          rows="7"
+          formControlName="body"
+          placeholder="We are a small team that prefers finishing things to announcing them.&#10;&#10;Most of our work comes from people we have already worked with."
+        ></textarea>
+        <span class="hint">Leave a blank line between paragraphs</span>
+      </div>
+
+      @if (writable()) {
+        <div class="row-end">
+          <button type="button" class="btn btn-ghost" (click)="reset()">Reset</button>
+          <button type="submit" class="btn btn-primary" [disabled]="saving()">
+            {{ saving() ? 'Saving…' : 'Save About section' }}
+          </button>
+        </div>
+      }
+    </form>
+
+    <!-- ------------------------------ the figures ------------------------------ -->
+    <div class="divider"></div>
+
+    <div class="row-between" style="align-items:flex-start;gap:12px">
+      <div>
+        <h4 style="margin:0 0 4px">The figures under it — {{ scopeName() }}</h4>
+        <p class="tiny muted" style="margin:0 0 14px;max-width:64ch">
+          Your own numbers, with your own wording. A figure can be fixed text, or counted from a date &mdash;
+          pick counting for anything that would otherwise go stale, like years in business.
+          @if (scope()) {
+            These belong to {{ scopeName() }} alone; a branch with none of its own shows the company-wide band.
+          }
+        </p>
+      </div>
+      @if (writable()) {
+        <button type="button" class="btn btn-sm btn-primary" (click)="openCard(null)">＋ Add figure</button>
+      }
+    </div>
+
+    @if (!feature()?.granted) {
+      <div class="stat-empty">Figures are part of the About us functionality.</div>
+    } @else if (cards().length === 0) {
+      <div class="stat-empty">No figures yet — the band is hidden on your website until you add one.</div>
+    } @else {
+      @for (row of cards(); track row.id; let first = $first; let last = $last) {
+        <div class="stat-row">
+          @if (writable()) {
+            <div class="seq">
+              <span class="seq-num">{{ row.sequence }}</span>
+              <button type="button" class="btn btn-sm btn-ghost" title="Move up"
+                      [disabled]="first || reordering()" (click)="move(row, -1)">↑</button>
+              <button type="button" class="btn btn-sm btn-ghost" title="Move down"
+                      [disabled]="last || reordering()" (click)="move(row, 1)">↓</button>
+            </div>
+          }
+
+          <span class="stat-figure">{{ figureOf(row) }}</span>
+
+          <span class="stat-main">
+            <span class="stat-label">{{ row.label }}</span>
+            <div class="stat-note">{{ describe(row) }}</div>
+          </span>
+
+          <app-status-badge [value]="row.status" />
+
+          @if (writable()) {
+            <span class="row-end" style="gap:4px">
+              <button type="button" class="btn btn-sm btn-ghost" (click)="toggleCard(row)">
+                {{ row.status === 'active' ? 'Deactivate' : 'Activate' }}
+              </button>
+              <button type="button" class="btn btn-sm btn-ghost" (click)="openCard(row)">Edit</button>
+              <button type="button" class="btn btn-sm btn-danger" (click)="removeCard(row)">Delete</button>
+            </span>
+          }
+        </div>
+      }
+      <p class="tiny muted" style="margin:12px 0 0">Only active figures appear on the website.</p>
+    }
+  }
+</div>
+
+@if (modalOpen()) {
+  <app-modal
+    [title]="editing() ? 'Edit figure' : 'Add figure'"
+    size="md"
+    [closeOnBackdrop]="false"
+    (closed)="modalOpen.set(false)"
+  >
+    <form [formGroup]="statForm" (ngSubmit)="saveCard()" id="stat-form">
+      <div class="field">
+        <label for="stat-label">Label <span class="req">*</span></label>
+        <input id="stat-label" class="input" formControlName="label" placeholder="Years in business" />
+        <app-field-error [control]="statForm.controls.label" label="Label" />
+        <span class="hint">The wording under the figure</span>
+      </div>
+
+      <div class="field">
+        <label>How is the figure produced?</label>
+        <div class="mode-grid">
+          <label class="mode" [class.mode-on]="modeIs('fixed')">
+            <input type="radio" [checked]="modeIs('fixed')" (change)="setMode('fixed')" />
+            <span>
+              <span class="mode-name">Fixed</span>
+              <span class="mode-hint">A number you type and maintain yourself</span>
+            </span>
+          </label>
+          <label class="mode" [class.mode-on]="modeIs('since_date')">
+            <input type="radio" [checked]="modeIs('since_date')" (change)="setMode('since_date')" />
+            <span>
+              <span class="mode-name">Counted from a date</span>
+              <span class="mode-hint">Recalculated on every visit, so it never goes stale</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      @if (modeIs('fixed')) {
+        <div class="field">
+          <label for="stat-value">Figure <span class="req">*</span></label>
+          <input id="stat-value" class="input" formControlName="value" placeholder="250" />
+        </div>
+      } @else {
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="stat-since">Counting from <span class="req">*</span></label>
+            <input id="stat-since" class="input" type="date" formControlName="sinceDate" />
+            <span class="hint">The day the business started, or whatever this counts from</span>
+          </div>
+          <div class="field">
+            <label for="stat-unit">Counted in</label>
+            <select id="stat-unit" class="select" formControlName="unit">
+              @for (unit of units; track unit.value) {
+                <option [value]="unit.value">{{ unit.label }}</option>
+              }
+            </select>
+          </div>
+        </div>
+      }
+
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="stat-prefix">Before the figure</label>
+          <input id="stat-prefix" class="input" formControlName="prefix" placeholder="₹" />
+        </div>
+        <div class="field">
+          <label for="stat-suffix">After the figure</label>
+          <input id="stat-suffix" class="input" formControlName="suffix" placeholder="+" />
+        </div>
+      </div>
+
+      <!-- Editing against what a visitor will actually see, not raw fields. -->
+      <div class="preview">
+        On your website this reads
+        <strong>{{ previewOf() }}</strong>
+        {{ statForm.controls.label.value || 'your label' }}
+      </div>
+
+      <div class="field" style="max-width:220px;margin-top:14px">
+        <label for="stat-status">Status</label>
+        <select id="stat-status" class="select" formControlName="status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+      <button type="submit" form="stat-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Add figure' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

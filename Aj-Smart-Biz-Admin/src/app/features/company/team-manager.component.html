@@ -1,0 +1,188 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:280px"></div>
+  } @else {
+    <app-feature-gate [feature]="feature()" />
+
+    <div class="row-between" style="align-items:flex-start;gap:12px">
+      <div>
+        <h4 style="margin:0 0 4px">The people on your website</h4>
+        <p class="tiny muted" style="margin:0 0 16px;max-width:64ch">
+          Separate from your admin logins on purpose &mdash; a founder who never signs in belongs here, and
+          nobody's account details are published just because they can log in.
+        </p>
+      </div>
+      <div class="row-end" style="gap:8px">
+        <!-- A branch site shows its own people; with none of its own it falls
+             back to the company-wide list, exactly as the sliders do. -->
+        @if (feature()?.granted && branches().length > 0) {
+          <select class="select" style="width:auto" (change)="onBranchFilter(selectValue($event))">
+            <option value="">All people</option>
+            <option value="none">Company-wide only</option>
+            @for (branch of branches(); track branch.id) {
+              <option [value]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+        }
+        @if (writable()) {
+          <button type="button" class="btn btn-sm btn-primary" (click)="open(null)">＋ Add person</button>
+        }
+      </div>
+    </div>
+
+    @if (!feature()?.granted) {
+      <div class="empty-note">The Team section is not part of your plan.</div>
+    } @else if (members().length === 0) {
+      <div class="empty-note">
+        Nobody added yet &mdash; the Team section stays off your website until there is at least one person.
+      </div>
+    } @else {
+      <div class="grid-cards">
+        @for (row of members(); track row.id; let first = $first; let last = $last) {
+          <article class="member" [class.member-inactive]="row.status !== 'active'">
+            <div class="member-head">
+              @if (photoUrl(row.photo); as src) {
+                <img class="avatar" [src]="src" [alt]="row.name" />
+              } @else {
+                <span class="avatar-empty" aria-hidden="true">{{ initial(row.name) }}</span>
+              }
+              <span style="min-width:0">
+                <div class="member-name">{{ row.name }}</div>
+                @if (row.role) {
+                  <div class="member-role">{{ row.role }}</div>
+                }
+                <div style="margin-top:5px">
+                  <app-status-badge [value]="row.status" />
+                  @if (row.branch) {
+                    <span class="badge badge-info" style="margin-left:4px">{{ row.branch.name }}</span>
+                  }
+                </div>
+              </span>
+            </div>
+
+            @if (row.bio) {
+              <p class="member-bio">{{ row.bio }}</p>
+            }
+
+            @if (row.email || row.phone || row.linkedinUrl) {
+              <div class="member-contact">
+                {{ row.email }}@if (row.email && row.phone) { · }{{ row.phone }}
+                @if (row.linkedinUrl) {
+                  <div>{{ row.linkedinUrl }}</div>
+                }
+              </div>
+            }
+
+            @if (writable()) {
+              <div class="member-foot">
+                <span class="seq-num">{{ row.sequence }}</span>
+                <button type="button" class="btn btn-sm btn-ghost" title="Move up"
+                        [disabled]="first || reordering()" (click)="move(row, -1)">↑</button>
+                <button type="button" class="btn btn-sm btn-ghost" title="Move down"
+                        [disabled]="last || reordering()" (click)="move(row, 1)">↓</button>
+                <span class="spacer"></span>
+                <button type="button" class="btn btn-sm btn-ghost" (click)="toggle(row)">
+                  {{ row.status === 'active' ? 'Hide' : 'Show' }}
+                </button>
+                <button type="button" class="btn btn-sm btn-ghost" (click)="open(row)">Edit</button>
+                <button type="button" class="btn btn-sm btn-danger" (click)="remove(row)">Delete</button>
+              </div>
+            }
+          </article>
+        }
+      </div>
+      <p class="tiny muted" style="margin:14px 0 0">Only active people appear on the website.</p>
+    }
+  }
+</div>
+
+@if (modalOpen()) {
+  <app-modal
+    [title]="editing() ? 'Edit team member' : 'Add team member'"
+    size="md"
+    [closeOnBackdrop]="false"
+    (closed)="modalOpen.set(false)"
+  >
+    <form [formGroup]="form" (ngSubmit)="save()" id="team-form">
+      <div class="field">
+        <label for="team-branch">Shows on</label>
+        <select id="team-branch" class="select" formControlName="branchId">
+          <option value="">All branches (company-wide)</option>
+          @for (branch of branches(); track branch.id) {
+            <option [value]="branch.id">{{ branch.name }}</option>
+          }
+        </select>
+        <p class="tiny muted mb-0">
+          A branch site shows its own. If it has none, it falls back to the company-wide ones.
+        </p>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="team-name">Name <span class="req">*</span></label>
+          <input id="team-name" class="input" formControlName="name" placeholder="Asha Patel" />
+          <app-field-error [control]="form.controls.name" label="Name" />
+        </div>
+        <div class="field">
+          <label for="team-role">Role</label>
+          <input id="team-role" class="input" formControlName="role" placeholder="Founder" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Photo</label>
+        <app-image-upload
+          formControlName="photo"
+          label="Photo"
+          folder="team"
+          hint="Square works best — 400×400 or larger · PNG, JPG or WEBP"
+        />
+        <span class="hint">Optional. Without one the card shows their initial.</span>
+      </div>
+
+      <div class="field">
+        <label for="team-bio">Short bio</label>
+        <textarea id="team-bio" class="textarea" formControlName="bio"
+                  placeholder="Started the workshop in 2012 and still cuts every frame."></textarea>
+        <span class="hint">A line or two — the card clamps anything longer</span>
+      </div>
+
+      <div class="divider"></div>
+      <p class="tiny muted" style="margin:0 0 12px">
+        Contact details are optional and <strong>published on your website</strong>. Leave them empty unless
+        this person should be reachable directly.
+      </p>
+
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="team-email">Email</label>
+          <input id="team-email" class="input" type="email" formControlName="email" />
+        </div>
+        <div class="field">
+          <label for="team-phone">Phone</label>
+          <input id="team-phone" class="input" formControlName="phone" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="team-linkedin">LinkedIn</label>
+        <input id="team-linkedin" class="input" formControlName="linkedinUrl" placeholder="https://linkedin.com/in/…" />
+      </div>
+
+      <div class="field" style="max-width:220px">
+        <label for="team-status">Status</label>
+        <select id="team-status" class="select" formControlName="status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+      <button type="submit" form="team-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Add person' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

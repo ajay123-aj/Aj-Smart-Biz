@@ -2,12 +2,17 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { ApiService } from '../../core/services/api.service';
 import { CompanyService } from '../../core/services/company.service';
 import { ConfirmService } from '../../core/services/confirm.service';
 import { ToastService } from '../../core/services/toast.service';
+import { FUNCTIONALITY_CATALOGUE_PATH } from '../../core/services/crud.service';
 import { messageOf } from '../../core/interceptors/auth.interceptor';
 import {
   AvailablePlan,
+  FunctionalityCatalogue,
+  FunctionalityKey,
+  FunctionalityMeta,
   MyPlanView,
   PlanCatalogue,
   PlanRequest,
@@ -114,6 +119,8 @@ const UNTRACKED: { key: 'maxUsers' | 'storageMb'; label: string; hint: string }[
       .chip.up { background: var(--success-bg); color: var(--success); }
       .chip.down { background: var(--warning-bg); color: var(--warning); }
 
+      .grant-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+
       .feature-mini { list-style: none; margin: 0 0 12px; padding: 0; }
       .feature-mini li { font-size: 12.5px; padding: 2px 0; color: var(--text-2); }
       .feature-mini li::before { content: '✓'; color: var(--success); margin-right: 6px; }
@@ -151,6 +158,26 @@ export class MyPlanComponent {
 
   readonly features = computed(() => this.terms()?.features ?? []);
 
+  /**
+   * Functionality this term was sold, read from the same snapshot as the limits.
+   *
+   * Separate from `features` on purpose: those are marketing lines, these are
+   * enforced grants — this is exactly the list Company Details will let the
+   * company switch on, so the two screens cannot disagree about what was bought.
+   */
+  readonly grantedFunctionalities = computed(() => this.functionalityNames(this.terms()?.functionalities));
+
+  /**
+   * Keys to display names, from the platform's own catalogue so this screen
+   * never hard-codes a list that could drift. An unknown key falls back to the
+   * key itself rather than vanishing — better a raw word than a silent gap.
+   */
+  functionalityNames(keys: FunctionalityKey[] | null | undefined): string[] {
+    if (!keys?.length) return [];
+    const catalogue = this.functionalityCatalogue();
+    return keys.map((key) => catalogue.find((entry) => entry.key === key)?.name ?? key);
+  }
+
   /** Every plan parameter, metered ones first. */
   readonly usageRows = computed<UsageRow[]>(() => {
     const view = this.view();
@@ -186,9 +213,20 @@ export class MyPlanComponent {
     return [...metered, ...informational];
   });
 
+  /** Display names for the functionality keys the snapshots carry. */
+  readonly functionalityCatalogue = signal<FunctionalityMeta[]>([]);
+
   constructor() {
     this.load();
     this.loadCatalogue();
+
+    inject(ApiService)
+      .get<FunctionalityCatalogue>(FUNCTIONALITY_CATALOGUE_PATH)
+      .subscribe({
+        next: (catalogue) => this.functionalityCatalogue.set(catalogue.functionalities ?? []),
+        // Without it the grants list simply stays empty; nothing else is affected.
+        error: () => this.functionalityCatalogue.set([]),
+      });
   }
 
   private load(): void {

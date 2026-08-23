@@ -28,6 +28,17 @@ cd Aj-Smart-Biz-Admin && npm install && npm start
 
 No MySQL handy? `DB_DIALECT=sqlite npm run dev` runs the API against a single file instead.
 
+> **On SQLite, schema changes rebuild tables.** SQLite has no real `ALTER`, so
+> sequelize emulates it by copying a table and dropping the original. Three
+> things go wrong with that, and boot now handles all three: foreign keys are
+> suspended for the sync (a key pointing at the table blocks the `DROP`),
+> `*_backup` tables left by an interrupted sync are cleared, and the composite
+> unique on `company_functionalities` is shed — sequelize reads it back as a
+> unique on `key` alone and recreates it that way, which then rejects the
+> second feature any company switches on. The constraint is therefore declared
+> on MySQL only; `findOrCreate` holds the invariant on both. MySQL does a real
+> `ALTER TABLE` and is unaffected by any of it.
+
 On first boot the API creates the schema, seeds the root super admin from
 `.env.development` and prints its credentials, then seeds the seven system menus,
 a few states, business types and a default theme.
@@ -173,17 +184,19 @@ the company built itself are left exactly as configured.
 
 ## Data model
 
-18 tables — platform masters (states, business types, themes, plans), tenants
-(companies, branches, branch contacts, company domains, sliders), billing
-(subscriptions, subscription events, plan requests, transactions) and identity
-(super admins, roles, menus, role permissions, admins).
+25 tables — platform masters (states, business types, themes, plans), tenants
+(companies, branches, branch contacts, company domains, sliders), website
+content (company functionalities, WhatsApp numbers, About copy, About stats,
+team members, gallery items, Contact page settings), billing (subscriptions,
+subscription events, plan requests, transactions) and identity (super admins,
+roles, menus, role permissions, admins).
 
 The full schema is in [`Aj-Smart-Biz-Backend/docs/schema.dbml`](Aj-Smart-Biz-Backend/docs/schema.dbml)
 — paste it into dbdiagram.io to view it or diff it against your own diagram.
 
 Three conventions run through it:
 
-- **Nothing is deleted.** Every table is paranoid; deleting a company soft deletes its branches, contacts, roles, permissions and admins together, and restoring it brings them all back.
+- **Nothing is deleted.** Every table is paranoid; deleting a company soft deletes its branches, contacts, roles, permissions and admins together, and restoring it brings them all back. One deliberate exception: `company_functionalities` holds exactly one switch row per (company, feature) behind a unique index, and a soft-deleted row would occupy that slot invisibly — nothing deletes those rows anyway, because switching a feature off sets its `status`.
 - **History is frozen.** A subscription snapshots the plan's terms at activation, so editing a plan later never rewrites what a company was actually sold.
 - **Every transition is recorded.** Subscription statuses only change through one guarded function, which writes a `subscription_events` row on the way past.
 
@@ -252,6 +265,312 @@ and a slide with no artwork at all sits on the plain white hero. Either way the
 template lays a scrim over the image — weighted to the left on desktop, to the
 top on a phone — so the headline stays readable without erasing the picture.
 
+## Optional functionality
+
+Some of what a website can do is sold, not given. Five things are, today, and
+they are one mechanism rather than five bolted on — adding a sixth means adding
+an entry to `FUNCTIONALITY_CATALOGUE`, and nothing else enumerates them.
+
+| Key | What it buys |
+| --- | --- |
+| `whatsapp` | WhatsApp buttons, per enquiry type |
+| `share_link` | A share button so visitors can pass the site on |
+| `about_us` | Writing the About section yourself, and its band of figures |
+| `team` | A Team section listing the people |
+| `gallery` | A Gallery section of the company's own photographs |
+| `contact_page` | A Contact page with the tenant's own wording and an enquiry form |
+
+**Three switches, all of which must be on** before a visitor sees anything:
+
+| | Who sets it | Where |
+| --- | --- | --- |
+| **granted** | the platform | `plans.functionalities` — ticked on the plan in **Plan Management** |
+| **enabled** | the company | **Company Details → Functionality** |
+| **served** | the platform | the plan has not expired and is not suspended |
+
+`active = granted && enabled && served`, decided in one place
+(`services/functionality.service.js`). The tenant's toggle renders that answer
+rather than working it out, the write routes guard on it, and
+`/public/company-details` embeds it — so a locked switch, a refused request and
+a missing button on the website can never tell different stories.
+
+The grant is **snapshotted onto the subscription** at activation, exactly like
+the branch and admin limits and for the same reason: dropping WhatsApp from a
+plan must not switch it off under a term that was already sold.
+
+**A feature that is not live is absent, not hidden.** `features.whatsapp` is
+`null` in the API response, so the markup never contains the button at all —
+hiding it with CSS would leave a lapsed tenant's WhatsApp number readable in the
+page source.
+
+### WhatsApp numbers are typed
+
+A company publishes numbers tagged with what each is for, so the website puts
+the right one on the right button rather than guessing:
+
+| Type | Where it lands |
+| --- | --- |
+| `inquiry` | the enquiry buttons in the hero and the contact section |
+| `contact` | the header button, the footer, and the floating chat bubble |
+| `support` | the support link in the footer |
+| `orders` | the order action in the contact section |
+
+A type left empty **falls back to `contact`**, so filling in one number makes
+every button work. The footer's support link is the one exception — it renders
+only when it is genuinely a different number, or it would be a second copy of
+the line above it.
+
+Numbers are stored as a country code plus the national number. People paste
+whatever is printed on their card, so an explicit `+91`, `0091` or leading `0`
+is stripped on the way in; without that, `+91 76230 38598` saved against country
+code `91` produced `wa.me/91917623038598`. A bare `919876543210` is left alone —
+with no `+` there is nothing to say the leading `91` is a country code.
+
+The API returns each number as a finished `https://wa.me/…?text=…` link, so no
+template builds one.
+
+### The share button
+
+On a phone it opens the device's own share sheet (`navigator.share`), which
+reaches apps a web link cannot. Everywhere else the visitor gets the channels
+the company ticked — copy link, WhatsApp, Facebook, X, LinkedIn, Telegram,
+email — with the company's own headline and message. The URL is read in the
+browser rather than built from the tenant's domain, so sharing from a branch
+host or a deep link passes on the address actually being looked at.
+
+### About us: the section, and its figures
+
+The About section is on every site — it is part of the template — so this
+functionality does not add it, it lets the company **write** it. Which means a
+tenant without the feature still gets an About section, built from what the
+platform already knows:
+
+| | Heading | Body | Figures |
+| --- | --- | --- | --- |
+| **With the feature** | the company's own | the company's own | the company's own |
+| **Without it** | `Who <company> is` | the company's `description`, plus where it is based | none |
+| **No tenant at all** | template placeholder | template placeholder | none |
+
+The middle row is the point. A real business that has not bought the feature is
+**not** given the template's invented prose — "we are a small team that prefers
+finishing things" is a claim, and it is not the platform's to make on someone
+else's behalf. Nor is `250+ projects delivered`, which is why the stat band is
+absent rather than filled with defaults.
+
+**Figures count themselves.** Each card is one of two modes:
+
+| Mode | The figure is | Good for |
+| --- | --- | --- |
+| `fixed` | whatever the company typed — `250+`, `98%` | things only they know |
+| `since_date` | counted from a date, every time the page renders | `Years in business` |
+
+A hardcoded "12+ years" is wrong every January and nobody remembers to fix it. A
+`since_date` card counting years from `2012-06-01` renders `14+` today and `15+`
+next June with no one touching it. The arithmetic is calendar-aware — whole
+units only, so a business founded on 29 February does not tick over a day early.
+
+The label is editable on every card, so a frame shop shows `Frames delivered`
+rather than being stuck with `Projects delivered`, and cards are added, edited,
+reordered and deleted freely. Four are seeded the first time About is switched
+on, counting from the company record's own creation date, so the band is never
+an empty row — the tenant corrects the founding date to the real one.
+
+### About is a page, not a band
+
+`/about` is its own route, and the header's **About us** links to it. The
+story, the figures, the team and the gallery live there together — they mean
+more next to each other than wedged between "what we do" and a contact form —
+and the home page keeps the hero, the services, the reasons and the contact.
+
+Because the nav now spans two pages, its anchors are written `/#services`
+rather than `#services`: a bare hash on `/about` would look for a section that
+is not on that page and do nothing.
+
+### Team and Gallery
+
+Both are ordered lists of cards with the same moves — add, edit, reorder,
+activate, delete — and both are **absent from the page** unless the tenant is
+entitled to them *and* has put something in them. An empty Team section is worse
+than no Team section, so a granted-but-empty feature still renders nothing.
+
+The nav agrees: `Team` and `Gallery` links appear only when those sections did,
+because the header, the footer and the page all ask the same function.
+
+Team members are deliberately **not** a view over `admins`. The people a
+business publishes and the people who can sign in to the workspace are different
+sets — a founder who never logs in belongs on the website, a bookkeeper with a
+login usually does not — and conflating them would either expose account details
+or force fake accounts. Contact details on a team card are optional and the form
+says plainly that they are published.
+
+Gallery images need only the image. Titles and captions are optional, and alt
+text falls back to the title; an image with neither is marked decorative rather
+than given a meaningless description.
+
+### The template writes nothing
+
+"What we do" and "Why us" are gone. They were the last two blocks of the
+template's own invented copy, and with About, Team, Gallery and Contact all
+tenant-written, they were the only thing on a live site that a real business had
+not said about itself.
+
+What that leaves is three pages, each entirely the tenant's: a **home page** of
+their hero slides and a closing invitation, **`/about`** with their story,
+figures, people and work, and **`/contact`**. Slide buttons that still pointed at
+the removed anchors are repointed on boot — see `ensureSlideLinks` — because a
+dead button on a live website is not something to leave until somebody notices.
+
+### Contact is a page too
+
+`/contact` is its own route, and the header's **Contact** links to it. It sits
+behind `contact_page` on the same rule as About, Team and Gallery: the plan
+grants it, the company switches it on, and only then is the page served.
+
+Switched off, it is **absent rather than empty**. The API sends no settings, the
+route answers 404, and every link to it disappears at once — the header, the
+footer's Explore column, the closing bands on the home and About pages, and any
+slide button aimed at it. Nothing on the site points at a page that is not
+there. Writing stays refused without the grant, but *reading* the settings does
+not: a tenant that downgraded can still see the wording it wrote, and what
+upgrading would bring back.
+
+**Company Details → Contact page** sets the eyebrow, heading and intro, whether
+the enquiry form appears, where it sends people, and whether the locations
+appear. Everything factual on the page — addresses, phone numbers, opening
+hours, map links — still comes from the company profile and its branches.
+
+**The enquiry form has no inbox behind it, on purpose.** A visitor fills it in
+and the button hands the composed message to their own WhatsApp or mail app.
+The platform never stores other people's enquiries, and nothing ends up sitting
+unread in a table nobody has built a screen for — the tenant already has an
+inbox and a phone, and this fills them. Pointed at WhatsApp with no Inquiry
+number set, the form is hidden rather than shown with a button that goes
+nowhere.
+
+The home page keeps a closing band that links here, rather than ending in a
+form and a table of addresses — and that link, too, is dropped when the page is
+not being published.
+
+### The menu is the tenant's, and the API builds it
+
+The website's menu is not a list in the template. `/public/company-details`
+returns a `nav` array — one entry per page **this** tenant is publishing,
+already named the way they named it — and the header and footer render exactly
+what arrives:
+
+```json
+"nav": [
+  { "key": "home",    "href": "/",        "label": "Home" },
+  { "key": "about",   "href": "/about",   "label": "Our studio" },
+  { "key": "contact", "href": "/contact", "label": "Reach us" }
+]
+```
+
+**A page is renamed where the page is edited.** Company Details → About us has
+a *Menu name* field, and so does Contact page. Blank keeps the template's name,
+so a tenant who never opens the field sees no difference. It is branch-aware
+like everything else: a branch site can call the same page something else.
+
+**A page the plan does not pay for is not in the array**, so the template needs
+no rule of its own about what to hide — `hasSection` answers from `nav` rather
+than from a list kept in step by hand.
+
+**Adding a page later is one row.** `NAV_PAGES` in the backend constants names
+each page, where it takes its label from, and which functionality it needs:
+
+```js
+{ key: 'contact', href: '/contact', label: 'Contact',
+  settings: 'contact', functionality: 'contact_page' }
+```
+
+Add a row, add a `navLabel` column to whatever settings table the page has, and
+it appears in the menu, renameable, gated and branch-aware. Neither the website
+nor the console has to be taught about it separately.
+
+### All of it is branch-aware
+
+About, its figures, the team, the gallery and the Contact page settings all
+follow the fallback the sliders have always used, and it is now the only one in
+the product:
+
+```
+branch-pinned domain ──► that branch's own content
+                          └─ none of its own? ──► the company-wide content
+company-wide domain  ──► the company-wide content
+```
+
+So `surat.acme.com` can introduce its own people and show its own work, and a
+branch that has written nothing is **inheriting** rather than blank. A
+company-wide host never shows a branch's content — a visitor to `acme.com`
+should not meet the Surat team.
+
+The console says which: the About screen has an **Editing About for** selector,
+and a branch with no copy of its own is labelled as inheriting, with saving
+described as *giving this branch its own*. Dropping the override puts it back to
+inheriting. The company-wide copy cannot be cleared — there is nothing above it
+to fall back to.
+
+Team, Gallery and the figures each get a branch filter and a **Shows on** field,
+the same pair Slider Management has. A card added while the list is filtered to
+one branch belongs to that branch, rather than silently landing on every site.
+
+### Company Details is a section, not a screen
+
+Its parts used to be nine tabs on one page. They are **submenus in the sidebar**
+now, nested under Company Details:
+
+| Submenu | Route | Permission | Needs a plan grant |
+| --- | --- | --- | --- |
+| Company profile | `/company/profile` | `company-details` | — |
+| Branches | `/company/branches` | `branch-management` | — |
+| Domains | `/company/domains` | `company-details` | — |
+| Functionality | `/company/functionality` | `company-details` | — |
+| Slider | `/company/sliders` | `slider-management` | — |
+| About us | `/company/about` | `company-details` | `about_us` |
+| Team | `/company/team` | `company-details` | `team` |
+| Gallery | `/company/gallery` | `company-details` | `gallery` |
+| Contact page | `/company/contact` | `company-details` | `contact_page` |
+| Plan & billing | `/company/subscription` | `company-details` | — |
+
+Each is a real route, so it can be linked to and bookmarked — the "switch it on"
+button on a locked section goes straight to `/company/functionality` rather than
+opening a page and then a tab. `/company` redirects to the profile, and the old
+`/sliders` redirects to `/company/sliders`.
+
+**A submenu the plan does not pay for is not in the sidebar.** The four in the
+last column above are dropped from `/auth/me` when the running subscription does
+not grant them, so a tenant is not offered a screen it cannot use. Being
+switched **off** is a different thing and does *not* hide the entry: that is the
+tenant's own choice, made on the Functionality screen, and they need the way
+back to what they wrote. The grant comes from the subscription snapshot, so
+editing a plan mid-term does not silently add screens to a live tenant — a plan
+change does.
+
+**The nesting is data, not a list in the frontend.** `menus.parent_id` has always
+existed; these are the first rows to use it, and `/auth/me` reports it, so the
+sidebar renders whatever tree the API sends.
+
+**Permissions did not change.** Eight of the nine follow their parent: they are
+parts of one screen, so a role that can view Company Details can view all of
+them, and one that cannot sees none. They are left out of the permission matrix
+for that reason — a checkbox that cannot actually deny anything is worse than no
+checkbox. **Branches is the exception and keeps its own row**, because it always
+had one: a role can be given Company Details without it, and moving the screen
+into the sidebar must not quietly undo that.
+
+The company payload is loaded once for the whole section, by the layout that
+frames it — see `CompanyContextService` — so moving between submenus costs no
+extra request.
+
+### Where each console sees it
+
+- **Plan Management (:4200)** — a card per feature on the plan form, and a column showing what each plan grants. Unlike the free-text `features` list beside it, these are validated against the platform's own keys.
+- **Company Details → Slider (:4300)** — hero slides for the public website, company-wide or pinned to one branch. Grantable on its own, like Branches.
+- **Company Details → Functionality (:4300)** — a card per feature with a switch, the reason it is not live when it is not, and its settings panel: the typed number list for WhatsApp, the channels and copy for the share button. The switch is locked, with the reason on it, when the plan does not grant the feature.
+- **Company Details → About us / Team / Gallery / Contact page (:4300)** — one submenu each, always present. About us and Contact page each carry the **Menu name** for their page, which is how the website's menu is renamed. A banner at the top says whether the section is live, switched off, or not in the plan, in the API's own words; where it is not granted the editor below is read only rather than hidden, so a tenant can see what it wrote and what upgrading would bring back. Each is scoped to a branch or to the company as a whole.
+- **The website** — `/about` carries About, Team and Gallery; `/contact` is its own page; the home page carries the rest.
+- **My Plan (:4300)** — what the current term was sold, and what each plan in the catalogue would unlock.
+
 ## When a plan lapses, the website stops
 
 A tenant's plan is what pays for its website, so `/public/company-details`
@@ -293,7 +612,7 @@ protection, head-office branch, main admin, system role, cross-tenant isolation)
 
 Both consoles were then driven in a real browser (Chrome via puppeteer-core)
 against their **production** bundles — **63 further checks** covering sign-in,
-the Company Details tabs, adding a domain through the UI, a company setting its
+the Company Details submenus, adding a domain through the UI, a company setting its
 own favicon and that favicon appearing on every page and surviving a reload,
 with console errors and page exceptions treated as failures.
 

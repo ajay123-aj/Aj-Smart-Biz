@@ -1,5 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { filter, map, startWith } from 'rxjs';
 import { AuthService } from '../core/services/auth.service';
 import { BrandingService } from '../core/services/branding.service';
 import { ThemeService } from '../core/services/theme.service';
@@ -11,11 +13,21 @@ const ICONS: Record<string, string> = {
   dashboard: '📊',
   'company-details': '🏢',
   'my-plan': '💳',
-  'branch-management': '📍',
   'role-management': '🛡️',
   'menu-permission': '🔐',
   'admin-management': '👥',
-  'slider-management': '🖼️',
+  // Company Details submenus
+  'company-profile': '🏢',
+  'branch-management': '📍',
+  'company-domains': '🌐',
+  'company-functionality': '🎛️',
+  // Distinct from Gallery's frame: these are the hero slides.
+  'slider-management': '🎞️',
+  'company-about': '📄',
+  'company-team': '👤',
+  'company-gallery': '🖼️',
+  'company-contact': '✉️',
+  'company-subscription': '💳',
 };
 
 @Component({
@@ -70,6 +82,36 @@ const ICONS: Record<string, string> = {
       .nav-item:hover { background: var(--surface-3); color: var(--text); text-decoration: none; }
       .nav-item.active { background: var(--brand-600); color: #fff; }
       .nav-icon { width: 18px; text-align: center; }
+
+      /* A parent with children is a button, not a link: it opens the group. */
+      .nav-parent {
+        width: 100%; border: none; background: none;
+        font: inherit; cursor: pointer; text-align: left;
+      }
+      .nav-caret {
+        margin-left: auto; font-size: 10px;
+        color: var(--text-3); transition: transform .15s;
+      }
+      .nav-parent.open .nav-caret { transform: rotate(90deg); }
+      /* The parent reads as active when a child of it is, so the section it
+         belongs to is never in doubt. */
+      .nav-parent.within { color: var(--text); background: var(--surface-3); }
+
+      .nav-children {
+        display: flex; flex-direction: column;
+        margin: 2px 0 6px 20px; padding-left: 10px;
+        border-left: 1px solid var(--border);
+      }
+      .nav-child {
+        display: flex; align-items: center; gap: 9px;
+        padding: 7px 10px; margin-bottom: 1px;
+        border-radius: var(--radius-sm);
+        color: var(--text-3); font-size: 13px; font-weight: 500;
+        text-decoration: none;
+      }
+      .nav-child:hover { background: var(--surface-3); color: var(--text); }
+      .nav-child.active { background: var(--brand-600); color: #fff; }
+      .nav-child .nav-icon { width: 15px; font-size: 12px; }
       .sidebar-foot { padding: 12px 18px; border-top: 1px solid var(--border); }
 
       .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -134,6 +176,7 @@ const ICONS: Record<string, string> = {
 })
 export class ShellComponent {
   readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
   readonly themeService = inject(ThemeService);
   private readonly uploads = inject(UploadService);
   private readonly branding = inject(BrandingService);
@@ -153,16 +196,92 @@ export class ShellComponent {
     () => this.branding.logoUrl() ?? this.uploads.toUrl(this.auth.user()?.company?.logo)
   );
 
-  /** Menus with a route, ordered by sequence, with an icon fallback. */
-  readonly navItems = computed(() =>
-    this.auth
-      .menus()
-      .filter((menu) => !!menu.route)
+  /**
+   * The sidebar, two levels deep: menus with a route, in sequence, each with
+   * whatever children the API sent under it.
+   *
+   * Nesting comes from the data rather than from a list held here — `/auth/me`
+   * already reports `parentId`, and a submenu the role cannot see never
+   * arrives, so nothing has to be filtered a second time.
+   */
+  readonly navItems = computed(() => {
+    const menus = this.auth.menus().filter((menu) => !!menu.route);
+    const decorate = (menu: (typeof menus)[number]) => ({
+      slug: menu.slug,
+      name: menu.name,
+      route: menu.route as string,
+      icon: menu.icon && menu.icon.length <= 3 ? menu.icon : (ICONS[menu.slug] ?? '•'),
+    });
+
+    const ids = new Set(menus.map((menu) => menu.id));
+    return menus
+      // A child whose parent did not come through is shown at the top level
+      // rather than dropped — better an odd position than a missing screen.
+      .filter((menu) => !menu.parentId || !ids.has(menu.parentId))
       .map((menu) => ({
-        slug: menu.slug,
-        name: menu.name,
-        route: menu.route as string,
-        icon: menu.icon && menu.icon.length <= 3 ? menu.icon : (ICONS[menu.slug] ?? '•'),
-      }))
+        ...decorate(menu),
+        children: menus.filter((child) => child.parentId === menu.id).map(decorate),
+      }));
+  });
+
+  /** The current URL as a signal, so the nav can react to navigation. */
+  private readonly url = toSignal(
+    this.router.events.pipe(
+      filter((event) => event instanceof NavigationEnd),
+      map(() => this.router.url),
+      startWith(this.router.url)
+    ),
+    { initialValue: this.router.url }
   );
+
+  /**
+   * Whether a section contains the page being shown. Drives both the header's
+   * own highlight and which section is open after a navigation.
+   */
+  within(item: { route: string }): boolean {
+    return this.url().startsWith(item.route);
+  }
+
+  /**
+   * Which parent is expanded. One at a time: two open sections at once makes a
+   * short sidebar long.
+   *
+   * It follows the URL rather than being set once — entering a section opens
+   * it, and moving inside it keeps it open — but the header can still close it,
+   * which is why this is state and not a computed.
+   */
+  readonly openGroup = signal<string | null>(null);
+
+  /**
+   * The section the URL last pointed at. The sync below writes `openGroup` only
+   * when this changes, which is the whole point of keeping it.
+   *
+   * Without it the sync fires on anything that recomputes `navItems` — the menu
+   * list arriving, or arriving again after a token refresh — and each of those
+   * would re-assert the URL's answer over the visitor's. That is felt as a
+   * click that did nothing: the section is collapsed and reopened before the
+   * next frame, and only a second click, after the page has settled, appears to
+   * work. Writing on a real change only means a toggle always survives.
+   */
+  private lastSection: string | null | undefined = undefined;
+
+  constructor() {
+    effect(() => {
+      const url = this.url();
+      const section =
+        this.navItems().find((item) => item.children.length && url.startsWith(item.route))?.route ?? null;
+
+      if (section === this.lastSection) return;
+      this.lastSection = section;
+      this.openGroup.set(section);
+    });
+  }
+
+  isOpen(item: { route: string; children: unknown[] }): boolean {
+    return item.children.length > 0 && this.openGroup() === item.route;
+  }
+
+  toggleGroup(item: { route: string }): void {
+    this.openGroup.update((open) => (open === item.route ? null : item.route));
+  }
 }

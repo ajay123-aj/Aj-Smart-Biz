@@ -1,17 +1,6 @@
-<app-page-header
-  title="Slider Management"
-  subtitle="Hero slides on your public website — company-wide, or for one branch"
->
-  <button
-    type="button"
-    class="btn btn-primary"
-    (click)="openModal(null)"
-    *appCan="'slider-management'; action: 'canCreate'"
-  >
-    ＋ Add slide
-  </button>
-</app-page-header>
-
+<!-- No page header of its own: this is a section of Company Details now, and
+     the layout above it already names the company and the section. The add
+     action moves in beside the filters, as it is on Team and Gallery. -->
 <div class="card">
   <div class="card-head">
     <input
@@ -35,6 +24,16 @@
       <option value="active">Active</option>
       <option value="inactive">Inactive</option>
     </select>
+
+    <button
+      type="button"
+      class="btn btn-primary"
+      style="margin-left:auto"
+      (click)="openModal(null)"
+      *appCan="'slider-management'; action: 'canCreate'"
+    >
+      ＋ Add slide
+    </button>
   </div>
 
   <div class="card-body tight">

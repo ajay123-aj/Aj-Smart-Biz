@@ -14,7 +14,6 @@ import { cleanPayload, touchAll } from '../../shared/utils';
 import { FieldErrorComponent } from '../../shared/ui/field-error.component';
 import { ImageUploadComponent } from '../../shared/ui/image-upload.component';
 import { ModalComponent } from '../../shared/ui/modal.component';
-import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { PagerComponent } from '../../shared/ui/pager.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 import { TableStateComponent } from '../../shared/ui/table-state.component';
@@ -28,7 +27,6 @@ const COMPANY_WIDE = 'none';
   imports: [
     ReactiveFormsModule,
     CanDirective,
-    PageHeaderComponent,
     PagerComponent,
     StatusBadgeComponent,
     TableStateComponent,

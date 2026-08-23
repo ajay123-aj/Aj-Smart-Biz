@@ -8,6 +8,7 @@ const { success, created, paginated } = require('../utils/response');
 const { getPagination, buildSearch, getSort, mergeWhere } = require('../utils/query');
 const { slugify } = require('../services/code.service');
 const { STATUS, PERMISSION_ACTIONS } = require('../constants');
+const { MENU_INHERITS_PARENT } = require('../seeders/defaultMenus');
 
 const findOrFail = async (req, options = {}) => {
   const role = await db.Role.findOne({ where: { id: req.params.id, companyId: req.auth.companyId }, ...options });
@@ -152,7 +153,14 @@ const getPermissions = asyncHandler(async (req, res) => {
   ]);
 
   const byMenu = permissions.reduce((acc, row) => ({ ...acc, [row.menuId]: row }), {});
-  const matrix = menus.map((menu) => ({
+  /**
+   * Submenus that follow their parent are left out: they are parts of one
+   * screen, and a checkbox that cannot actually deny anything is worse than no
+   * checkbox. Branches keeps its row — it has always been grantable on its own.
+   */
+  const matrix = menus
+    .filter((menu) => !MENU_INHERITS_PARENT.has(menu.slug))
+    .map((menu) => ({
     menuId: menu.id,
     parentId: menu.parentId,
     name: menu.name,

@@ -4,8 +4,9 @@ const { fn, col, where: sqlWhere } = require('sequelize');
 const db = require('../models');
 const asyncHandler = require('../utils/asyncHandler');
 const { success } = require('../utils/response');
-const { Op } = require('sequelize');
-const { STATUS, SUBSCRIPTION_STATUS, OCCUPYING_SUBSCRIPTION_STATUSES } = require('../constants');
+const functionalityService = require('../services/functionality.service');
+const { resolveServiceState } = require('../services/serviceState.service');
+const { STATUS } = require('../constants');
 
 /** Hosts that never identify a tenant, so a bare dev server gets platform branding. */
 const NEUTRAL_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', 'www']);
@@ -165,44 +166,6 @@ const publicBranch = (branch) =>
     }
     : null;
 
-/**
- * Whether this tenant's website should be served at all, and if not, why.
- *
- * The reasons are the platform's own — the identical set `quota.service` blocks
- * branch and admin creation with — so a company whose plan lapsed cannot be
- * refused a branch in the console while its website carries on serving.
- *
- * Deliberately coarse. This endpoint is public, so it answers with a flag and a
- * one-word reason and nothing else: no plan name, no price, no dates, no
- * renewal amount. That is enough for a site to render a holding page and not
- * enough to read a company's commercial position off its own homepage.
- */
-async function resolveService(companyId) {
-  const running = await db.CompanySubscription.findOne({
-    where: { companyId, status: { [Op.in]: OCCUPYING_SUBSCRIPTION_STATUSES } },
-    attributes: ['id', 'status'],
-    order: [['id', 'DESC']],
-  });
-
-  if (running) {
-    // A suspended term keeps its dates and its money; the tenant just stops
-    // being served until the platform switches it back on.
-    return running.status === SUBSCRIPTION_STATUS.SUSPENDED
-      ? { active: false, reason: 'suspended' }
-      : { active: true, reason: null };
-  }
-
-  // Nothing running. Whether a term ever existed is the difference between a
-  // plan that lapsed and a company that was never put on one.
-  const everHadOne = await db.CompanySubscription.findOne({
-    where: { companyId },
-    attributes: ['id'],
-    paranoid: false,
-  });
-
-  return { active: false, reason: everHadOne ? 'expired' : 'no_plan' };
-}
-
 /** The public half of a slide — no ids beyond its own, no audit columns. */
 const publicSlide = (slide) => ({
   id: slide.id,
@@ -256,6 +219,20 @@ const platformDetails = (host) => ({
   headOffice: null,
   branches: [],
   sliders: [],
+  // No tenant, so no optional functionality. Every key is present and null so a
+  // template can read `features.whatsapp` without guarding the parent.
+  features: { whatsapp: null, shareLink: null, about: null, team: null, gallery: null },
+  // The Contact page exists for every tenant, so the platform default carries
+  // a usable block rather than null.
+  contactPage: {
+    eyebrow: 'Contact',
+    title: 'Talk to {company}',
+    lead: 'Tell us what you need and we will come back with questions, a scope and a number.',
+    showForm: true,
+    formTarget: 'email',
+    formNote: 'We usually reply within one working day.',
+    showLocations: true,
+  },
   // Nothing resolved, so nothing is being withheld — the platform default page
   // is not a lapsed tenant.
   service: { active: true, reason: null },
@@ -287,7 +264,16 @@ const platformDetails = (host) => ({
  * already resolved branch-wise — see `resolveSlides`.
  *
  * `service` says whether the tenant's plan still entitles it to be served, so a
- * site can put up a holding page instead of its content — see `resolveService`.
+ * site can put up a holding page instead of its content — see
+ * `services/serviceState.service`, which the console's quota guard shares, so a
+ * company blocked there cannot have its website carry on regardless.
+ *
+ * `features` carries the optional functionality this tenant is actually
+ * entitled to right now — WhatsApp numbers, the share button — and a key is
+ * `null` unless the plan granted it, the company switched it on and the plan is
+ * still being served. The site renders on presence alone; deciding what a
+ * tenant may show is the API's job, not the template's. See
+ * `services/functionality.service`.
  */
 const companyDetails = asyncHandler(async (req, res) => {
   const host = resolveHost(req);
@@ -318,9 +304,24 @@ const companyDetails = asyncHandler(async (req, res) => {
     }),
   ]);
 
-  const [slides, service] = await Promise.all([
+  const functionalities = await functionalityService.getFunctionalities(company.id);
+
+  const [slides, service, features, contactPage, nav] = await Promise.all([
     resolveSlides(company.id, branch?.id ?? null),
-    resolveService(company.id),
+    resolveServiceState(company.id),
+    // The pinned branch, so About/Team/Gallery resolve branch-first the same
+    // way the slides above them do.
+    functionalityService.publicFeatures(company.id, branch?.id ?? null),
+    // Alongside `features` rather than inside it, because the template reaches
+    // for it by name on one page. Null when the tenant is not entitled to a
+    // Contact page or has it switched off — the website then drops the page and
+    // its nav link, rather than serving an empty one.
+    functionalityService.publicContact(company.id, branch?.id ?? null),
+    /**
+     * The menu. Built by the API so a page's name is the tenant's to set and a
+     * page they are not entitled to never reaches the template at all.
+     */
+    functionalityService.publicNav(company.id, branch?.id ?? null, functionalities.activeKeys),
   ]);
 
   const mainBranch = branches.find((row) => row.isMain) ?? null;
@@ -363,6 +364,9 @@ const companyDetails = asyncHandler(async (req, res) => {
       headOffice: publicBranch(mainBranch),
       branches: branches.map(publicBranch),
       sliders: slides.map(publicSlide),
+      features,
+      contactPage,
+      nav,
       service,
     },
   });

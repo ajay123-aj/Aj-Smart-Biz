@@ -4,6 +4,7 @@ const express = require('express');
 const controller = require('../controllers/master.controller');
 const validate = require('../middlewares/validate');
 const schema = require('../validators/master.validator');
+const functionalityController = require('../controllers/functionality.controller');
 const { superAdminOnly } = require('../middlewares/auth');
 
 /**
@@ -28,6 +29,13 @@ const buildRouter = ({ handlers, createSchema, updateSchema }) => {
 };
 
 const router = express.Router();
+
+/**
+ * The optional-functionality catalogue. Read-only and not a table, so it does
+ * not go through `buildRouter`: the platform defines these in code, and both
+ * consoles read them rather than hard-coding a list that could drift.
+ */
+router.get('/functionalities', functionalityController.catalogue);
 
 router.use('/states', buildRouter({
   handlers: controller.state,

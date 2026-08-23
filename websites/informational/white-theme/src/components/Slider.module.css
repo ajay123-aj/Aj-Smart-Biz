@@ -33,15 +33,48 @@
   opacity: 1;
 }
 
-/* A soft brand tint behind the copy — the only colour on an otherwise white hero. */
+/*
+ * The ground behind the copy when the tenant has uploaded no artwork — which is
+ * every new tenant, so it has to be a design rather than an absence. Warm
+ * gradients, an accent bloom, and the concentric arcs below.
+ */
 .wash {
   position: absolute;
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(58rem 30rem at 82% -12%, color-mix(in srgb, var(--brand) 14%, transparent), transparent 70%),
-    radial-gradient(42rem 26rem at 6% 108%, color-mix(in srgb, var(--brand) 8%, transparent), transparent 68%);
+    radial-gradient(50rem 28rem at 78% -14%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 68%),
+    radial-gradient(46rem 30rem at 6% 112%, color-mix(in srgb, var(--brand) 12%, transparent), transparent 70%),
+    linear-gradient(170deg, var(--surface-sunken) 0%, var(--surface) 62%);
   transition: background 0.55s ease;
+}
+
+/*
+ * Two very faint concentric rings off the right edge. They give the empty hero
+ * a focal point and a sense of depth without needing a photograph, and they are
+ * hidden the moment there is one — see `.washOverPhoto`.
+ */
+.wash::before,
+.wash::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+.wash::before {
+  width: 40rem;
+  height: 40rem;
+  top: -12rem;
+  right: -10rem;
+}
+
+.wash::after {
+  width: 26rem;
+  height: 26rem;
+  top: -4rem;
+  right: -2rem;
+  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 /**
@@ -50,6 +83,11 @@
  * enough at the left edge to keep the headline readable over a busy photo,
  * clearing by the middle so the image is still the thing you see.
  */
+.washOverPhoto::before,
+.washOverPhoto::after {
+  display: none;
+}
+
 .washOverPhoto {
   background: linear-gradient(
     100deg,
@@ -69,8 +107,8 @@
      and nothing jumps as they cross-fade. */
   grid-template-areas: 'slide';
   align-items: center;
-  min-height: min(74vh, 620px);
-  padding-block: 96px 120px;
+  min-height: min(80vh, 680px);
+  padding-block: 104px 132px;
 }
 
 .slide {
@@ -89,8 +127,10 @@
 }
 
 .title {
-  font-size: clamp(2.2rem, 5.4vw, 3.75rem);
-  letter-spacing: -0.03em;
+  font-size: clamp(2.4rem, 6vw, 4.25rem);
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+  max-width: 16ch;
 }
 
 .body {

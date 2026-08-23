@@ -130,6 +130,251 @@ export interface Slider extends AuditFields {
   sequence: number;
 }
 
+/* --------------------------- optional functionality --------------------------- */
+
+/** A key the platform implements. Mirrors `FUNCTIONALITY` in the API. */
+export type FunctionalityKey = 'whatsapp' | 'share_link' | 'about_us' | 'team' | 'gallery' | 'contact_page';
+
+/** What a WhatsApp number is for, and therefore which button it lands on. */
+export type WhatsappType = 'inquiry' | 'contact' | 'support' | 'orders';
+
+export type ShareChannel = 'copy' | 'whatsapp' | 'facebook' | 'x' | 'linkedin' | 'telegram' | 'email';
+
+/** Why a functionality is not live. `null` when it is. */
+export type FunctionalityBlockReason = 'not_in_plan' | 'disabled' | 'expired' | 'suspended' | 'no_plan';
+
+export interface WhatsappTypeMeta {
+  key: WhatsappType;
+  name: string;
+  /** Where on the website a number of this type is used. */
+  placement: string;
+  defaultMessage: string;
+  sequence: number;
+}
+
+/** One entry of the platform's own functionality list. */
+export interface FunctionalityMeta {
+  key: FunctionalityKey;
+  name: string;
+  icon: string;
+  summary: string;
+  description: string;
+  sequence: number;
+}
+
+/**
+ * `GET /masters/functionalities`. Read rather than hard-coded, so a key added to
+ * the platform gets a name here without this app changing.
+ */
+export interface FunctionalityCatalogue {
+  functionalities: FunctionalityMeta[];
+  whatsappTypes: WhatsappTypeMeta[];
+  shareChannels: ShareChannel[];
+  shareDefaults: ShareLinkSettings;
+  statModes: StatMode[];
+  statUnits: StatUnit[];
+}
+
+/** The share button's copy and the channels it offers. */
+export interface ShareLinkSettings {
+  headline: string;
+  /** `{company}` is filled in by the website. */
+  message: string;
+  channels: ShareChannel[];
+}
+
+/** The About section's prose. Its stat band is a separate list of cards. */
+export interface AboutSettings {
+  /**
+   * What this page is called in the website's menu. Blank keeps the template's
+   * name — see the placeholder on the field.
+   */
+  navLabel: string | null;
+  eyebrow: string;
+  /** `{company}` is filled in by the website. */
+  title: string;
+  lead: string;
+  /** Blank lines separate paragraphs. */
+  body: string;
+}
+
+/** Where the enquiry form hands its message off. There is no server behind it. */
+export type ContactFormTarget = 'email' | 'whatsapp';
+
+/** How the Contact page reads. Never gated — every tenant gets the page. */
+export interface ContactSettings {
+  navLabel: string | null;
+  eyebrow: string;
+  /** `{company}` is filled in by the website. */
+  title: string;
+  lead: string;
+  showForm: boolean;
+  formTarget: ContactFormTarget;
+  formNote: string;
+  showLocations: boolean;
+}
+
+/** `GET /my-company/contact[?branchId=]` — the settings for one scope. */
+export interface ContactView {
+  branchId: number | null;
+  overridden: boolean;
+  settings: ContactSettings;
+  /** What the site would show if the branch override were removed. */
+  inherited: ContactSettings | null;
+  branches: { id: number; name: string; code: string }[];
+}
+
+/**
+ * How a stat card produces its figure.
+ *
+ *   fixed       whatever the company typed — "250+", "98%"
+ *   since_date  counted from a date every time the page renders, so
+ *               "Years in business" is right next year on its own
+ */
+export type StatMode = 'fixed' | 'since_date';
+export type StatUnit = 'years' | 'months' | 'days';
+
+/** One figure in the About section's stat band. */
+export interface CompanyStat extends AuditFields {
+  companyId: number;
+  /**
+   * Branch this belongs to; null means the whole company.
+   *
+   * Same rule the sliders follow: a branch-pinned site shows the branch's own,
+   * and falls back to the company-wide ones when it has none.
+   */
+  branchId?: number | null;
+  branch?: { id: number; name: string; code: string } | null;
+  label: string;
+  mode: StatMode;
+  /** The figure, for `fixed` cards. */
+  value?: string | null;
+  /** What a `since_date` card counts from. */
+  sinceDate?: string | null;
+  unit: StatUnit;
+  prefix?: string | null;
+  suffix?: string | null;
+  sequence: number;
+}
+
+/** One person on the website's Team section. */
+export interface TeamMember extends AuditFields {
+  companyId: number;
+  /**
+   * Branch this belongs to; null means the whole company.
+   *
+   * Same rule the sliders follow: a branch-pinned site shows the branch's own,
+   * and falls back to the company-wide ones when it has none.
+   */
+  branchId?: number | null;
+  branch?: { id: number; name: string; code: string } | null;
+  name: string;
+  role?: string | null;
+  bio?: string | null;
+  /** Upload path, e.g. `/uploads/team/asha.jpg`. */
+  photo?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  linkedinUrl?: string | null;
+  sequence: number;
+}
+
+/** One image in the website's Gallery section. */
+export interface GalleryItem extends AuditFields {
+  companyId: number;
+  /**
+   * Branch this belongs to; null means the whole company.
+   *
+   * Same rule the sliders follow: a branch-pinned site shows the branch's own,
+   * and falls back to the company-wide ones when it has none.
+   */
+  branchId?: number | null;
+  branch?: { id: number; name: string; code: string } | null;
+  /** Upload path, e.g. `/uploads/gallery/frame.jpg`. */
+  image: string;
+  title?: string | null;
+  caption?: string | null;
+  altText?: string | null;
+  sequence: number;
+}
+
+/** Every card list answers with the same envelope. */
+export interface CardList<T> {
+  items: T[];
+}
+
+/**
+ * `GET /my-company/about[?branchId=]` — the copy for one scope.
+ *
+ * `overridden` is the distinction the screen turns on: a branch with no row of
+ * its own is *inheriting* the company-wide copy, not sitting empty, and saying
+ * which is the difference between "nothing here" and "the same as everyone".
+ */
+export interface AboutView {
+  branchId: number | null;
+  overridden: boolean;
+  copy: AboutSettings;
+  /** What the site would show if the branch override were removed. */
+  inherited: AboutSettings | null;
+  branches: { id: number; name: string; code: string }[];
+}
+
+/**
+ * One functionality as it stands for this company: whether the plan grants it,
+ * whether the company switched it on, and whether it is therefore live.
+ *
+ * `active` is the API's own answer — the switch renders it rather than working
+ * it out, so a toggle, a refused request and a website button always agree.
+ */
+export interface Functionality {
+  key: FunctionalityKey;
+  name: string;
+  icon: string;
+  summary: string;
+  description: string;
+  sequence: number;
+  /** The plan includes it. Without this the switch is locked. */
+  granted: boolean;
+  /** The company's own switch is on. */
+  enabled: boolean;
+  /** granted && enabled && the plan is still being served. */
+  active: boolean;
+  /** False until the company has touched this feature at all. */
+  configured: boolean;
+  settings: ShareLinkSettings | AboutSettings | Record<string, unknown>;
+  reason: FunctionalityBlockReason | null;
+  /** Ready to show — the same wording the API refuses with. */
+  message: string | null;
+}
+
+/** `GET /my-company/functionalities`. */
+export interface FunctionalityView {
+  items: Functionality[];
+  service: { active: boolean; reason: 'expired' | 'suspended' | 'no_plan' | null };
+  plan: { id: number; name: string | null; status: SubscriptionStatus; endDate: string } | null;
+  activeKeys: FunctionalityKey[];
+}
+
+/** One WhatsApp number the company publishes, tagged with what it is for. */
+export interface WhatsappNumber extends AuditFields {
+  companyId: number;
+  type: WhatsappType;
+  /** Digits only, no `+`. */
+  countryCode: string;
+  /** National subscriber number, digits only. */
+  number: string;
+  /** Overrides the type's name on the button. */
+  label?: string | null;
+  defaultMessage?: string | null;
+  sequence: number;
+}
+
+/** `GET /my-company/whatsapp-numbers` — unpaginated; it is a short list. */
+export interface WhatsappNumberView {
+  items: WhatsappNumber[];
+  types: WhatsappTypeMeta[];
+}
+
 /** One row of the role permission grid. */
 export interface PermissionRow extends PermissionFlags {
   menuId: number;
@@ -276,7 +521,14 @@ export interface PlanTerms {
   maxAdmins?: number;
   maxUsers?: number;
   storageMb?: number;
+  /** Marketing copy for the pricing table — free text, one line each. */
   features?: string[] | null;
+  /**
+   * Optional functionality the plan grants, as `FunctionalityKey`s. Enforced,
+   * unlike `features`, and frozen here at activation so a later plan edit never
+   * revokes what this term was sold.
+   */
+  functionalities?: FunctionalityKey[] | null;
   status?: Status;
 }
 

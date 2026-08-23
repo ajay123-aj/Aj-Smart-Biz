@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { NAV_LINKS } from '@/config/site';
-import { toFileUrl, type CompanyDetails } from '@/lib/company';
+import Link from 'next/link';
+import { navOf, toFileUrl, type CompanyDetails } from '@/lib/company';
+import WhatsAppButton from './WhatsAppButton';
 import styles from './Header.module.css';
 
 /**
@@ -40,7 +41,7 @@ export default function Header({ company }: { company: CompanyDetails }) {
   return (
     <header className={`${styles.header} ${scrolled ? styles.scrolled : ''}`}>
       <div className={`container ${styles.inner}`}>
-        <a className={styles.brand} href="#home" onClick={() => setMenuOpen(false)}>
+        <Link className={styles.brand} href="/" onClick={() => setMenuOpen(false)}>
           {logo ? (
             // Not next/image: the file origin is configured per deployment and a
             // plain img keeps the header working when it is not.
@@ -55,17 +56,27 @@ export default function Header({ company }: { company: CompanyDetails }) {
             <span className={styles.brandName}>{company.name}</span>
             {branchName ? <span className={styles.brandBranch}>{branchName}</span> : null}
           </span>
-        </a>
+        </Link>
 
         <nav className={`${styles.nav} ${menuOpen ? styles.navOpen : ''}`} aria-label="Primary">
-          {NAV_LINKS.map((link) => (
-            <a key={link.href} className={styles.navLink} href={link.href} onClick={() => setMenuOpen(false)}>
+          {/* next/link throughout: the bar mixes a route (`/about`) with
+              anchors on another page (`/#services`), and Link handles both
+              without a full reload. */}
+          {/* Straight from the API: pages the tenant is not publishing are
+              already absent from it, and each is named the way they named it. */}
+          {navOf(company).map((link) => (
+            <Link key={link.key} className={styles.navLink} href={link.href} onClick={() => setMenuOpen(false)}>
               {link.label}
-            </a>
+            </Link>
           ))}
-          <a className={`btn btn--primary ${styles.navCta}`} href="#contact" onClick={() => setMenuOpen(false)}>
-            Enquire now
-          </a>
+          {/* Renders nothing unless the tenant's plan includes WhatsApp and it
+              is switched on — the same rule everywhere it appears. */}
+          <WhatsAppButton
+            company={company}
+            type="contact"
+            label="WhatsApp"
+            className={styles.navWhatsapp}
+          />
         </nav>
 
         <button

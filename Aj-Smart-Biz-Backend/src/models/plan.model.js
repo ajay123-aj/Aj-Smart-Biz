@@ -26,8 +26,18 @@ module.exports = (sequelize) =>
       maxAdmins: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 1 },
       maxUsers: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 5 },
       storageMb: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 1024 },
-      /** e.g. ["GST billing","WhatsApp alerts"] */
+      /** Marketing copy for the pricing table, e.g. ["GST billing","Daily backups"] */
       features: { type: DataTypes.JSON, allowNull: true },
+      /**
+       * Optional functionality this plan grants, as `FUNCTIONALITY` keys —
+       * `["whatsapp","share_link"]`.
+       *
+       * Unlike `features`, which is prose, these are enforced: a company can
+       * only switch on what its plan lists here, and the value is snapshotted
+       * onto the subscription at activation like every other plan term, so
+       * editing a plan never silently removes a feature a running term was sold.
+       */
+      functionalities: { type: DataTypes.JSON, allowNull: true },
       isPopular: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
       sequence: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       status: { type: DataTypes.ENUM(...STATUS_VALUES), allowNull: false, defaultValue: STATUS.ACTIVE },

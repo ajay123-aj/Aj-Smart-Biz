@@ -1,0 +1,270 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:220px"></div>
+  } @else {
+    @if (!canEdit()) {
+      <p class="tiny muted" style="margin-top:0">
+        Only the main admin can change what your website shows. You are viewing this read only.
+      </p>
+    }
+
+    <p class="tiny muted" style="margin-top:0">
+      Each of these is included in your plan or it is not. Where it is, switching it on is what makes it
+      appear on your public website &mdash; switching it off takes it away again.
+    </p>
+
+    @for (item of items(); track item.key) {
+      <section class="feature" [class.feature-live]="item.active" [class.feature-locked]="!item.granted">
+        <div class="feature-head">
+          <span class="feature-icon" aria-hidden="true">{{ item.key === 'whatsapp' ? '💬' : '🔗' }}</span>
+
+          <div class="feature-main">
+            <div class="feature-title">
+              <span class="feature-name">{{ item.name }}</span>
+              <app-status-badge [value]="stateLabel(item)" />
+              @if (item.active) {
+                <span class="badge badge-success">On your website</span>
+              }
+            </div>
+            <p class="feature-summary">{{ item.description }}</p>
+
+            <!-- The API's own wording, so this never contradicts a refused request. -->
+            @if (item.message) {
+              <p class="feature-reason" [class.feature-reason-block]="!item.granted">{{ item.message }}</p>
+            }
+          </div>
+
+          <div class="feature-actions">
+            @if (item.granted) {
+              <button type="button" class="btn btn-sm btn-ghost" (click)="togglePanel(item.key)">
+                {{ panelOpen(item.key) ? 'Hide settings' : 'Settings' }}
+              </button>
+            }
+            <label
+              class="switch"
+              [title]="
+                !canEdit()
+                  ? 'Only the main admin can change this'
+                  : !item.granted
+                    ? 'Not included in your plan'
+                    : item.enabled
+                      ? 'Switch off'
+                      : 'Switch on'
+              "
+            >
+              <input
+                type="checkbox"
+                [checked]="item.enabled"
+                [disabled]="!canEdit() || !item.granted || toggling() === item.key"
+                (change)="toggle(item)"
+              />
+              <span class="track"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- ------------------------- WhatsApp settings ------------------------- -->
+        @if (item.key === 'whatsapp' && item.granted && panelOpen('whatsapp')) {
+          <div class="feature-body">
+            <div class="row-between" style="align-items:flex-start;gap:12px">
+              <div>
+                <div class="feature-body-title">WhatsApp numbers</div>
+                <p class="feature-body-note">
+                  One number per kind of conversation, so the right desk gets the right message. A type you
+                  leave empty falls back to your <strong>Contact</strong> number, so a single number is enough
+                  to make every button work.
+                </p>
+              </div>
+              @if (canEdit()) {
+                <button type="button" class="btn btn-sm btn-primary" (click)="openNumber(null)">
+                  ＋ Add number
+                </button>
+              }
+            </div>
+
+            @if (numbers().length === 0) {
+              <div class="wa-empty">
+                No numbers yet &mdash; add one and the buttons appear on your website.
+              </div>
+            } @else {
+              @for (row of numbers(); track row.id) {
+                <div class="wa-row">
+                  <span class="wa-type">
+                    <span class="badge badge-info">{{ typeName(row.type) }}</span>
+                  </span>
+
+                  <span class="wa-main">
+                    <span class="wa-number">{{ display(row) }}</span>
+                    @if (row.label) {
+                      <span class="tiny muted"> · {{ row.label }}</span>
+                    }
+                    <div class="wa-note">
+                      {{ row.defaultMessage || 'Opens WhatsApp with an empty message' }}
+                    </div>
+                    <div class="wa-note">{{ typePlacement(row.type) }}</div>
+                  </span>
+
+                  <app-status-badge [value]="row.status" />
+
+                  @if (canEdit()) {
+                    <span class="row-end" style="gap:4px">
+                      <button type="button" class="btn btn-sm btn-ghost" (click)="toggleNumber(row)">
+                        {{ row.status === 'active' ? 'Deactivate' : 'Activate' }}
+                      </button>
+                      <button type="button" class="btn btn-sm btn-ghost" (click)="openNumber(row)">Edit</button>
+                      <button type="button" class="btn btn-sm btn-danger" (click)="removeNumber(row)">
+                        Delete
+                      </button>
+                    </span>
+                  }
+                </div>
+              }
+
+              <!-- Naming what is missing matters: those buttons still work, but
+                   they reach the general line rather than the right desk. -->
+              @if (unsetTypes().length && numbers().length) {
+                <p class="tiny muted" style="margin:12px 0 0">
+                  No number set for
+                  @for (missing of unsetTypes(); track missing.key; let last = $last) {
+                    <strong>{{ missing.name }}</strong>{{ last ? '' : ', ' }}
+                  }
+                  &mdash; those buttons use your Contact number instead.
+                </p>
+              }
+            }
+          </div>
+        }
+
+        <!-- ------------------------ Share link settings ------------------------ -->
+        @if (item.key === 'share_link' && item.granted && panelOpen('share_link')) {
+          <div class="feature-body">
+            <div class="feature-body-title">Share button</div>
+            <p class="feature-body-note">
+              On a phone this opens the device's own share sheet. Everywhere else the visitor gets the
+              channels you tick below.
+            </p>
+
+            <form [formGroup]="shareForm" (ngSubmit)="saveShare()" id="share-form">
+              <div class="grid grid-2">
+                <div class="field">
+                  <label for="share-headline">Button text</label>
+                  <input id="share-headline" class="input" formControlName="headline" placeholder="Share this page" />
+                </div>
+                <div class="field">
+                  <label for="share-message">Message</label>
+                  <input id="share-message" class="input" formControlName="message" placeholder="Have a look at {company}" />
+                  <span class="hint"><code>&#123;company&#125;</code> is replaced with your company name</span>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>Channels</label>
+                <div class="channel-grid">
+                  @for (channel of shareChannels; track channel.key) {
+                    <label class="channel" [class.channel-on]="channelOn(channel.key)">
+                      <input
+                        type="checkbox"
+                        [checked]="channelOn(channel.key)"
+                        [disabled]="!canEdit()"
+                        (change)="toggleChannel(channel.key, $event)"
+                      />
+                      <span>
+                        <span class="channel-name">{{ channel.name }}</span>
+                        <span class="channel-hint" style="display:block">{{ channel.hint }}</span>
+                      </span>
+                    </label>
+                  }
+                </div>
+              </div>
+
+              @if (canEdit()) {
+                <div class="row-end">
+                  <button type="button" class="btn btn-ghost" (click)="resetShare()">Reset</button>
+                  <button type="submit" class="btn btn-primary" [disabled]="saving()">
+                    {{ saving() ? 'Saving…' : 'Save share settings' }}
+                  </button>
+                </div>
+              }
+            </form>
+          </div>
+        }
+      </section>
+    }
+  }
+</div>
+
+@if (numberModalOpen()) {
+  <app-modal
+    [title]="editingNumber() ? 'Edit WhatsApp number' : 'Add WhatsApp number'"
+    size="md"
+    [closeOnBackdrop]="false"
+    (closed)="numberModalOpen.set(false)"
+  >
+    <form [formGroup]="numberForm" (ngSubmit)="saveNumber()" id="wa-form">
+      <div class="field">
+        <label for="wa-type">What is this number for? <span class="req">*</span></label>
+        <select id="wa-type" class="select" formControlName="type">
+          @for (type of whatsappTypes(); track type.key) {
+            <option [value]="type.key">{{ type.name }}</option>
+          }
+        </select>
+        <span class="hint">{{ typePlacement(numberForm.controls.type.value) }}</span>
+      </div>
+
+      <div class="grid grid-3">
+        <div class="field">
+          <label for="wa-cc">Country code <span class="req">*</span></label>
+          <input id="wa-cc" class="input" formControlName="countryCode" placeholder="91" />
+          <app-field-error [control]="numberForm.controls.countryCode" label="Country code" />
+        </div>
+        <div class="field" style="grid-column:span 2">
+          <label for="wa-number">Mobile number <span class="req">*</span></label>
+          <input id="wa-number" class="input" formControlName="number" placeholder="98765 43210" />
+          <app-field-error [control]="numberForm.controls.number" label="Mobile number" />
+          <span class="hint">
+            Paste it however you have it &mdash; a leading <code>+91</code> or <code>0</code> is removed so the
+            country code is not doubled.
+          </span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="wa-label">Button label</label>
+        <input id="wa-label" class="input" formControlName="label" placeholder="Enquiries desk" />
+        <span class="hint">Optional. Leave empty to use the type's own name.</span>
+      </div>
+
+      <div class="field">
+        <label for="wa-message">Pre-filled message</label>
+        <textarea
+          id="wa-message"
+          class="textarea"
+          formControlName="defaultMessage"
+          placeholder="Hello, I would like to enquire about your services."
+        ></textarea>
+        <div class="row-between">
+          <span class="hint">What the visitor's chat opens with. Leave empty for a blank box.</span>
+          <button type="button" class="btn btn-sm btn-ghost" (click)="useSuggestedMessage()">
+            Use suggested
+          </button>
+        </div>
+      </div>
+
+      <div class="field" style="max-width:220px">
+        <label for="wa-status">Status</label>
+        <select id="wa-status" class="select" formControlName="status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+      <p class="tiny muted mb-0">Only active numbers appear on the website.</p>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="numberModalOpen.set(false)">Cancel</button>
+      <button type="submit" form="wa-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : editingNumber() ? 'Save changes' : 'Add number' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

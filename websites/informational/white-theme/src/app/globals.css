@@ -1,42 +1,74 @@
 /* ------------------------------------------------------------------ *
  * White theme.
  *
- * The page is deliberately a light surface throughout — no dark mode
- * counterpart — so the tenant's logo and accent colour are the only strong
- * colour on the page. `--brand-*` is overridden per tenant in the layout from
- * whatever theme the company-details API returns.
+ * A light surface throughout — no dark-mode counterpart — so the tenant's logo
+ * and accent colour are the only strong colour on the page.
+ *
+ * Two kinds of token live here and they are not interchangeable:
+ *
+ *   --brand / --accent   the tenant's own colours, overridden at runtime in the
+ *                        layout from whatever the company-details API returns.
+ *                        The values below are only what a tenant with no theme
+ *                        configured gets.
+ *   everything else      the template's own design — surfaces, radii, shadows,
+ *                        type scale, rhythm. These do not vary per tenant, and
+ *                        they are what makes every site built on this template
+ *                        recognisably the same template.
+ *
+ * The charcoal-and-warm-cream palette, the generous radii and the pill buttons
+ * follow the reference design this template was matched to.
  * ------------------------------------------------------------------ */
 
 :root {
   /* Brand — replaced at runtime by the company's theme when it has one. */
-  --brand: #2563eb;
-  --brand-strong: #1d4ed8;
-  --brand-soft: #eff4ff;
+  --brand: #2b2b30;
+  --brand-strong: #161619;
+  --brand-soft: #f2f0ec;
   --brand-contrast: #ffffff;
 
-  /* Neutrals */
+  /* Accent — the tenant's third colour, used for hairlines and eyebrows. */
+  --accent: #b08d57;
+  --accent-soft: #d9c29a;
+
+  /* Neutrals. Warm rather than blue-grey, so the cream sections sit with them. */
   --surface: #ffffff;
-  --surface-muted: #f7f8fa;
-  --surface-sunken: #f1f3f6;
-  --border: #e5e7eb;
-  --border-strong: #d1d5db;
+  --surface-muted: #faf9f7;
+  --surface-sunken: #f2f0ec;
+  --border: #e8e5e0;
+  --border-strong: #d6d1c9;
 
-  --text: #101828;
-  --text-muted: #5a6474;
-  --text-faint: #8a93a2;
+  --text: #1c1c1f;
+  --text-muted: #5b5b62;
+  --text-faint: #8d8d96;
 
-  --radius-sm: 8px;
-  --radius: 14px;
-  --radius-lg: 22px;
+  /* WhatsApp's own colours. Fixed, never themed — see WhatsAppButton.module.css. */
+  --whatsapp: #25d366;
+  --whatsapp-dark: #1da851;
 
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
-  --shadow: 0 6px 20px rgba(16, 24, 40, 0.07);
-  --shadow-lg: 0 20px 48px rgba(16, 24, 40, 0.1);
+  --radius-sm: 12px;
+  --radius: 1.5rem;
+  --radius-lg: 2rem;
 
-  --header-height: 74px;
-  --max-width: 1160px;
+  /*
+   * Warm-tinted rather than neutral black, to match the surfaces, and layered
+   * rather than single — one soft wide shadow reads as a smudge, a tight
+   * contact shadow under a wide ambient one reads as an object on a surface.
+   */
+  --shadow-sm: 0 1px 2px rgba(28, 28, 31, 0.05);
+  --shadow: 0 12px 40px color-mix(in srgb, var(--brand) 8%, transparent);
+  --shadow-lg: 0 30px 80px color-mix(in srgb, var(--brand) 18%, transparent);
+  --shadow-hover: 0 20px 56px color-mix(in srgb, var(--brand) 14%, transparent);
 
-  --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --header-height: 76px;
+  --max-width: 1180px;
+
+  /*
+    Geist is the reference's face. It is not a dependency of this template — no
+    package, no build-time font download — so it is simply preferred where the
+    visitor or the deployment already has it, and falls back to the same
+    neutral grotesques it was designed alongside.
+  */
+  --font-sans: 'Geist', 'Inter', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
 }
 
 *,
@@ -53,7 +85,12 @@ html {
 
 body {
   margin: 0;
-  background: var(--surface);
+  /*
+   * A warm ground, not white. The reference's whole look depends on it: its
+   * panels are translucent white, so they only read as panels when there is
+   * something tinted behind them to lift off.
+   */
+  background: var(--surface-sunken);
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 16px;
@@ -66,9 +103,10 @@ h2,
 h3,
 h4 {
   margin: 0;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  /* The reference sets its headings black, not bold. */
+  font-weight: 800;
 }
 
 p {
@@ -106,33 +144,105 @@ button {
 }
 
 .section {
-  padding-block: 88px;
+  padding-block: 96px;
 }
 
-.section--muted {
-  background: var(--surface-muted);
-  border-block: 1px solid var(--border);
-}
-
+/*
+  The eyebrow carries the accent colour and a hairline, which is what gives the
+  reference its "signature collection" feel above every heading.
+*/
 .eyebrow {
-  display: inline-block;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
-  color: var(--brand);
-  margin-bottom: 14px;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+
+.eyebrow::before {
+  content: '';
+  width: 26px;
+  height: 1px;
+  background: currentColor;
+  flex: none;
 }
 
 .section-title {
-  font-size: clamp(1.75rem, 3.4vw, 2.5rem);
+  font-size: clamp(1.85rem, 3.6vw, 2.7rem);
 }
 
 .section-lede {
-  margin-top: 16px;
+  margin-top: 18px;
   max-width: 62ch;
   color: var(--text-muted);
   font-size: 1.06rem;
+}
+
+/*
+ * The block every section opens with. Capped well short of the container so a
+ * heading never runs the full width of a desktop — long measures are what made
+ * the old sections read as sparse rather than spacious.
+ */
+.section-head {
+  max-width: 46rem;
+  margin-bottom: 48px;
+}
+
+/* ---------------------------- surfaces ---------------------------- */
+
+/*
+ * One card, everywhere. Cards were previously a hairline and a barely-visible
+ * shadow, which is what made the page feel flat: nothing sat *on* anything.
+ */
+.card-surface {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease,
+    background-color 0.22s ease;
+}
+
+.card-surface:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-hover);
+}
+
+/*
+ * A muted section is otherwise a flat cream rectangle. The gradient gives it a
+ * light source, and the hairline grid a texture you register without reading —
+ * both very low contrast on purpose.
+ */
+.section--muted {
+  position: relative;
+  border-block: 1px solid rgba(255, 255, 255, 0.7);
+  background:
+    radial-gradient(60rem 30rem at 88% -10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%),
+    rgba(255, 255, 255, 0.55);
+}
+
+.section--muted::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image:
+    linear-gradient(to right, var(--border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+  background-size: 72px 72px;
+  /* Fades out before the edges so the texture never becomes a visible panel. */
+  mask-image: radial-gradient(70% 60% at 50% 40%, #000 20%, transparent 100%);
+}
+
+.section--muted > * {
+  position: relative;
 }
 
 /* ---------------------------- buttons ---------------------------- */
@@ -142,11 +252,12 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 22px;
+  padding: 13px 26px;
   border-radius: 999px;
   border: 1px solid transparent;
   font-weight: 600;
   font-size: 0.95rem;
+  line-height: 1;
   transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease,
     transform 0.18s ease, box-shadow 0.18s ease;
 }
@@ -158,12 +269,12 @@ button {
 .btn--primary {
   background: var(--brand);
   color: var(--brand-contrast);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 8px 22px rgba(28, 28, 31, 0.16);
 }
 
 .btn--primary:hover {
   background: var(--brand-strong);
-  box-shadow: var(--shadow);
+  box-shadow: 0 12px 30px rgba(28, 28, 31, 0.22);
 }
 
 .btn--ghost {
@@ -223,6 +334,6 @@ button {
 
 @media (max-width: 640px) {
   .section {
-    padding-block: 64px;
+    padding-block: 66px;
   }
 }
