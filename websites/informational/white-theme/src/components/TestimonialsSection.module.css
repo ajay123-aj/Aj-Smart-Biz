@@ -1,0 +1,110 @@
+/* ------------------------------------------------------------------ *
+ * Testimonials — the band around the carousel.
+ *
+ * The cards and the slider controls bring their own styling; see
+ * `TestimonialsCarousel.module.css`. What is left here is the ground, the
+ * heading row, and the score tile beside it.
+ * ------------------------------------------------------------------ */
+
+.section {
+  /*
+   * Deliberately NOT `section--muted`. The Features band above it already uses
+   * that treatment, and two textured bands in a row read as one long panel with
+   * a seam through it. This one sits on the plain ground so the cards lift off
+   * it instead.
+   */
+  background: var(--surface-sunken);
+  border-top: 1px solid var(--border);
+}
+
+/* ---------------------------------- head ---------------------------------- */
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 40px;
+  margin-bottom: 40px;
+}
+
+.headCopy {
+  max-width: 46rem;
+}
+
+/* The right-hand end of the row, which the review button has to itself. */
+.headSide {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.write {
+  white-space: nowrap;
+}
+
+/*
+ * The off-site arrow, on the link version of the button only. Sized against the
+ * label rather than fixed, and dimmed, because it is a note about where the
+ * button goes and not part of what it says.
+ */
+.writeIcon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  opacity: 0.75;
+}
+
+/* ---------------------------------- feet ---------------------------------- */
+
+.empty {
+  padding: 34px 0 6px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+
+
+/* ------------------------------ responsive ------------------------------ */
+
+/*
+ * Tablet. The score and the button move under the heading rather than beside
+ * it: at this width the three of them squeeze the heading to three words a line.
+ */
+@media (max-width: 900px) {
+  .head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 22px;
+    margin-bottom: 30px;
+  }
+
+  .score {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+  }
+
+  .scoreValue {
+    font-size: 1.8rem;
+  }
+}
+
+/* Phone. The button takes the full width, as every other primary action does. */
+@media (max-width: 620px) {
+  .headSide {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .score {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .write {
+    width: 100%;
+  }
+}

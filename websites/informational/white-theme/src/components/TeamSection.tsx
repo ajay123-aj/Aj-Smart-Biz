@@ -11,16 +11,22 @@ import styles from './TeamSection.module.css';
  * section, not a `display: none` a visitor can read in the source.
  */
 export default function TeamSection({ company }: { company: CompanyDetails }) {
-  const members = company.features?.team?.members ?? [];
+  const team = company.features?.team;
+  const members = team?.members ?? [];
   if (!members.length) return null;
 
   return (
     <section className="section section--muted" id="team">
       <div className="container">
         <div className="section-head">
-          <span className="eyebrow">{TEAM_COPY.eyebrow}</span>
-          <h2 className="section-title">{TEAM_COPY.title}</h2>
-          <p className="section-lede">{TEAM_COPY.lede}</p>
+          {/*
+            The tenant's own wording. The API resolves it — sending its own
+            defaults where the company wrote nothing — so `TEAM_COPY` is reached
+            for only by an API too old to carry the block at all.
+          */}
+          <span className="eyebrow">{team?.eyebrow || TEAM_COPY.eyebrow}</span>
+          <h2 className="section-title">{team?.title || TEAM_COPY.title}</h2>
+          <p className="section-lede">{team?.lead || TEAM_COPY.lede}</p>
         </div>
 
         <div className={styles.grid}>

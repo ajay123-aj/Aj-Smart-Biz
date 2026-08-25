@@ -21,7 +21,8 @@ import styles from './GallerySection.module.css';
  * the images and their captions are in the HTML either way.
  */
 export default function GallerySection({ company }: { company: CompanyDetails }) {
-  const items = (company.features?.gallery?.items ?? []).filter((item) => toFileUrl(item.image));
+  const gallery = company.features?.gallery;
+  const items = (gallery?.items ?? []).filter((item) => toFileUrl(item.image));
   const [open, setOpen] = useState<number | null>(null);
 
   const count = items.length;
@@ -64,9 +65,13 @@ export default function GallerySection({ company }: { company: CompanyDetails })
     <section className="section" id="gallery">
       <div className="container">
         <div className="section-head">
-          <span className="eyebrow">{GALLERY_COPY.eyebrow}</span>
-          <h2 className="section-title">{GALLERY_COPY.title}</h2>
-          <p className="section-lede">{GALLERY_COPY.lede}</p>
+          {/*
+            The tenant's own wording, resolved by the API. `GALLERY_COPY` is the
+            fallback for an API too old to carry the block — see `TeamSection`.
+          */}
+          <span className="eyebrow">{gallery?.eyebrow || GALLERY_COPY.eyebrow}</span>
+          <h2 className="section-title">{gallery?.title || GALLERY_COPY.title}</h2>
+          <p className="section-lede">{gallery?.lead || GALLERY_COPY.lede}</p>
         </div>
 
         {/* `data-count` drives the mosaic, saturating at five — from there on

@@ -65,18 +65,62 @@ Production boot refuses to start with placeholder JWT secrets or `DB_SYNC_MODE=f
 
 ---
 
-## Two portals, one API
+## One API, three consumers
 
-Tokens carry a `scope`, so a token from one portal can never be used on the other.
+Three things talk to this API, and each has a prefix of its own. A client needs
+its base URL and its own prefix and nothing else: everything under that prefix is
+something it may call, and everything it may call is under that prefix.
 
-| Scope | Issued by | Reaches |
-| --- | --- | --- |
-| `super_admin` | `POST /auth/super-admin/login` | `/companies`, `/super-admins`, `/dashboard/super-admin`, master writes |
-| `admin` | `POST /auth/admin/login` | `/my-company`, `/roles`, `/menus`, `/admins`, `/dashboard/admin` |
+| Prefix | Consumer | Auth | Scope |
+| --- | --- | --- | --- |
+| `/website` | A tenant's public site (`websites/`) | None | The tenant is resolved from the request **host** |
+| `/admin` | The company workspace (`Aj-Smart-Biz-Admin`) | `POST /auth/admin/login` | The token's own company, always |
+| `/super-admin` | The platform console (`Aj-Smart-Biz-Supper-Admin`) | `POST /auth/super-admin/login` | Every tenant |
+
+`/auth`, `/masters`, `/uploads` and `/health` sit outside those prefixes because
+every consumer uses them — putting `/auth/admin/login` under `/admin` would mean
+writing the same endpoint twice, and `/admin/masters/states` would be a path the
+platform console has to know about.
+
+**The guard belongs to the module, not to the route.** `authenticate` and the
+scope check are applied once, in `modules/index.js`, so a route added inside a
+module cannot be reachable by the wrong consumer through an omission. Tokens
+carry a `scope`, so an admin token on `/super-admin` is a 403 and the reverse is
+too.
 
 Company admins are additionally gated per menu: every tenant route is wrapped in
 `requirePermission('<menu-slug>', '<action>')`, which reads `role_permissions`.
 The main admin (`is_company_admin`) bypasses those checks.
+
+### Where the code lives
+
+```
+src/modules/
+├── index.js                       mounts the four below, and owns the guards
+├── shared/shared.routes.js        /health · /auth · /masters · /uploads
+├── website/website.routes.js      /website/*      — unauthenticated
+├── admin/admin.routes.js          /admin/*        — admin token
+└── superadmin/superadmin.routes.js /super-admin/* — super-admin token
+```
+
+The resource routers in `src/routes/` are the building blocks; the modules
+compose them and decide who may reach what.
+
+---
+
+## Docs
+
+Swagger UI at **`/api/v1/docs`**, the raw spec at **`/api/v1/docs.json`**.
+
+Both halves of it are generated rather than written twice:
+
+- **Every route** is read off the Express router at boot (`docs/routeScanner`),
+  so coverage cannot fall behind the code — if it is mounted it is documented.
+- **Every request shape** is compiled from the **Joi validators the API already
+  runs** (`joi-to-swagger`), so the documented body is the enforced body.
+
+What is hand-written is the prose — the `@openapi` blocks next to the routes,
+which explain what an endpoint is *for*. Those win over the scanned entry.
 
 ---
 
@@ -111,28 +155,28 @@ Reads are open to any authenticated user; writes are super admin only.
 Deletes are refused while rows are still referenced (a plan with an active
 subscription, a state used by a company, the default theme).
 
-### Companies — super admin
+### Companies — `/super-admin/companies`
 | Method | Route | Notes |
 | --- | --- | --- |
-| GET | `/companies` | Filters: `businessTypeId`, `stateId`, `planId`, `subscriptionStatus`; each row carries `activeSubscription` |
-| POST | `/companies` | **Provisions the whole tenant in one transaction** — see below |
-| GET | `/companies/:id` | Branches + contacts, subscription history, transactions, admins and a `summary` block |
-| PUT | `/companies/:id` | |
-| PATCH | `/companies/:id/status` | Deactivating blocks every admin of that tenant |
-| DELETE | `/companies/:id` | Soft deletes the company *and* its branches, contacts, roles, permissions, admins and tenant menus |
-| POST | `/companies/:id/restore` | Restores all of the above |
-| GET/POST | `/companies/:id/subscriptions` | List / assign-and-renew a plan |
-| POST | `/companies/:id/subscriptions/:subscriptionId/cancel` | |
-| GET/POST | `/companies/:id/transactions` | Paginated list / record a manual payment |
-| * | `/companies/:companyId/branches…` | Same branch routes as the tenant portal |
+| GET | `/super-admin/companies` | Filters: `businessTypeId`, `stateId`, `planId`, `subscriptionStatus`; each row carries `activeSubscription` |
+| POST | `/super-admin/companies` | **Provisions the whole tenant in one transaction** — see below |
+| GET | `/super-admin/companies/:id` | Branches + contacts, subscription history, transactions, admins and a `summary` block |
+| PUT | `/super-admin/companies/:id` | |
+| PATCH | `/super-admin/companies/:id/status` | Deactivating blocks every admin of that tenant |
+| DELETE | `/super-admin/companies/:id` | Soft deletes the company *and* its branches, contacts, roles, permissions, admins and tenant menus |
+| POST | `/super-admin/companies/:id/restore` | Restores all of the above |
+| GET/POST | `/super-admin/companies/:id/subscriptions` | List / assign-and-renew a plan |
+| POST | `/super-admin/companies/:id/subscriptions/:subscriptionId/cancel` | |
+| GET/POST | `/super-admin/companies/:id/transactions` | Paginated list / record a manual payment |
+| * | `/super-admin/companies/:companyId/branches…` | Same branch routes as the tenant portal |
 
-`POST /companies` creates, in one transaction: the company → its head-office
+`POST /super-admin/companies` creates, in one transaction: the company → its head-office
 branch → the `Company Admin` role with every permission → the main admin login →
 optionally an active subscription and a paid transaction. If no password was
 supplied for the main admin the API generates one and returns it **once** as
 `mainAdminPassword`.
 
-### Super admins — `/super-admins`
+### Super admins — `/super-admin/super-admins`
 `GET /` · `POST /` · `GET /:id` · `PUT /:id` · `PATCH /:id/status` · `PATCH /:id/reset-password` · `DELETE /:id`
 
 The root account cannot be deleted, deactivated or demoted, and nobody can delete or disable themselves.
@@ -140,22 +184,23 @@ The root account cannot be deleted, deactivated or demoted, and nobody can delet
 ### Tenant portal
 | Method | Route | Menu slug |
 | --- | --- | --- |
-| GET/PUT | `/my-company` | `company-details` — writes are main-admin only, and `status`/`code`/plan fields are ignored |
-| GET | `/my-company/subscriptions`, `/my-company/transactions` | `company-details` |
-| * | `/my-company/branches`, `/my-company/branches/:branchId/contacts` | `branch-management` |
-| * | `/my-company/sliders` | `slider-management` — each verb carries its own action right, so view-only roles cannot edit |
-| * | `/roles` | `role-management` |
+| GET/PUT | `/admin/company` | `company-details` — writes are main-admin only, and `status`/`code`/plan fields are ignored |
+| GET | `/admin/company/subscriptions`, `/admin/company/transactions` | `company-details` |
+| * | `/admin/company/branches`, `/admin/company/branches/:branchId/contacts` | `branch-management` |
+| * | `/admin/company/sliders` | `slider-management` — each verb carries its own action right, so view-only roles cannot edit |
+| * | `/admin/roles` | `role-management` |
 | GET/PUT | `/roles/:roleId/permissions` | `menu-permission` — `PUT` replaces the whole matrix |
-| * | `/menus` (+ `/menus/tree`) | `menu-permission` — platform menus are read only for tenants |
-| * | `/admins` (+ `PATCH /admins/:id/reset-password`) | `admin-management` |
+| * | `/admin/menus` (+ `/menus/tree`) | `menu-permission` — platform menus are read only for tenants |
+| * | `/admin/admins` (+ `PATCH /admin/admins/:id/reset-password`) | `admin-management` |
 
-### Public — `/public`
-No token; the login screen calls this before anyone has signed in.
+### Website — `/website`
+No token. A tenant's own website reads everything it renders from here, and the
+two login screens read their branding from it.
 
 | Method | Route | Notes |
 | --- | --- | --- |
-| GET | `/public/branding` | Tenant branding for the requesting host — what a login screen needs |
-| GET | `/public/company-details` | The tenant's full public profile, its hero slides, and whether its plan still entitles it to be served |
+| GET | `/website/branding` | Tenant branding for the requesting host — what a login screen needs |
+| GET | `/website/company-details` | The tenant's full public profile, its hero slides, and whether its plan still entitles it to be served |
 
 The tenant is resolved from the request **Host** (`X-Forwarded-Host` behind a
 proxy): first an active row in `company_domain`, then the leading label of the
@@ -196,7 +241,7 @@ A company can own several hosts, each optionally pinned to one of its branches
 
 | Method | Route | Notes |
 | --- | --- | --- |
-| GET | `/companies/:companyId/domains` · `/my-company/domains` | List |
+| GET | `/super-admin/companies/:companyId/domains` · `/admin/company/domains` | List |
 | POST | same | Add. The first one added becomes primary automatically |
 | PUT | `…/domains/:id` | Edit host, branch pin, or promote to primary |
 | PATCH | `…/domains/:id/status` | Activate / deactivate |

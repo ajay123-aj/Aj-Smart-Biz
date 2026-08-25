@@ -5,8 +5,19 @@ const db = require('../models');
 const asyncHandler = require('../utils/asyncHandler');
 const { success } = require('../utils/response');
 const functionalityService = require('../services/functionality.service');
+const leadService = require('../services/lead.service');
+const logger = require('../utils/logger');
 const { resolveServiceState } = require('../services/serviceState.service');
-const { STATUS } = require('../constants');
+const ApiError = require('../utils/ApiError');
+const { created } = require('../utils/response');
+const {
+  STATUS,
+  FUNCTIONALITY,
+  TESTIMONIAL_MODE,
+  TESTIMONIAL_REVIEW_TARGET,
+  TESTIMONIAL_SOURCE,
+  TESTIMONIAL_MODERATION,
+} = require('../constants');
 
 /** Hosts that never identify a tenant, so a bare dev server gets platform branding. */
 const NEUTRAL_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', 'www']);
@@ -221,7 +232,16 @@ const platformDetails = (host) => ({
   sliders: [],
   // No tenant, so no optional functionality. Every key is present and null so a
   // template can read `features.whatsapp` without guarding the parent.
-  features: { whatsapp: null, shareLink: null, about: null, team: null, gallery: null },
+  features: {
+    whatsapp: null,
+    shareLink: null,
+    about: null,
+    figures: null,
+    team: null,
+    gallery: null,
+    testimonials: null,
+    benefits: null,
+  },
   // The Contact page exists for every tenant, so the platform default carries
   // a usable block rather than null.
   contactPage: {
@@ -372,4 +392,173 @@ const companyDetails = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { branding, companyDetails, resolveTenantByHost, normaliseHost, resolveHost };
+/* ------------------------------------------------------------------ *
+ * Testimonial submission
+ * ------------------------------------------------------------------ */
+
+/**
+ * POST /public/testimonials
+ *
+ * A customer writing a review on a tenant's own website. The only route on the
+ * platform that lets an unauthenticated stranger create a row, so every one of
+ * its rules exists to keep that narrow:
+ *
+ *  - **The tenant comes from the host, never from the body.** The same resolver
+ *    `/public/company-details` uses. There is no `companyId` field to send, so
+ *    a review cannot be aimed at a company whose site the writer never visited.
+ *  - **Only when the tenant is actually collecting.** The feature has to be
+ *    live — plan, switch and served, the same three conditions as everything
+ *    else — the mode has to be `dynamic`, *and* the review button has to be the
+ *    one that opens our own form. A company running a curated wall has no open
+ *    form and no open endpoint, which are the same fact; a company that points
+ *    its button at Google is in exactly the same position, because the form it
+ *    would have been posting from is not on the site either.
+ *  - **Always pending.** `moderation` and `source` are set here and are not
+ *    fields a body can carry. Nothing a stranger sends can reach a website
+ *    without someone at the company approving it first.
+ *  - **Branch-stamped from the domain.** A review written on the Surat site
+ *    belongs to Surat, so it appears on that site's wall rather than the
+ *    company's.
+ *
+ * The reply is deliberately the same whether or not the review was the first
+ * one that day: it reports that the review was received, never how many exist
+ * or what happens next internally.
+ */
+const submitTestimonial = asyncHandler(async (req, res) => {
+  const host = resolveHost(req);
+  const { company, branch } = await resolveTenantByHost(host);
+
+  /**
+   * A host that matched no tenant is refused with the same message an inactive
+   * one gets. `/public/branding` and `/public/company-details` both answer an
+   * unknown host with platform defaults rather than an error precisely so the
+   * endpoint cannot be walked to enumerate tenants, and a distinct "no such
+   * company" here would undo that for the price of a POST.
+   */
+  const refuse = () => {
+    throw ApiError.badRequest('This website is not accepting reviews at the moment');
+  };
+
+  if (!company || company.status !== STATUS.ACTIVE) refuse();
+
+  const { activeKeys } = await functionalityService.getFunctionalities(company.id);
+  if (!activeKeys.includes(FUNCTIONALITY.TESTIMONIALS)) refuse();
+
+  const row = await db.CompanyFunctionality.findOne({
+    where: { companyId: company.id, key: FUNCTIONALITY.TESTIMONIALS },
+  });
+  const settings = functionalityService.testimonialSettings(row?.settings);
+  if (settings.mode !== TESTIMONIAL_MODE.DYNAMIC) refuse();
+  /*
+   * The button sends people elsewhere, so there is no form on the site and this
+   * endpoint is shut with it. Checked rather than assumed from the mode: the
+   * two settings move independently, and this is the one that decides whether
+   * a stranger can write a row.
+   */
+  if (settings.reviewTarget !== TESTIMONIAL_REVIEW_TARGET.FORM) refuse();
+
+  const { authorName, authorRole, authorEmail, authorPhone, rating, body } = req.body;
+
+  await db.CompanyTestimonial.create({
+    companyId: company.id,
+    // The branch whose domain this was written on; null on a company-wide host.
+    branchId: branch?.id ?? null,
+    authorName,
+    authorRole: authorRole || null,
+    authorEmail: authorEmail || null,
+    authorPhone: authorPhone || null,
+    // The form can be configured without stars; a rating sent anyway is dropped
+    // rather than saved, so the section's average means what it says.
+    rating: settings.showRating ? rating ?? null : null,
+    body,
+    /* Not from the body, and there is no body field that could carry them. */
+    source: TESTIMONIAL_SOURCE.VISITOR,
+    moderation: TESTIMONIAL_MODERATION.PENDING,
+    /* `sequence` is left at 0 until someone approves it — see `moderateTestimonial`. */
+    submittedIp: req.ip ?? null,
+    createdBy: null,
+  });
+
+  /**
+   * The row is not echoed back. A pending review is not public, and returning
+   * the record — with its id — would hand a submitter a handle on something
+   * nobody has agreed to publish.
+   */
+  return created(res, 'Thank you — your review has been sent to us for publishing', {
+    received: true,
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Lead tracking
+ * ------------------------------------------------------------------ */
+
+/**
+ * POST /public/leads
+ *
+ * Fired by a tenant's website on every launch. Records the visit, and the
+ * device behind it as a lead — see `lead.service` for what that means and how
+ * one device stays one row.
+ *
+ * This is the second unauthenticated write on the platform, and it differs from
+ * the testimonial one in the way that matters most: **it never fails loudly.**
+ *
+ * A visitor is reading a page. Nothing they came for depends on this call, and
+ * a 4xx on every page load would put a red line in the console of a working
+ * website, tempt someone into retrying it, and tell whoever asked whether a
+ * hostname is a tenant. So every outcome that is not a stored visit answers
+ * `200 { tracked: false }` — an unknown host, an inactive company, a payload
+ * the database refused. What went wrong is logged server-side, where the people
+ * who can fix it are, rather than returned to the person it did not happen to.
+ *
+ * The tenant is resolved from the host exactly as everywhere else in this file,
+ * so there is no `companyId` field to send and a visit cannot be aimed at a
+ * company whose website the sender never opened.
+ *
+ * `deviceId` comes back in the response. A first-time visitor whose browser had
+ * nothing stored gets the id the server derived, and the site can keep it — so
+ * the second page load is recognisably the same person even where the tracker
+ * had no identity of its own to send.
+ */
+const trackLead = asyncHandler(async (req, res) => {
+  const host = req.body?.domain ? normaliseHost(req.body.domain) : resolveHost(req);
+  const declined = (reason) => success(res, { message: reason, data: { tracked: false } });
+
+  const { company, branch } = await resolveTenantByHost(host);
+  if (!company || company.status !== STATUS.ACTIVE) return declined('Nothing to track');
+
+  try {
+    const { lead, isNewLead, isNewVisit } = await leadService.recordVisit({
+      company,
+      branch,
+      payload: req.body ?? {},
+      req,
+    });
+
+    return created(res, 'Visit recorded', {
+      tracked: true,
+      /* So a browser with no storage of its own can adopt the server's id. */
+      deviceId: lead.deviceId,
+      newLead: isNewLead,
+      newVisit: isNewVisit,
+    });
+  } catch (error) {
+    /**
+     * Swallowed on purpose, and only here. Analytics must never be able to
+     * break the page it is measuring, so a failure to store one visit is this
+     * endpoint's problem and nobody else's.
+     */
+    logger.error(`Lead tracking failed for company ${company.id}: ${error.message}`);
+    return declined('Nothing to track');
+  }
+});
+
+module.exports = {
+  branding,
+  companyDetails,
+  submitTestimonial,
+  trackLead,
+  resolveTenantByHost,
+  normaliseHost,
+  resolveHost,
+};

@@ -223,6 +223,9 @@ table.table tbody tr:last-child td { border-bottom: none; }
 .badge-warning { background: var(--warning-bg); color: var(--warning); }
 .badge-info    { background: var(--info-bg);    color: var(--info); }
 .badge-muted   { background: var(--surface-3);  color: var(--text-2); }
+/* The brand tone, for a state that is progress rather than success — a lead
+   that has been qualified but not yet won. */
+.badge-brand   { background: var(--brand-100);   color: var(--brand-700); }
 
 /* -------------------------------- states --------------------------------- */
 .empty { padding: 48px 20px; text-align: center; color: var(--text-2); }

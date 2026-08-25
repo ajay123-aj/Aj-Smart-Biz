@@ -1,18 +1,24 @@
 import PlanNotice from '@/components/PlanNotice';
+import ServiceUnavailable from '@/components/ServiceUnavailable';
 import Slider from '@/components/Slider';
-import StatsGrid from '@/components/StatsGrid';
+import FiguresSection from '@/components/FiguresSection';
+import FeaturesSection from '@/components/FeaturesSection';
+import TestimonialsSection from '@/components/TestimonialsSection';
 import CtaBand from '@/components/CtaBand';
-import { resolveAbout } from '@/lib/about';
 import { getCompanyDetails } from '@/lib/company.server';
-import styles from './page.module.css';
 
 /**
- * The home page: the tenant's hero, and the invitation to get in touch.
+ * The home page: the tenant's hero, the case for getting in touch, and the
+ * invitation to do it.
  *
- * Deliberately short. The story, team and gallery live on `/about` and the
- * contact details on `/contact`, and the two template-written sections that
- * used to sit here — "what we do" and "why us" — are gone: every word on the
- * site is now the tenant's own, which is the point of the platform.
+ * Still short. The story, team and gallery live on `/about` and the contact
+ * details on `/contact`.
+ *
+ * Everything on it is the tenant's own — the hero, the figures, and now the
+ * Features / Benefits band, which is written card by card in the admin. A
+ * company that has not switched that section on simply has no band: the
+ * component renders nothing rather than falling back to words the platform
+ * made up about a business it has never met.
  *
  * The company was already resolved from the domain in the layout; this call is
  * deduped against that one, so the page costs no extra request.
@@ -26,30 +32,61 @@ export default async function HomePage() {
    * here — rather than only hiding it in the layout — is what keeps the site out
    * of the streamed payload as well as off the screen.
    */
-  if (!company.service.active) return <PlanNotice company={company} />;
-
   /**
-   * The same figures the About page opens with. They belong here too: a
-   * visitor who never leaves the home page should still see what the business
-   * has to show for itself.
+   * The layout declines to frame the site when the API is unreachable; the page
+   * has to decline to render it too. Skipping only the layout would still leave
+   * this page in the streamed RSC payload, where its markup — placeholder
+   * company and all — remains readable to anyone who looks. Same rule, and the
+   * same reason, as the plan check below.
    */
-  const { stats } = resolveAbout(company);
+  if (!company.apiReachable) return <ServiceUnavailable />;
+
+  if (!company.service.active) return <PlanNotice company={company} />;
 
   return (
     <>
       <Slider company={company} />
 
       {/*
-        Nothing at all unless the tenant has written figures — `StatsGrid`
-        returns null on an empty set, so the section would be an empty band.
+        Features / Benefits: what the business can do, and what that is worth to
+        the person reading. It sits above the closing band on purpose — it is the
+        case for getting in touch, so it belongs immediately before the
+        invitation to do so.
+
+        The component is shared and self-contained: it resolves its own copy and
+        renders nothing when the tenant is not carrying the section — the plan
+        does not grant it, the switch is off, or no card has been written. The
+        home page is the only place it is used today, which is a decision made
+        here and nowhere else.
       */}
-      {stats.length > 0 ? (
-        <section className={styles.figures}>
-          <div className="container">
-            <StatsGrid stats={stats} />
-          </div>
-        </section>
-      ) : null}
+      <FeaturesSection company={company} />
+
+      {/*
+        Testimonials. After the case the business makes for itself, because that
+        is the order the two are worth reading in: what we say, then what our
+        customers say about it.
+
+        Renders nothing at all unless the tenant is entitled to the feature and
+        has something to show — the API omits the block otherwise — so it needs
+        no guard here. Whether it carries a form is the API's answer too.
+      */}
+      <TestimonialsSection company={company} />
+
+      {/*
+        The figures, immediately before the closing band.
+
+        They used to sit under the hero, which put the hardest evidence on the
+        page in front of a reader who had not yet been told what the business
+        does. Here they land on someone who has just read the case for it and
+        the customers agreeing with it — so the numbers confirm all of that
+        rather than opening with it, and the last thing before "get in touch" is
+        the reason to.
+
+        The section resolves its own copy and renders nothing when the tenant is
+        not carrying the band, so there is no condition here. The About page
+        closes the same way; see `FiguresSection`.
+      */}
+      <FiguresSection company={company} />
 
       {/*
         The full contact section moved to `/contact`. What stays here is the

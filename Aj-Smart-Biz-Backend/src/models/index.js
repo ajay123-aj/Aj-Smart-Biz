@@ -18,6 +18,8 @@ const CompanyContact = require('./companyContact.model')(sequelize);
 const CompanyStat = require('./companyStat.model')(sequelize);
 const CompanyTeamMember = require('./companyTeamMember.model')(sequelize);
 const CompanyGalleryItem = require('./companyGalleryItem.model')(sequelize);
+const CompanyTestimonial = require('./companyTestimonial.model')(sequelize);
+const CompanyFeature = require('./companyFeature.model')(sequelize);
 const CompanySubscription = require('./companySubscription.model')(sequelize);
 const SubscriptionEvent = require('./subscriptionEvent.model')(sequelize);
 const PlanRequest = require('./planRequest.model')(sequelize);
@@ -27,6 +29,8 @@ const Role = require('./role.model')(sequelize);
 const Menu = require('./menu.model')(sequelize);
 const RolePermission = require('./rolePermission.model')(sequelize);
 const Admin = require('./admin.model')(sequelize);
+const Lead = require('./lead.model')(sequelize);
+const LeadVisit = require('./leadVisit.model')(sequelize);
 
 /* ------------------------------------------------------------------ *
  * Associations
@@ -64,8 +68,9 @@ CompanyFunctionality.belongsTo(Company, { foreignKey: 'companyId', as: 'company'
 Company.hasMany(CompanyWhatsapp, { foreignKey: 'companyId', as: 'whatsappNumbers', onDelete: 'CASCADE' });
 CompanyWhatsapp.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 
-// Website content the tenant writes: the About stat band, the Team section and
-// the Gallery. Each is gated by its own functionality but owned by the company,
+// Website content the tenant writes: the About stat band, the Team section, the
+// Gallery, the Testimonials wall and the Features / Benefits cards. Each is
+// gated by its own functionality but owned by the company,
 // so losing a plan parks the content rather than deleting it.
 // All four are branch-aware the way sliders are: a row pinned to a branch shows
 // on that branch's site, and `branch_id NULL` is the company-wide copy every
@@ -95,6 +100,16 @@ Company.hasMany(CompanyGalleryItem, { foreignKey: 'companyId', as: 'galleryItems
 CompanyGalleryItem.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Branch.hasMany(CompanyGalleryItem, { foreignKey: 'branchId', as: 'galleryItems', onDelete: 'CASCADE' });
 CompanyGalleryItem.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+
+Company.hasMany(CompanyTestimonial, { foreignKey: 'companyId', as: 'testimonials', onDelete: 'CASCADE' });
+CompanyTestimonial.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(CompanyTestimonial, { foreignKey: 'branchId', as: 'testimonials', onDelete: 'CASCADE' });
+CompanyTestimonial.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+
+Company.hasMany(CompanyFeature, { foreignKey: 'companyId', as: 'featureCards', onDelete: 'CASCADE' });
+CompanyFeature.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(CompanyFeature, { foreignKey: 'branchId', as: 'featureCards', onDelete: 'CASCADE' });
+CompanyFeature.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
 
 Company.hasMany(CompanyDomain, { foreignKey: 'companyId', as: 'domains', onDelete: 'CASCADE' });
 CompanyDomain.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
@@ -171,6 +186,27 @@ Admin.belongsTo(Role, { foreignKey: 'roleId', as: 'role' });
 Branch.hasMany(Admin, { foreignKey: 'branchId', as: 'admins' });
 Role.hasMany(Admin, { foreignKey: 'roleId', as: 'admins' });
 
+/**
+ * Website visitors, and the visits behind each one.
+ *
+ * Both tables carry `companyId` so the super admin's cross-tenant reads never
+ * have to join to scope themselves, and both cascade from the company: a tenant
+ * that is deleted takes its traffic with it rather than leaving orphan rows
+ * nobody can attribute. A visit additionally names the branch site it landed
+ * on, which is what the branch-wise breakdown groups by.
+ */
+Company.hasMany(Lead, { foreignKey: 'companyId', as: 'leads', onDelete: 'CASCADE' });
+Lead.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(Lead, { foreignKey: 'branchId', as: 'leads', onDelete: 'SET NULL' });
+Lead.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+
+Lead.hasMany(LeadVisit, { foreignKey: 'leadId', as: 'visits', onDelete: 'CASCADE' });
+LeadVisit.belongsTo(Lead, { foreignKey: 'leadId', as: 'lead' });
+Company.hasMany(LeadVisit, { foreignKey: 'companyId', as: 'leadVisits', onDelete: 'CASCADE' });
+LeadVisit.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(LeadVisit, { foreignKey: 'branchId', as: 'leadVisits', onDelete: 'SET NULL' });
+LeadVisit.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+
 const db = {
   sequelize,
   Sequelize,
@@ -190,6 +226,8 @@ const db = {
   CompanyStat,
   CompanyTeamMember,
   CompanyGalleryItem,
+  CompanyTestimonial,
+  CompanyFeature,
   CompanySubscription,
   SubscriptionEvent,
   PlanRequest,
@@ -199,6 +237,8 @@ const db = {
   Menu,
   RolePermission,
   Admin,
+  Lead,
+  LeadVisit,
 };
 
 module.exports = db;

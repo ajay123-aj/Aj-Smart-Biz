@@ -40,6 +40,26 @@ export const routes: Routes = [
         title: 'Edit Company · Aj Smart Biz',
         loadComponent: () => import('./features/companies/company-form.component').then((m) => m.CompanyFormComponent),
       },
+      /**
+       * Lead management across every tenant. `analytics` is declared before
+       * `:id`, or the router would match it as a lead id.
+       */
+      {
+        path: 'leads',
+        title: 'Lead Management · Aj Smart Biz',
+        loadComponent: () => import('./features/leads/lead-list.component').then((m) => m.SuperLeadListComponent),
+      },
+      {
+        path: 'leads/analytics',
+        title: 'Lead Analysis · Aj Smart Biz',
+        loadComponent: () =>
+          import('./features/leads/lead-analytics.component').then((m) => m.SuperLeadAnalyticsComponent),
+      },
+      {
+        path: 'leads/:id',
+        title: 'Lead Details · Aj Smart Biz',
+        loadComponent: () => import('./features/leads/lead-detail.component').then((m) => m.SuperLeadDetailComponent),
+      },
       {
         path: 'plans',
         title: 'Plan Management · Aj Smart Biz',

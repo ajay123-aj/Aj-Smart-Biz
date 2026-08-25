@@ -27,9 +27,18 @@ const getSort = (query = {}, allowed = ['created_at'], fallback = [['created_at'
   return [[sortBy, sortOrder]];
 };
 
-/** Merges a list of where fragments, dropping empty ones. */
+/**
+ * Merges a list of where fragments, dropping empty ones.
+ *
+ * "Empty" is measured with `Reflect.ownKeys` rather than `Object.keys`, and the
+ * difference is not cosmetic: Sequelize's operators are **symbols**, so the
+ * clause `buildSearch` returns — `{ [Op.or]: [...] }` — has no string keys at
+ * all. Under `Object.keys` it measured as empty and every `?search=` that came
+ * through here was silently discarded, filtering nothing while looking like it
+ * worked.
+ */
 const mergeWhere = (...clauses) =>
-  clauses.filter((clause) => clause && Object.keys(clause).length).reduce(
+  clauses.filter((clause) => clause && Reflect.ownKeys(clause).length).reduce(
     (acc, clause) => {
       if (clause[Op.or]) {
         acc[Op.and] = [...(acc[Op.and] || []), clause];

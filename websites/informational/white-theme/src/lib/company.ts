@@ -1,5 +1,5 @@
 /**
- * The shape `GET /public/company-details` answers with, and the one helper both
+ * The shape `GET /website/company-details` answers with, and the one helper both
  * halves of the app need.
  *
  * Nothing here talks to the API — the call lives in `company.server.ts`, and the
@@ -109,14 +109,31 @@ export interface ShareLinkFeature {
 }
 
 /**
- * One figure in the About band. The API has already done the arithmetic — a
- * card counting years from a date arrives as a finished string — so the
- * template renders `display` and never computes anything itself.
+ * One figure in the band. The API has already done the arithmetic — a card
+ * counting years from a date arrives as a finished string — so the template
+ * renders `display` and never computes anything itself.
  */
-export interface AboutStat {
+export interface Figure {
   id: number;
   label: string;
   display: string;
+}
+
+/**
+ * The band of figures, or `null` when this tenant is not showing one.
+ *
+ * Its own feature rather than part of `about`, which is where it used to live
+ * and never belonged: the band opens the **home page**, which renders nothing
+ * else the About block carries, and a company can want its numbers on show
+ * without buying a written About page. Absent unless the plan grants `figures`,
+ * the tenant switched it on, the plan is still being served, and at least one
+ * figure resolves to something — the same rule Team and Gallery follow.
+ *
+ * `eyebrow`, `title` and `lead` are always present and never blank; the API
+ * fills its own wording where the tenant wrote none.
+ */
+export interface FiguresFeature extends SectionCopy {
+  items: Figure[];
 }
 
 export interface AboutFeature {
@@ -126,7 +143,6 @@ export interface AboutFeature {
   lead: string;
   /** Blank lines separate paragraphs. */
   body: string;
-  stats: AboutStat[];
 }
 
 export interface TeamMember {
@@ -141,7 +157,19 @@ export interface TeamMember {
   linkedinUrl: string | null;
 }
 
-export interface TeamFeature {
+/**
+ * The words above a section's cards, as the API resolved them: the tenant's own
+ * where they wrote any, the platform's wording where they did not. Always
+ * present and never blank, so a template renders them without a fallback of its
+ * own — the one in `config/site.ts` is only for an API too old to send these.
+ */
+export interface SectionCopy {
+  eyebrow: string;
+  title: string;
+  lead: string;
+}
+
+export interface TeamFeature extends SectionCopy {
   members: TeamMember[];
 }
 
@@ -155,8 +183,145 @@ export interface GalleryImage {
   altText: string;
 }
 
-export interface GalleryFeature {
+export interface GalleryFeature extends SectionCopy {
   items: GalleryImage[];
+}
+
+/* ------------------------------ testimonials ------------------------------ */
+
+/** How the company runs its wall. See `TestimonialsFeature`. */
+export type TestimonialMode = 'static' | 'dynamic';
+
+/** Who wrote a review — the company itself, or one of its customers. */
+export type TestimonialSource = 'admin' | 'visitor';
+
+/**
+ * One published review.
+ *
+ * Everything a stranger typed that is *not* here is the point: the API holds an
+ * email, a phone number and the submitting IP against a visitor review, and
+ * sends none of them. This is the whole of what may go on a page.
+ */
+export interface Testimonial {
+  id: number;
+  authorName: string;
+  authorRole: string | null;
+  /** Upload path; run through `toFileUrl` before use. */
+  photo: string | null;
+  /** Out of five, or null — a written review with no star is fine. */
+  rating: number | null;
+  body: string;
+  source: TestimonialSource;
+  /** `YYYY-MM-DD`. No time of day. */
+  submittedAt: string | null;
+}
+
+/** The wording around the form, present only when the form is. */
+export interface TestimonialForm {
+  title: string;
+  note: string;
+  showRating: boolean;
+}
+
+/**
+ * A review button that leaves the site — the company's Google Business page, a
+ * directory listing, a form it runs itself.
+ *
+ * The alternative to `form`, never its companion: the API sends one of the two
+ * and nulls the other, so there is no arrangement of settings that produces two
+ * review buttons on one section.
+ *
+ * `url` is `http`/`https` and absolute, checked on the way out of the platform
+ * rather than here — which is what makes it safe to hand straight to an
+ * `href`.
+ */
+export interface TestimonialReviewLink {
+  /** The label on the button. The same field that titles the dialog. */
+  label: string;
+  url: string;
+}
+
+/**
+ * The Testimonials section, or `null` when this tenant has nothing to show.
+ *
+ * The mode is what the company chose in the admin, and it has already decided
+ * what arrived in `items`:
+ *
+ *   static   the company's own wall, every approved review, in the order it
+ *            arranged by hand. No form.
+ *   dynamic  the ten most recent approved reviews, newest first, whoever wrote
+ *            them — plus a button for the next one, which is either our own
+ *            form or a link off the site. See `canSubmit` and `reviewLink`.
+ *
+ * The template does not re-derive any of that. It renders `items` in the order
+ * given and shows the form when `canSubmit` says so, which is what stops the
+ * two ever disagreeing with the API about what a tenant is running.
+ */
+export interface TestimonialsFeature {
+  mode: TestimonialMode;
+  eyebrow: string;
+  title: string;
+  lead: string;
+  /**
+   * Whether this site is collecting reviews **through its own form**. The only
+   * cue to render the dialog — a section can be open for reviews and still
+   * have no form here, because the company sends people somewhere else.
+   */
+  canSubmit: boolean;
+  form: TestimonialForm | null;
+  /**
+   * The other destination for the review button, when the company chose one.
+   * Mutually exclusive with `form`: at most one of the two is ever non-null.
+   */
+  reviewLink: TestimonialReviewLink | null;
+  items: Testimonial[];
+  /** Every approved review, not just the ones sent — see `items`. */
+  total: number;
+  /** One decimal place, e.g. `4.8`; null when nobody has left a star. */
+  averageRating: number | null;
+  ratingCount: number;
+}
+
+/* --------------------------- features / benefits -------------------------- */
+
+/**
+ * One benefit card — a capability the business offers, and what it is worth to
+ * the person reading.
+ *
+ * `icon` names a glyph the template draws itself; see `FeaturesSection`, which
+ * owns the artwork and falls back to `spark` for a name it does not know.
+ *
+ * Deliberately a plain `string` rather than the template's own `FeatureIcon`
+ * union. The platform's library is the wider of the two — it can grow a glyph
+ * before this template learns to draw it — and typing this field as the
+ * narrower set would be claiming the opposite. The renderer is what narrows it,
+ * which is also the only place that can.
+ */
+export interface BenefitCard {
+  id: number;
+  icon: string;
+  title: string;
+  /** Optional — a good heading can stand on its own. */
+  body: string | null;
+}
+
+/**
+ * The Features / Benefits band, or `null` when this tenant is not showing one.
+ *
+ * Absent unless the plan grants `features_benefits`, the tenant switched it on,
+ * the plan is still being served and there is at least one active card — the
+ * same rule Team and Gallery follow. There is deliberately no fallback to the
+ * template's own six cards: the platform knows nothing factual about a tenant's
+ * capabilities, so wording nobody wrote is wording nobody can stand behind.
+ */
+export interface BenefitsFeature {
+  eyebrow: string;
+  /** `{company}` is filled in at render time. */
+  title: string;
+  lead: string;
+  /** The button under the lede, rendered only where there is a Contact page. */
+  ctaLabel: string;
+  items: BenefitCard[];
 }
 
 /**
@@ -175,8 +340,23 @@ export interface SiteFeatures {
    * See `AboutSection`, which is the one place that decides.
    */
   about: AboutFeature | null;
+  /** The band of figures. See `FiguresFeature` — absent is the whole check. */
+  figures: FiguresFeature | null;
   team: TeamFeature | null;
   gallery: GalleryFeature | null;
+  /**
+   * Customer reviews. Absent unless the plan grants `testimonials`, the tenant
+   * switched it on and the plan is still being served — and additionally absent
+   * on a `static` wall with nothing on it yet, exactly like Team and Gallery. A
+   * `dynamic` section survives being empty: the form is the point of it.
+   */
+  testimonials: TestimonialsFeature | null;
+  /**
+   * What the business offers, in the tenant's own words. Absent unless the plan
+   * grants it, the tenant switched it on and wrote at least one card — so a
+   * site that is not carrying the section simply has no block here.
+   */
+  benefits: BenefitsFeature | null;
 }
 
 /**
@@ -289,7 +469,16 @@ export const FALLBACK_COMPANY: CompanyDetails = {
    * below, the safe fallback here is "show nothing": a WhatsApp button with no
    * number behind it is worse than no button.
    */
-  features: { whatsapp: null, shareLink: null, about: null, team: null, gallery: null },
+  features: {
+    whatsapp: null,
+    shareLink: null,
+    about: null,
+    figures: null,
+    team: null,
+    gallery: null,
+    testimonials: null,
+    benefits: null,
+  },
   /** Same rule as `features`: with no answer from the API, show nothing. */
   contactPage: null,
   /**
@@ -382,6 +571,11 @@ export const shareLinkOf = (company: CompanyDetails): ShareLinkFeature | null =>
 export const hasSection = (company: CompanyDetails, href: string): boolean => {
   if (href === '#team') return Boolean(company.features?.team?.members?.length);
   if (href === '#gallery') return Boolean(company.features?.gallery?.items?.length);
+  /**
+   * A `dynamic` section renders with no reviews at all — the form is the
+   * section — so presence of the block is the test here, not a row count.
+   */
+  if (href === '#testimonials') return Boolean(company.features?.testimonials);
   /**
    * Pages are decided by the API now — a withheld page is simply not in `nav` —
    * so anything with a real path is answered from there rather than by a rule

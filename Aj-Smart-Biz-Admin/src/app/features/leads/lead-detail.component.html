@@ -1,0 +1,420 @@
+@if (loading()) {
+  <div class="skeleton" style="height:120px;margin-bottom:16px"></div>
+  <div class="skeleton" style="height:280px"></div>
+} @else if (lead(); as row) {
+  <header class="lead-head">
+    <div style="flex:1;min-width:0">
+      <a class="tiny" routerLink="/leads">← Back to leads</a>
+      <h1 style="margin-top:6px">{{ title() }}</h1>
+      <p class="device-id" style="margin:4px 0 0">
+        {{ row.deviceId }}
+        @if (row.deviceId.startsWith('anon_')) {
+          <span class="badge badge-muted" title="This browser stored no id, so the platform derived one from the address and user agent. It is stable only while that address is.">
+            derived
+          </span>
+        }
+      </p>
+    </div>
+    <div class="row wrap" style="align-items:center;gap:8px">
+      <app-lead-stage-badge [value]="row.stage" />
+      @if (row.isBot) {
+        <span class="badge badge-muted" title="A crawler or link previewer, not a person">🤖 Bot</span>
+      }
+      @if (row.branch) {
+        <span class="badge badge-info">{{ row.branch.name }}</span>
+      } @else {
+        <span class="badge badge-muted">Company-wide site</span>
+      }
+    </div>
+  </header>
+
+  <div class="grid grid-2">
+    <!-- ------------------------------------------------------------------ -->
+    <!-- The only editable panel on the screen: what the company decided.    -->
+    <!-- ------------------------------------------------------------------ -->
+    <section class="card">
+      <div class="card-head"><h3 class="card-title">Follow-up</h3></div>
+      <div class="card-body">
+        <form [formGroup]="form" (ngSubmit)="save()">
+          <div class="field" style="max-width:240px">
+            <label for="stage">Stage</label>
+            <select id="stage" class="select" formControlName="stage">
+              @for (stage of stages; track stage) {
+                <option [value]="stage">{{ stage | titlecase }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="grid grid-2">
+            <div class="field">
+              <label for="name">Name</label>
+              <input id="name" class="input" formControlName="name" placeholder="Learned on the phone" />
+            </div>
+            <div class="field">
+              <label for="phone">Phone</label>
+              <input id="phone" class="input" formControlName="phone" placeholder="+91…" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" class="input" type="email" formControlName="email" />
+          </div>
+
+          <div class="field">
+            <label for="notes">Notes</label>
+            <textarea id="notes" class="textarea" rows="3" formControlName="notes"
+              placeholder="What you found out — what they asked for, when to ring back."></textarea>
+          </div>
+
+          <p class="tiny muted">
+            Nothing else on this screen can be edited: it is a record of what happened, not an opinion.
+            A later visit will never overwrite a name you have entered here.
+          </p>
+
+          <div class="row-end" *appCan="'lead-management'; action: 'canEdit'">
+            <button type="submit" class="btn btn-primary" [disabled]="saving()">
+              {{ saving() ? 'Saving…' : 'Save' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------------ -->
+    <!-- Acquisition. First touch and last touch, side by side.              -->
+    <!-- ------------------------------------------------------------------ -->
+    <section class="card">
+      <div class="card-head"><h3 class="card-title">Where they came from</h3></div>
+      <div class="card-body">
+        <div class="facts">
+          <div class="fact">
+            <span class="fact-label">First touch</span>
+            <span class="fact-value">{{ source(row) }}</span>
+          </div>
+          <div class="fact">
+            <span class="fact-label">Landed on</span>
+            <span class="fact-value mono">{{ row.firstLandingUrl || '—' }}</span>
+          </div>
+          <div class="fact">
+            <span class="fact-label">Referred by</span>
+            <span class="fact-value">{{ row.firstReferrerHost || 'Direct' }}</span>
+          </div>
+          <div class="fact">
+            <span class="fact-label">Most recent referrer</span>
+            <span class="fact-value">{{ row.lastReferrerHost || 'Direct' }}</span>
+          </div>
+        </div>
+
+        @if (firstUtm().length) {
+          <div class="visit-section">
+            <h4>Campaign parameters · first visit</h4>
+            <div class="kv">
+              @for (pair of firstUtm(); track pair.key) {
+                <span class="kv-pair"><span class="kv-key">{{ pair.key }}</span><span class="kv-val">{{ pair.value }}</span></span>
+              }
+            </div>
+          </div>
+        }
+
+        @if (lastUtm().length) {
+          <div class="visit-section">
+            <h4>Campaign parameters · most recent</h4>
+            <div class="kv">
+              @for (pair of lastUtm(); track pair.key) {
+                <span class="kv-pair"><span class="kv-key">{{ pair.key }}</span><span class="kv-val">{{ pair.value }}</span></span>
+              }
+            </div>
+          </div>
+        }
+
+        @if (!firstUtm().length && !lastUtm().length) {
+          <p class="tiny muted" style="margin-top:12px">
+            No campaign parameters — this visitor arrived without a tagged link.
+          </p>
+        }
+      </div>
+    </section>
+  </div>
+
+  <!-- -------------------------------------------------------------------- -->
+  <!-- The device and the place, as last reported.                           -->
+  <!-- -------------------------------------------------------------------- -->
+  <section class="card" style="margin-top:16px">
+    <div class="card-head"><h3 class="card-title">Device &amp; location</h3></div>
+    <div class="card-body">
+      <div class="facts">
+        <div class="fact">
+          <span class="fact-label">Device</span>
+          <span class="fact-value">{{ device(row.deviceType) }}</span>
+        </div>
+        <div class="fact">
+          <span class="fact-label">Make &amp; model</span>
+          <span class="fact-value">{{ row.deviceVendor || '—' }} {{ row.deviceModel || '' }}</span>
+        </div>
+        <div class="fact">
+          <span class="fact-label">Browser</span>
+          <span class="fact-value">{{ row.browser || '—' }} {{ row.browserVersion || '' }}</span>
+        </div>
+        <div class="fact">
+          <span class="fact-label">Operating system</span>
+          <span class="fact-value">{{ row.os || '—' }} {{ row.osVersion || '' }}</span>
+        </div>
+        <div class="fact">
+          <span class="fact-label">Place</span>
+          <span class="fact-value">{{ place(row) }}</span>
+        </div>
+        <div class="fact">
+          <span class="fact-label">Timezone</span>
+          <span class="fact-value">{{ row.timezone || '—' }}</span>
+        </div>
+        <div class="fact">
+          <span class="fact-label">Language</span>
+          <span class="fact-value">{{ row.language || '—' }}</span>
+        </div>
+        <div class="fact">
+          <span class="fact-label">IP address</span>
+          <span class="fact-value mono">{{ row.ip || '—' }}</span>
+        </div>
+        <div class="fact">
+          <span class="fact-label">Coordinates</span>
+          <!-- Present only where the visitor had already granted the location
+               permission — the site never prompts for it. -->
+          <span class="fact-value mono">
+            @if (row.latitude && row.longitude) {
+              {{ row.latitude }}, {{ row.longitude }}
+            } @else {
+              Not shared
+            }
+          </span>
+        </div>
+        <div class="fact">
+          <span class="fact-label">Push token</span>
+          <span class="fact-value mono">{{ row.fcmToken || 'Not granted' }}</span>
+        </div>
+        <div class="fact">
+          <span class="fact-label">First seen</span>
+          <span class="fact-value">{{ row.firstSeenAt | date: 'dd MMM yyyy, shortTime' }}</span>
+        </div>
+        <div class="fact">
+          <span class="fact-label">Last seen</span>
+          <span class="fact-value">{{ row.lastSeenAt | date: 'dd MMM yyyy, shortTime' }}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- -------------------------------------------------------------------- -->
+  <!-- Every visit. This is what the View action was for.                    -->
+  <!-- -------------------------------------------------------------------- -->
+  <section class="card" style="margin-top:16px">
+    <div class="card-head">
+      <h3 class="card-title">
+        Visits
+        <span class="badge badge-muted">{{ row.visitCount }}</span>
+        <span class="tiny muted" style="margin-left:6px">{{ row.pageViewCount }} page loads</span>
+      </h3>
+      <div class="row" style="margin-left:auto;gap:6px">
+        <button type="button" class="btn btn-sm btn-ghost" (click)="expandAll()">Expand all</button>
+        <button type="button" class="btn btn-sm btn-ghost" (click)="collapseAll()">Collapse all</button>
+      </div>
+    </div>
+
+    <div class="card-body">
+      @if (!visits().length) {
+        <p class="muted mb-0">No visits recorded yet.</p>
+      }
+
+      @for (visit of visits(); track visit.id) {
+        <article class="visit">
+          <button
+            type="button"
+            class="visit-head"
+            [class.open]="isExpanded(visit.id)"
+            (click)="toggle(visit.id)"
+            [attr.aria-expanded]="isExpanded(visit.id)"
+          >
+            <span class="visit-caret" aria-hidden="true">▸</span>
+            <span class="visit-when">{{ visit.visitedAt | date: 'dd MMM yyyy, shortTime' }}</span>
+            <span class="visit-page">{{ page(visit) }}</span>
+            @if (visit.pageViewCount > 1) {
+              <span class="badge badge-muted">{{ visit.pageViewCount }} pages</span>
+            }
+            @if (visit.utmCampaign) {
+              <span class="badge badge-info">{{ visit.utmCampaign }}</span>
+            }
+            <span class="tiny muted">{{ deviceIcon(visit.deviceType) }} {{ visit.browser }}</span>
+          </button>
+
+          @if (isExpanded(visit.id)) {
+            <div class="visit-body">
+              <div class="visit-section">
+                <h4>The page</h4>
+                <div class="facts">
+                  <div class="fact">
+                    <span class="fact-label">URL</span>
+                    <span class="fact-value mono">{{ visit.pageUrl || '—' }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Title</span>
+                    <span class="fact-value">{{ visit.pageTitle || '—' }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Host</span>
+                    <span class="fact-value">{{ visit.host || '—' }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Referrer</span>
+                    <span class="fact-value mono">{{ visit.referrer || 'Direct' }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Branch site</span>
+                    <span class="fact-value">{{ visit.branch?.name || 'Company-wide' }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Session</span>
+                    <span class="fact-value mono">{{ visit.sessionId || '—' }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Last activity</span>
+                    <span class="fact-value">{{ visit.lastActivityAt | date: 'dd MMM yyyy, shortTime' }}</span>
+                  </div>
+                </div>
+              </div>
+
+              @if (entries(visit.utm).length) {
+                <div class="visit-section">
+                  <h4>Campaign parameters</h4>
+                  <div class="kv">
+                    @for (pair of entries(visit.utm); track pair.key) {
+                      <span class="kv-pair"><span class="kv-key">{{ pair.key }}</span><span class="kv-val">{{ pair.value }}</span></span>
+                    }
+                  </div>
+                </div>
+              }
+
+              <div class="visit-section">
+                <h4>Device</h4>
+                <div class="facts">
+                  <div class="fact">
+                    <span class="fact-label">Type</span>
+                    <span class="fact-value">{{ device(visit.deviceType) }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Make &amp; model</span>
+                    <span class="fact-value">{{ visit.deviceVendor || '—' }} {{ visit.deviceModel || '' }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Browser</span>
+                    <span class="fact-value">{{ visit.browser || '—' }} {{ visit.browserVersion || '' }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">OS</span>
+                    <span class="fact-value">{{ visit.os || '—' }} {{ visit.osVersion || '' }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Engine</span>
+                    <span class="fact-value">{{ visit.engine || '—' }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Screen</span>
+                    <span class="fact-value">{{ size(visit.screenWidth, visit.screenHeight) }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Window</span>
+                    <span class="fact-value">{{ size(visit.viewportWidth, visit.viewportHeight) }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Pixel ratio</span>
+                    <span class="fact-value">{{ visit.pixelRatio || '—' }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Orientation</span>
+                    <span class="fact-value">{{ visit.orientation || '—' }}</span>
+                  </div>
+                </div>
+
+                @if (entries(visit.device).length) {
+                  <div class="kv" style="margin-top:12px">
+                    @for (pair of entries(visit.device); track pair.key) {
+                      <span class="kv-pair"><span class="kv-key">{{ pair.key }}</span><span class="kv-val">{{ pair.value }}</span></span>
+                    }
+                  </div>
+                }
+
+                <p class="tiny muted" style="margin:10px 0 0;word-break:break-all">
+                  {{ visit.userAgent }}
+                </p>
+              </div>
+
+              <div class="visit-section">
+                <h4>Location &amp; contact</h4>
+                <div class="facts">
+                  <div class="fact">
+                    <span class="fact-label">Place</span>
+                    <span class="fact-value">{{ place(visit) }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Timezone</span>
+                    <span class="fact-value">{{ visit.timezone || '—' }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">IP address</span>
+                    <span class="fact-value mono">{{ visit.ip || '—' }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Language</span>
+                    <span class="fact-value">{{ visit.language || '—' }}</span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Coordinates</span>
+                    <span class="fact-value mono">
+                      @if (visit.latitude && visit.longitude) {
+                        {{ visit.latitude }}, {{ visit.longitude }}
+                        @if (visit.locationAccuracy) {
+                          <span class="tiny muted">±{{ visit.locationAccuracy }}m</span>
+                        }
+                      } @else {
+                        Not shared
+                      }
+                    </span>
+                  </div>
+                  <div class="fact">
+                    <span class="fact-label">Push token</span>
+                    <span class="fact-value mono">{{ visit.fcmToken || 'Not granted' }}</span>
+                  </div>
+                </div>
+
+                @if (entries(visit.location).length) {
+                  <div class="kv" style="margin-top:12px">
+                    @for (pair of entries(visit.location); track pair.key) {
+                      <span class="kv-pair"><span class="kv-key">{{ pair.key }}</span><span class="kv-val">{{ pair.value }}</span></span>
+                    }
+                  </div>
+                }
+              </div>
+
+              @if (entries(visit.extra).length) {
+                <div class="visit-section">
+                  <h4>Anything else the site reported</h4>
+                  <div class="kv">
+                    @for (pair of entries(visit.extra); track pair.key) {
+                      <span class="kv-pair"><span class="kv-key">{{ pair.key }}</span><span class="kv-val">{{ pair.value }}</span></span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </article>
+      }
+    </div>
+  </section>
+} @else {
+  <div class="card">
+    <div class="card-body">
+      <p class="muted">This lead could not be loaded.</p>
+      <a class="btn btn-ghost" routerLink="/leads">← Back to leads</a>
+    </div>
+  </div>
+}

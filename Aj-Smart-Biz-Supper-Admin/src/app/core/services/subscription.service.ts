@@ -87,83 +87,83 @@ export class SubscriptionService {
   /* ---------------------------- the console ---------------------------- */
 
   list(query: SubscriptionListQuery = {}): Observable<PagedResult<Subscription>> {
-    return this.api.list<Subscription>('/subscriptions', query);
+    return this.api.list<Subscription>('/super-admin/subscriptions', query);
   }
 
   summary(): Observable<SubscriptionSummary> {
-    return this.api.get<SubscriptionSummary>('/subscriptions/summary');
+    return this.api.get<SubscriptionSummary>('/super-admin/subscriptions/summary');
   }
 
   getById(id: number): Observable<Subscription> {
-    return this.api.get<Subscription>(`/subscriptions/${id}`);
+    return this.api.get<Subscription>(`/super-admin/subscriptions/${id}`);
   }
 
   events(id: number, query: ListQuery = {}): Observable<PagedResult<SubscriptionEvent>> {
-    return this.api.list<SubscriptionEvent>(`/subscriptions/${id}/events`, query);
+    return this.api.list<SubscriptionEvent>(`/super-admin/subscriptions/${id}/events`, query);
   }
 
   /** Rolls due terms forward on demand rather than waiting for the hourly sweep. */
   runDue(): Observable<{ activated: number; expired: number; renewed: number; checkedAt: string }> {
-    return this.api.post('/subscriptions/run-due');
+    return this.api.post('/super-admin/subscriptions/run-due');
   }
 
   /* ---------------------------- transitions ---------------------------- */
 
   transition(id: number, status: SubscriptionStatus, reason?: string | null): Observable<Subscription> {
-    return this.api.post<Subscription>(`/subscriptions/${id}/transition`, { status, reason: reason || null });
+    return this.api.post<Subscription>(`/super-admin/subscriptions/${id}/transition`, { status, reason: reason || null });
   }
 
   suspend(id: number, reason?: string | null): Observable<Subscription> {
-    return this.api.post<Subscription>(`/subscriptions/${id}/suspend`, { reason: reason || null });
+    return this.api.post<Subscription>(`/super-admin/subscriptions/${id}/suspend`, { reason: reason || null });
   }
 
   resume(id: number): Observable<Subscription> {
-    return this.api.post<Subscription>(`/subscriptions/${id}/resume`);
+    return this.api.post<Subscription>(`/super-admin/subscriptions/${id}/resume`);
   }
 
   cancel(id: number, reason?: string | null): Observable<Subscription> {
-    return this.api.post<Subscription>(`/subscriptions/${id}/cancel`, { reason: reason || null });
+    return this.api.post<Subscription>(`/super-admin/subscriptions/${id}/cancel`, { reason: reason || null });
   }
 
   expire(id: number, reason?: string | null): Observable<Subscription> {
-    return this.api.post<Subscription>(`/subscriptions/${id}/expire`, { reason: reason || null });
+    return this.api.post<Subscription>(`/super-admin/subscriptions/${id}/expire`, { reason: reason || null });
   }
 
   /** Starts a queued term today; its full duration is re-based on the new start. */
   startNow(id: number): Observable<Subscription> {
-    return this.api.post<Subscription>(`/subscriptions/${id}/start-now`);
+    return this.api.post<Subscription>(`/super-admin/subscriptions/${id}/start-now`);
   }
 
   reactivate(id: number, payload: TermPayload & { planId?: number } = {}): Observable<RenewResult> {
-    return this.api.post<RenewResult>(`/subscriptions/${id}/reactivate`, payload);
+    return this.api.post<RenewResult>(`/super-admin/subscriptions/${id}/reactivate`, payload);
   }
 
   extend(id: number, days: number, reason?: string | null): Observable<Subscription> {
-    return this.api.post<Subscription>(`/subscriptions/${id}/extend`, { days, reason: reason || null });
+    return this.api.post<Subscription>(`/super-admin/subscriptions/${id}/extend`, { days, reason: reason || null });
   }
 
   setAutoRenew(id: number, autoRenew: boolean): Observable<{ id: number; autoRenew: boolean }> {
-    return this.api.patch<{ id: number; autoRenew: boolean }>(`/subscriptions/${id}/auto-renew`, { autoRenew });
+    return this.api.patch<{ id: number; autoRenew: boolean }>(`/super-admin/subscriptions/${id}/auto-renew`, { autoRenew });
   }
 
   /* -------------------------- per-company work ------------------------- */
 
   companyPlan(companyId: number): Observable<CompanyPlanView> {
-    return this.api.get<CompanyPlanView>(`/companies/${companyId}/plan`);
+    return this.api.get<CompanyPlanView>(`/super-admin/companies/${companyId}/plan`);
   }
 
   /** Queues a pre-renewal by default; pass `immediate` to start it right away. */
   renew(companyId: number, payload: RenewPayload = {}): Observable<RenewResult> {
-    return this.api.post<RenewResult>(`/companies/${companyId}/subscriptions/renew`, payload);
+    return this.api.post<RenewResult>(`/super-admin/companies/${companyId}/subscriptions/renew`, payload);
   }
 
   changePlan(companyId: number, payload: ChangePlanPayload): Observable<ChangePlanResult> {
-    return this.api.post<ChangePlanResult>(`/companies/${companyId}/subscriptions/change-plan`, payload);
+    return this.api.post<ChangePlanResult>(`/super-admin/companies/${companyId}/subscriptions/change-plan`, payload);
   }
 
   /** Proration workings for an upgrade or downgrade, without writing anything. */
   changePreview(companyId: number, planId: number, applyCredit = true): Observable<PlanChangePreview> {
-    return this.api.get<PlanChangePreview>(`/companies/${companyId}/subscriptions/change-preview`, {
+    return this.api.get<PlanChangePreview>(`/super-admin/companies/${companyId}/subscriptions/change-preview`, {
       planId,
       applyCredit,
     });
@@ -173,7 +173,7 @@ export class SubscriptionService {
 
   /** Tenants asking to be moved onto a different plan. */
   requests(query: ListQuery & { status?: PlanRequestStatus } = {}): Observable<PagedResult<PlanRequest>> {
-    return this.api.list<PlanRequest>('/plan-requests', query);
+    return this.api.list<PlanRequest>('/super-admin/plan-requests', query);
   }
 
   /** Approving is what actually moves the company — and bills it. */
@@ -189,10 +189,10 @@ export class SubscriptionService {
       payment?: PaymentPayload;
     } = {}
   ): Observable<{ request: PlanRequest; subscription: Subscription; transaction: Transaction | null }> {
-    return this.api.post(`/plan-requests/${id}/approve`, payload);
+    return this.api.post(`/super-admin/plan-requests/${id}/approve`, payload);
   }
 
   rejectRequest(id: number, decisionNote?: string | null): Observable<PlanRequest> {
-    return this.api.post<PlanRequest>(`/plan-requests/${id}/reject`, { decisionNote: decisionNote || null });
+    return this.api.post<PlanRequest>(`/super-admin/plan-requests/${id}/reject`, { decisionNote: decisionNote || null });
   }
 }

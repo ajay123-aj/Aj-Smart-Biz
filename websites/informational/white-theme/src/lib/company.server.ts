@@ -5,12 +5,12 @@ import { FALLBACK_COMPANY, type CompanyDetails } from './company';
 /**
  * Calls the company-details API.
  *
- * The endpoint lives in the backend — `GET /public/company-details?domain=` in
+ * The endpoint lives in the backend — `GET /website/company-details?domain=` in
  * `Aj-Smart-Biz-Backend/src/controllers/public.controller.js`. This website
  * defines no API of its own; it passes the domain it was served on and renders
  * whatever comes back.
  *
- * It is unauthenticated, like the `/public/branding` endpoint the admin console
+ * It is unauthenticated, like the `/website/branding` endpoint the admin console
  * uses, and an unknown or inactive tenant gets platform defaults rather than an
  * error — so the site always has something to paint.
  */
@@ -63,11 +63,27 @@ export async function resolveDomain(): Promise<string> {
  * Called once at launch, from the root layout, so header, slider and footer all
  * render against one already-resolved company rather than each fetching its own.
  */
-export async function getCompanyDetails(): Promise<CompanyDetails> {
+/**
+ * What the site actually got back.
+ *
+ * `apiReachable` is the distinction the whole site now turns on, and it is not
+ * part of `CompanyDetails` because it is not part of the API's answer — it is a
+ * fact about whether there *was* an answer.
+ *
+ *   reachable, resolved      a real tenant. Render its site.
+ *   reachable, not resolved  the API answered, this host names no tenant. That
+ *                            is a legitimate reply and the platform defaults
+ *                            are the right thing to show.
+ *   not reachable            nothing answered. Nothing about this company is
+ *                            known, so nothing about it may be shown.
+ */
+export type ResolvedCompany = CompanyDetails & { apiReachable: boolean };
+
+export async function getCompanyDetails(): Promise<ResolvedCompany> {
   const domain = await resolveDomain();
 
   try {
-    const res = await fetch(`${API_URL}/public/company-details?domain=${encodeURIComponent(domain)}`, {
+    const res = await fetch(`${API_URL}/website/company-details?domain=${encodeURIComponent(domain)}`, {
       headers: { Accept: 'application/json' },
       /**
        * Always live, never cached.
@@ -82,12 +98,34 @@ export async function getCompanyDetails(): Promise<CompanyDetails> {
       cache: 'no-store',
     });
 
-    if (!res.ok) return { ...FALLBACK_COMPANY, host: domain };
+    /**
+     * A 5xx is the API failing, not answering — the same situation as not
+     * reaching it at all, so it is reported the same way. A 4xx means it
+     * answered and declined, which the defaults below can stand in for.
+     */
+    if (!res.ok) {
+      return { ...FALLBACK_COMPANY, host: domain, apiReachable: res.status < 500 };
+    }
 
     const body = (await res.json()) as ApiResponse<CompanyDetails>;
-    return body.data ? { ...FALLBACK_COMPANY, ...body.data } : { ...FALLBACK_COMPANY, host: domain };
+    return body.data
+      ? { ...FALLBACK_COMPANY, ...body.data, apiReachable: true }
+      : { ...FALLBACK_COMPANY, host: domain, apiReachable: true };
   } catch {
-    // The site is informational — it must render with or without the API.
-    return { ...FALLBACK_COMPANY, host: domain };
+    /**
+     * Nothing answered.
+     *
+     * This used to return the platform defaults and let the site render, on the
+     * reasoning that an informational site should survive a network blip. What
+     * that actually produced was a **complete, plausible website for a company
+     * that was never consulted** — the platform's name in the title, three
+     * invented hero slides, invented nav — served with a 200. A visitor could
+     * not tell it from the real thing, and the tenant had no idea their site was
+     * showing somebody else's words.
+     *
+     * A site that cannot reach its own data has nothing true to say, so it says
+     * that instead. See `ServiceUnavailable`.
+     */
+    return { ...FALLBACK_COMPANY, host: domain, apiReachable: false };
   }
 }

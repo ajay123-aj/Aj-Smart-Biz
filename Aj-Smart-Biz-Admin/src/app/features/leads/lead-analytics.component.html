@@ -1,0 +1,130 @@
+<app-page-header title="Lead analysis" subtitle="Where your website visitors come from, and what they arrive on.">
+  <a class="btn btn-ghost" routerLink="/leads">← All leads</a>
+  <button type="button" class="btn btn-ghost" (click)="load()" [disabled]="loading()">↻ Refresh</button>
+</app-page-header>
+
+<div class="card" style="margin-bottom:18px">
+  <div class="card-head filters">
+    <select class="select" style="width:auto" (change)="apply({ branchId: selectValue($event) })">
+      <option value="">All branches</option>
+      <option value="none">Company-wide site</option>
+      @for (branch of branches(); track branch.id) {
+        <option [value]="branch.id">{{ branch.name }}</option>
+      }
+    </select>
+
+    <div class="date-filter">
+      <input class="input" type="date" title="From" (change)="apply({ from: inputValue($event) })" />
+      <span class="tiny muted">to</span>
+      <input class="input" type="date" title="To" (change)="apply({ to: inputValue($event) })" />
+    </div>
+
+    <label class="tiny muted" style="display:inline-flex;align-items:center;gap:6px">
+      <input type="checkbox" (change)="apply({ includeBots: checked($event) })" />
+      Include bots
+    </label>
+  </div>
+</div>
+
+@if (loading() && !data()) {
+  <div class="grid grid-3">
+    @for (item of [1, 2, 3]; track item) {
+      <div class="skeleton" style="height:118px"></div>
+    }
+  </div>
+} @else if (data(); as d) {
+  <section class="grid grid-3" style="margin-bottom:18px">
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--brand-100);color:var(--brand-700)">🎯</span>
+        <span class="tile-label">Leads</span>
+      </div>
+      <div class="tile-value">{{ d.totals.leads }}</div>
+      <div class="tile-foot"><span class="tiny muted">Distinct devices in this period</span></div>
+    </article>
+
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--info-bg);color:var(--info)">👣</span>
+        <span class="tile-label">Visits</span>
+      </div>
+      <div class="tile-value">{{ d.totals.visits }}</div>
+      <div class="tile-foot"><span class="tiny muted">A visit is one sitting, not one page</span></div>
+    </article>
+
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--success-bg);color:var(--success)">🔁</span>
+        <span class="tile-label">Visits per lead</span>
+      </div>
+      <div class="tile-value">{{ d.totals.visitsPerLead }}</div>
+      <div class="tile-foot"><span class="tiny muted">Above 1 means people are coming back</span></div>
+    </article>
+  </section>
+
+  <!-- The pipeline, left to right in the order a lead moves through it. -->
+  <section class="card" style="margin-bottom:18px">
+    <div class="card-head"><h3 class="card-title">Pipeline</h3></div>
+    <div class="card-body">
+      <div class="funnel">
+        @for (stage of stages; track stage) {
+          <div class="funnel-step">
+            <div class="funnel-n">{{ d.stages[stage] }}</div>
+            <div class="funnel-label">{{ stage }}</div>
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- The trend. Days with no visitors are simply absent from the series, so
+       the axis is labelled at both ends rather than pretending to be regular. -->
+  @if (d.daily.length) {
+    <section class="card" style="margin-bottom:18px">
+      <div class="card-head">
+        <h3 class="card-title">Leads by day</h3>
+        <span class="tiny muted" style="margin-left:auto">{{ d.daily.length }} days with activity</span>
+      </div>
+      <div class="card-body">
+        <div class="trend">
+          @for (day of d.daily; track day.day) {
+            <div class="trend-col" [title]="day.day + ' · ' + day.total + ' leads'">
+              <div class="trend-bar" [style.height.%]="barHeight(day.total)"></div>
+            </div>
+          }
+        </div>
+        <div class="trend-axis tiny muted">
+          <span>{{ dayLabel(d.daily[0].day) }}</span>
+          <span>{{ dayLabel(d.daily[d.daily.length - 1].day) }}</span>
+        </div>
+      </div>
+    </section>
+  }
+
+  <div class="grid grid-2">
+    <app-lead-breakdown
+      title="Traffic sources"
+      hint="utm_source"
+      [rows]="d.sources"
+      emptyText="No tagged links yet — add utm_source to your campaign URLs to see this fill in."
+    />
+    <app-lead-breakdown title="Campaigns" hint="utm_campaign" [rows]="d.campaigns" />
+    <app-lead-breakdown title="Mediums" hint="utm_medium" [rows]="d.mediums" />
+    <app-lead-breakdown
+      title="Referring sites"
+      hint="where the link was"
+      [rows]="d.referrers"
+      emptyText="Nobody has arrived from a link on another site."
+    />
+    <app-lead-breakdown title="Branch sites" [rows]="branchRows()" />
+    <app-lead-breakdown title="Devices" [rows]="d.devices" />
+    <app-lead-breakdown title="Cities" [rows]="d.cities" />
+    <app-lead-breakdown title="Countries" [rows]="d.countries" />
+    <app-lead-breakdown title="Browsers" [rows]="d.browsers" />
+    <app-lead-breakdown title="Operating systems" [rows]="d.operatingSystems" />
+  </div>
+} @else {
+  <div class="card">
+    <div class="card-body"><p class="muted mb-0">The analysis could not be loaded.</p></div>
+  </div>
+}

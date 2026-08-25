@@ -24,7 +24,7 @@ build time who it belongs to:
 1. The request arrives on the company's domain.
 2. The app reads that host (`X-Forwarded-Host` behind a proxy, otherwise `Host`),
    with `?domain=` overriding it for local previews.
-3. It calls `GET /api/v1/public/company-details?domain=<host>` — unauthenticated.
+3. It calls `GET /api/v1/website/company-details?domain=<host>` — unauthenticated.
 4. The API matches the host against `company_domain` (which may pin a **branch**,
    so `surat.acme.com` and `acme.com` can differ), falling back to matching the
    leading label against `companies.code`.
@@ -33,9 +33,9 @@ build time who it belongs to:
 
 One domain, one company, no per-tenant build.
 
-**The API lives in the backend.** `/public/company-details` is defined in
+**The API lives in the backend.** `/website/company-details` is defined in
 `Aj-Smart-Biz-Backend/src/controllers/public.controller.js`, next to the
-`/public/branding` endpoint the admin consoles use, and shares its host resolver.
+`/website/branding` endpoint the admin consoles use, and shares its host resolver.
 The websites contain no API of their own — they only call it. Adding a field a
 site needs means adding it there, once, for every template.
 

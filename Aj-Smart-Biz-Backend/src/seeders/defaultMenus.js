@@ -19,6 +19,17 @@ const menus = [
    * sold and changed by the platform, so this menu grants no write actions.
    */
   { name: 'My Plan', slug: 'my-plan', icon: 'credit-card', route: '/plan', sequence: 3 },
+  /**
+   * Everyone who has opened the company's public website, one row per device.
+   *
+   * A top-level menu rather than a child of Company Details: that section is
+   * the company describing itself, and this is the company reading about other
+   * people. Different screen, different staff, different permission.
+   *
+   * Its own sequence puts it above the administration menus, because a sales
+   * team opens it daily and nobody opens Role Management twice.
+   */
+  { name: 'Lead Management', slug: 'lead-management', icon: 'target', route: '/leads', sequence: 4 },
   { name: 'Role Management', slug: 'role-management', icon: 'shield', route: '/roles', sequence: 5 },
   { name: 'Menu Permission', slug: 'menu-permission', icon: 'list-checks', route: '/menu-permissions', sequence: 6 },
   { name: 'Admin Management', slug: 'admin-management', icon: 'users', route: '/admins', sequence: 7 },
@@ -45,10 +56,24 @@ const menus = [
    */
   { name: 'Slider', slug: 'slider-management', icon: 'film', route: '/company/sliders', sequence: 25, parent: 'company-details' },
   { name: 'About us', slug: 'company-about', icon: 'file-text', route: '/company/about', sequence: 26, parent: 'company-details' },
-  { name: 'Team', slug: 'company-team', icon: 'users', route: '/company/team', sequence: 27, parent: 'company-details' },
-  { name: 'Gallery', slug: 'company-gallery', icon: 'image', route: '/company/gallery', sequence: 28, parent: 'company-details' },
-  { name: 'Contact page', slug: 'company-contact', icon: 'mail', route: '/company/contact', sequence: 29, parent: 'company-details' },
-  { name: 'Plan & billing', slug: 'company-subscription', icon: 'credit-card', route: '/company/subscription', sequence: 30, parent: 'company-details' },
+  /**
+   * The band of figures, and the words above it. Its own entry rather than a
+   * block on the About screen: it is its own functionality now, sold and
+   * switched on separately, and a tenant whose plan carries one of the two but
+   * not the other must not find it half-hidden inside the other's page.
+   */
+  { name: 'Figures', slug: 'company-figures', icon: 'bar-chart-3', route: '/company/figures', sequence: 27, parent: 'company-details' },
+  { name: 'Team', slug: 'company-team', icon: 'users', route: '/company/team', sequence: 28, parent: 'company-details' },
+  { name: 'Gallery', slug: 'company-gallery', icon: 'image', route: '/company/gallery', sequence: 29, parent: 'company-details' },
+  { name: 'Contact page', slug: 'company-contact', icon: 'mail', route: '/company/contact', sequence: 30, parent: 'company-details' },
+  { name: 'Features / Benefits', slug: 'company-features', icon: 'sparkles', route: '/company/features', sequence: 31, parent: 'company-details' },
+  /**
+   * Customer reviews. Unlike the rest of the section this screen is a queue as
+   * well as an editor — a review a stranger wrote sits here until someone
+   * approves it — which is why it is worth its own entry rather than a tab.
+   */
+  { name: 'Testimonials', slug: 'company-testimonials', icon: 'quote', route: '/company/testimonials', sequence: 32, parent: 'company-details' },
+  { name: 'Plan & billing', slug: 'company-subscription', icon: 'credit-card', route: '/company/subscription', sequence: 33, parent: 'company-details' },
 ];
 
 /**
@@ -67,9 +92,12 @@ const MENU_INHERITS_PARENT = new Set([
   'company-domains',
   'company-functionality',
   'company-about',
+  'company-figures',
   'company-team',
   'company-gallery',
   'company-contact',
+  'company-features',
+  'company-testimonials',
   'company-subscription',
 ]);
 
@@ -87,9 +115,12 @@ const MENU_INHERITS_PARENT = new Set([
  */
 const MENU_FUNCTIONALITY = {
   'company-about': FUNCTIONALITY.ABOUT_US,
+  'company-figures': FUNCTIONALITY.FIGURES,
   'company-team': FUNCTIONALITY.TEAM,
   'company-gallery': FUNCTIONALITY.GALLERY,
   'company-contact': FUNCTIONALITY.CONTACT_PAGE,
+  'company-testimonials': FUNCTIONALITY.TESTIMONIALS,
+  'company-features': FUNCTIONALITY.FEATURES,
 };
 
 module.exports = { menus, MENU_INHERITS_PARENT, MENU_FUNCTIONALITY };

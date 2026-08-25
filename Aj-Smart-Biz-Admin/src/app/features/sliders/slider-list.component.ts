@@ -63,7 +63,7 @@ export class SliderListComponent {
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
 
-  readonly store = new ListStore<Slider>((query) => this.api.list<Slider>('/my-company/sliders', query), {
+  readonly store = new ListStore<Slider>((query) => this.api.list<Slider>('/admin/company/sliders', query), {
     limit: 25,
   });
   readonly branches = signal<Branch[]>([]);
@@ -176,8 +176,8 @@ export class SliderListComponent {
     this.saving.set(true);
 
     const request = row
-      ? this.api.put<Slider>(`/my-company/sliders/${row.id}`, payload)
-      : this.api.post<Slider>('/my-company/sliders', payload);
+      ? this.api.put<Slider>(`/admin/company/sliders/${row.id}`, payload)
+      : this.api.post<Slider>('/admin/company/sliders', payload);
 
     request.subscribe({
       next: () => {
@@ -194,7 +194,7 @@ export class SliderListComponent {
   }
 
   toggleStatus(row: Slider): void {
-    this.api.patch(`/my-company/sliders/${row.id}/status`, {}).subscribe({
+    this.api.patch(`/admin/company/sliders/${row.id}/status`, {}).subscribe({
       next: () => {
         this.toast.success(`${row.title} is now ${row.status === 'active' ? 'inactive' : 'active'}`);
         this.store.reload();
@@ -216,7 +216,7 @@ export class SliderListComponent {
     [items[from], items[to]] = [items[to], items[from]];
     this.reordering.set(true);
 
-    this.api.patch('/my-company/sliders/reorder', { ids: items.map((item) => item.id) }).subscribe({
+    this.api.patch('/admin/company/sliders/reorder', { ids: items.map((item) => item.id) }).subscribe({
       next: () => {
         this.reordering.set(false);
         this.store.reload();
@@ -231,7 +231,7 @@ export class SliderListComponent {
   async remove(row: Slider): Promise<void> {
     if (!(await this.confirm.askDelete(`the slide "${row.title}"`))) return;
 
-    this.api.delete(`/my-company/sliders/${row.id}`).subscribe({
+    this.api.delete(`/admin/company/sliders/${row.id}`).subscribe({
       next: () => {
         this.toast.success('Slide deleted');
         this.store.reloadAfterDelete();

@@ -9,7 +9,7 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
 const config = require('./config/env');
-const routes = require('./routes');
+const routes = require('./modules');
 const { notFound, errorHandler } = require('./middlewares/errorHandler');
 
 const app = express();
@@ -72,8 +72,17 @@ app.use(
 );
 
 app.get('/', (req, res) =>
-  res.json({ success: true, message: 'Aj Smart Biz API', docs: `${config.apiPrefix}/health` })
+  res.json({ success: true, message: 'Aj Smart Biz API', docs: `${config.apiPrefix}/docs` })
 );
+
+/**
+ * The docs, mounted before the API itself so `/docs` is matched here rather
+ * than falling through to the module tree and its 404.
+ *
+ * The router is handed in so the spec can be built by reading what is actually
+ * mounted — see `docs/routeScanner`.
+ */
+app.use(config.apiPrefix, require('./docs')(routes));
 
 app.use(config.apiPrefix, routes);
 

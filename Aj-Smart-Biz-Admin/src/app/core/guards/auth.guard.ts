@@ -1,7 +1,9 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { AuthService } from '../services/auth.service';
+import { ServerStatusService } from '../services/server-status.service';
 import { ToastService } from '../services/toast.service';
 import { PermissionAction } from '../models/domain.model';
 
@@ -12,6 +14,7 @@ import { PermissionAction } from '../models/domain.model';
 export const authGuard: CanActivateFn = (route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
+  const status = inject(ServerStatusService);
 
   if (!auth.isLoggedIn()) {
     return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
@@ -20,7 +23,28 @@ export const authGuard: CanActivateFn = (route, state) => {
 
   return auth.loadProfile().pipe(
     map(() => true),
-    catchError(() => of(router.createUrlTree(['/login'])))
+    catchError((error: HttpErrorResponse) => {
+      /**
+       * The API could not be reached at all.
+       *
+       * That is not a session problem, and sending the user to /login makes it
+       * worse: `guestGuard` sees the token still in storage and sends them
+       * straight back here, which fails again — a redirect loop that renders a
+       * blank console and, because every navigation cancels the request it was
+       * waiting on, never lets the interceptor report the outage either.
+       *
+       * So navigation is simply refused. The user stays where they are, the
+       * status signal flips, and `App` puts the server-down screen over the
+       * whole console until something answers.
+       */
+      if (error.status === 0) {
+        status.markUnreachable();
+        return of(false);
+      }
+
+      // A real answer that refused us: the session is over, so sign out.
+      return of(router.createUrlTree(['/login']));
+    })
   );
 };
 

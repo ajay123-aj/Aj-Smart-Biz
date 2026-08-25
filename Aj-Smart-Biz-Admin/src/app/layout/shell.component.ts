@@ -13,6 +13,7 @@ const ICONS: Record<string, string> = {
   dashboard: '📊',
   'company-details': '🏢',
   'my-plan': '💳',
+  'lead-management': '🎯',
   'role-management': '🛡️',
   'menu-permission': '🔐',
   'admin-management': '👥',
@@ -27,6 +28,7 @@ const ICONS: Record<string, string> = {
   'company-team': '👤',
   'company-gallery': '🖼️',
   'company-contact': '✉️',
+  'company-features': '✨',
   'company-subscription': '💳',
 };
 

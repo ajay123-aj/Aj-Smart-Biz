@@ -1,3 +1,10 @@
+<!-- The API is unreachable, so there is no console to render — see
+     ServerDownComponent for why this replaces the app rather than
+     overlaying it. -->
+@if (status.unreachable()) {
+  <app-server-down />
+}
+
 <router-outlet />
 <app-toast-host />
 <app-confirm-dialog />

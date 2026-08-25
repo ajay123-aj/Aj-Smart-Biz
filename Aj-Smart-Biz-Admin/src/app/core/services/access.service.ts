@@ -20,15 +20,15 @@ export class AccessService {
   /* -------------------------------- roles ------------------------------- */
 
   listRoles(query: ListQuery = {}): Observable<PagedResult<Role>> {
-    return this.api.list<Role>('/roles', query);
+    return this.api.list<Role>('/admin/roles', query);
   }
 
   roleOptions(): Observable<Option[]> {
-    return this.api.get<Option[]>('/roles/dropdown');
+    return this.api.get<Option[]>('/admin/roles/dropdown');
   }
 
   createRole(payload: Record<string, unknown>): Observable<Role> {
-    return this.api.post<Role>('/roles', payload);
+    return this.api.post<Role>('/admin/roles', payload);
   }
 
   updateRole(id: number, payload: Record<string, unknown>): Observable<Role> {
@@ -57,15 +57,15 @@ export class AccessService {
   /* -------------------------------- menus ------------------------------- */
 
   listMenus(query: ListQuery = {}): Observable<PagedResult<Menu>> {
-    return this.api.list<Menu>('/menus', query);
+    return this.api.list<Menu>('/admin/menus', query);
   }
 
   menuTree(): Observable<Menu[]> {
-    return this.api.get<Menu[]>('/menus/tree');
+    return this.api.get<Menu[]>('/admin/menus/tree');
   }
 
   createMenu(payload: Record<string, unknown>): Observable<Menu> {
-    return this.api.post<Menu>('/menus', payload);
+    return this.api.post<Menu>('/admin/menus', payload);
   }
 
   updateMenu(id: number, payload: Record<string, unknown>): Observable<Menu> {
@@ -79,7 +79,7 @@ export class AccessService {
   /* -------------------------------- admins ------------------------------ */
 
   listAdmins(query: ListQuery = {}): Observable<PagedResult<CompanyAdmin>> {
-    return this.api.list<CompanyAdmin>('/admins', query);
+    return this.api.list<CompanyAdmin>('/admin/admins', query);
   }
 
   /**
@@ -88,11 +88,11 @@ export class AccessService {
    * that would refuse the request.
    */
   adminQuota(): Observable<QuotaView> {
-    return this.api.get<QuotaView>('/admins/quota');
+    return this.api.get<QuotaView>('/admin/admins/quota');
   }
 
   createAdmin(payload: Record<string, unknown>): Observable<CompanyAdmin> {
-    return this.api.post<CompanyAdmin>('/admins', payload);
+    return this.api.post<CompanyAdmin>('/admin/admins', payload);
   }
 
   updateAdmin(id: number, payload: Record<string, unknown>): Observable<CompanyAdmin> {

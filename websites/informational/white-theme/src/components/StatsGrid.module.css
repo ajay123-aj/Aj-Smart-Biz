@@ -1,21 +1,39 @@
 /* ------------------------------------------------------------------ *
  * The figures, as cards.
  *
- * The same object the other cards on the site are — frosted panel, ghosted
- * numeral, accent rule filling on hover — so there is one card and not
- * several. They were an open strip of dividers before, which read as a table
- * rather than as something to look at.
- *
- * This was written into the About stylesheet. It lives here now because the
- * same row also closes the home page.
+ * Two places use this row — the About masthead and the band under the slider
+ * on the home page — over two different grounds. That is the reason nothing
+ * here is a literal colour: the card used to be `rgba(255,255,255,.72)` with a
+ * white border and a backdrop blur, which on the home page's cream ground was
+ * a near-white panel with an invisible edge. It reads on tokens now, so the
+ * same card sits correctly on both.
  * ------------------------------------------------------------------ */
 
+/*
+ * Flex rather than grid, and that is the whole layout decision.
+ *
+ * The count is the tenant's — three figures or seven, changed in the admin
+ * whenever they like — so the row has to look deliberate at every one of them.
+ * A grid cannot: `auto-fit` strands a lone card at full width on the last row,
+ * and a fixed column count leaves a hole when the tenant has fewer than it.
+ * Wrapping flex items that are centred do neither. A short last row sits in the
+ * middle of the band, under a centred heading, and reads as arrangement.
+ *
+ * `flex: 1 1 240px` is what sets the maximum per row: four fit the container's
+ * 1132px of content, five do not, so five figures wrap to four and one rather
+ * than squeezing into a row nobody can read.
+ *
+ * `max-width: 380px` is the other end of it, and the number is not arbitrary:
+ * three cards at 380 plus two gaps is 1180, so a company with three figures
+ * still fills the row edge to edge rather than sitting in an indented block
+ * under a left-aligned heading. Below three it does bite, which is the point —
+ * two figures spanning half a screen each would be slabs, not cards.
+ */
 .stats {
-  display: grid;
-  /* Auto-fit rather than a fixed four: the company decides how many figures it
-     has, and three or five must not leave a hole in the row. */
-  grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
-  gap: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
   margin: 0;
   padding: 0;
 }
@@ -23,93 +41,135 @@
 .stat {
   position: relative;
   overflow: hidden;
+  flex: 1 1 240px;
+  max-width: 380px;
+
   display: flex;
-  /* The value is second in the DOM so a screen reader reads "label, value";
-     reversing here puts the figure on top where the eye wants it. */
+  /*
+   * The value is second in the DOM so a screen reader reads "label, value".
+   * Reversing puts the figure on top, where the eye wants it. `flex-end` is the
+   * visual top in a reversed column: it holds the content up when a taller
+   * neighbour stretches this card, instead of letting it float to the bottom.
+   */
   flex-direction: column-reverse;
-  gap: 6px;
-  padding: 28px 26px 30px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.75);
+  justify-content: flex-end;
+  gap: 10px;
+
+  padding: 46px 28px 30px;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-sm);
   transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease,
-    background-color 0.22s ease;
+    border-color 0.22s ease;
+}
+
+/*
+ * A short accent rule above the figure, in place of the ghosted numeral the
+ * card used to carry — see the component. Absolutely placed rather than a flex
+ * item, so the reversed column order does not decide where it lands, and the
+ * top padding above is the clearance it needs.
+ */
+.stat::before {
+  content: '';
+  position: absolute;
+  /* Above the hover wash below, which is a later sibling and would otherwise
+     paint over it: positioned boxes at the same level stack in tree order. */
+  z-index: 2;
+  left: 28px;
+  top: 28px;
+  width: 26px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * A very faint accent wash bleeding in from the corner on hover. Behind the
+ * content — hence `z-index: 0` here and `position: relative` on the two text
+ * elements — and clipped by the card's own `overflow`.
+ */
+.stat::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: radial-gradient(
+    18rem 12rem at 108% -30%,
+    color-mix(in srgb, var(--accent) 16%, transparent),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.28s ease;
+  pointer-events: none;
 }
 
 .stat:hover {
   transform: translateY(-4px);
-  background: rgba(255, 255, 255, 0.92);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
   box-shadow: var(--shadow-hover);
 }
 
-/* A hairline that fills across the top on hover — the card acknowledging you. */
-.stat::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  height: 2px;
-  width: 100%;
-  background: var(--accent);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+.stat:hover::before {
+  width: 46px;
 }
 
 .stat:hover::after {
-  transform: scaleX(1);
-}
-
-.index {
-  position: absolute;
-  top: 6px;
-  right: 14px;
-  font-size: 3.4rem;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.05em;
-  color: color-mix(in srgb, var(--accent) 13%, transparent);
-  pointer-events: none;
+  opacity: 1;
 }
 
 .value {
+  position: relative;
+  z-index: 1;
   margin: 0;
-  font-size: clamp(1.8rem, 3vw, 2.35rem);
+  /* `dd` carries a browser indent; the reset covers it, this is the belt. */
+  margin-inline-start: 0;
+  font-size: clamp(1.9rem, 2.6vw, 2.5rem);
   font-weight: 700;
   letter-spacing: -0.03em;
+  /* Figures line up across a row rather than jittering by digit width. */
   font-variant-numeric: tabular-nums;
-  line-height: 1.05;
+  line-height: 1.02;
   /* Ink, not brand: a row of saturated numbers would out-shout the heading. */
   color: var(--text);
 }
 
 .label {
+  position: relative;
+  z-index: 1;
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.06em;
+  line-height: 1.35;
   color: var(--text-muted);
+  /* Two words that would break mid-word on a narrow card break between words. */
+  text-wrap: balance;
 }
 
 /* ------------------------------ responsive ------------------------------ */
 
 /*
- * Tablet. `auto-fit` is right on a wide screen and wrong here: at this width it
- * resolves to three columns, so a company with four figures gets a row of three
- * and one stranded underneath. Two columns divide four, six and eight evenly.
+ * Tablet. Two per row, stated as a basis rather than left to the flex maths:
+ * at this width three cards fit but each is too narrow for a figure and a
+ * label, and two divides the four most companies have.
+ *
+ * `max-width: none` goes with it — the cap exists to stop three cards spanning
+ * a desktop, and here it would leave two cards marooned in the middle of the
+ * row instead.
  */
 @media (max-width: 1024px) {
-  .stats {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
+  .stat {
+    flex-basis: calc(50% - 10px);
+    max-width: none;
+    padding: 40px 24px 26px;
   }
 }
 
 /*
- * Phone. Still two up rather than stacking: four figures in a column is most of
- * a screen scrolled past. Smaller type keeps a pair legible on the narrowest
- * phones.
+ * Phone. Still two up rather than stacked: four figures in a single column is
+ * most of a screen scrolled past, and they are the fastest thing on the page to
+ * read only while you can see more than one at a time.
  */
 @media (max-width: 560px) {
   .stats {
@@ -117,20 +177,56 @@
   }
 
   .stat {
-    padding: 20px 18px 22px;
+    flex-basis: calc(50% - 6px);
+    padding: 30px 16px 18px;
+    border-radius: var(--radius-sm);
+  }
+
+  .stat::before {
+    left: 16px;
+    top: 18px;
+    width: 20px;
+  }
+
+  .stat:hover::before {
+    width: 32px;
   }
 
   .value {
-    font-size: 1.6rem;
+    font-size: 1.55rem;
   }
 
   .label {
-    font-size: 0.74rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+  }
+}
+
+/*
+ * The narrowest phones. Two cards and a gap in 320px leaves 148px a card, and a
+ * label like "Typical reply time" cannot be read three words to a line in it.
+ * This is the one width where stacking is the lesser evil.
+ */
+@media (max-width: 380px) {
+  .stat {
+    flex-basis: 100%;
+    padding: 26px 20px 20px;
+  }
+}
+
+/*
+ * Anyone who has asked their system not to animate. The hover states still
+ * change — colour and shadow say "this is under the pointer" without moving —
+ * but nothing translates or grows.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .stat,
+  .stat::before,
+  .stat::after {
+    transition: none;
   }
 
-  .index {
-    font-size: 2.4rem;
-    top: 4px;
-    right: 10px;
+  .stat:hover {
+    transform: none;
   }
 }

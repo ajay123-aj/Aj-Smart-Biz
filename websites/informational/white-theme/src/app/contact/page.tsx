@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import PlanNotice from '@/components/PlanNotice';
+import ServiceUnavailable from '@/components/ServiceUnavailable';
 import EnquiryForm from '@/components/EnquiryForm';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import ShareButton from '@/components/ShareButton';
@@ -49,6 +50,15 @@ export default async function ContactPage() {
   const company = await getCompanyDetails();
 
   // The plan is what pays for the content — same rule as every other page.
+  /**
+   * The layout declines to frame the site when the API is unreachable; the page
+   * has to decline to render it too. Skipping only the layout would still leave
+   * this page in the streamed RSC payload, where its markup — placeholder
+   * company and all — remains readable to anyone who looks. Same rule, and the
+   * same reason, as the plan check below.
+   */
+  if (!company.apiReachable) return <ServiceUnavailable />;
+
   if (!company.service.active) return <PlanNotice company={company} />;
 
   // Withheld or switched off. A 404 is the honest answer: the tenant is not

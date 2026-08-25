@@ -38,37 +38,37 @@ export class CompanyService {
   private readonly api = inject(ApiService);
 
   list(query: ListQuery = {}): Observable<PagedResult<Company>> {
-    return this.api.list<Company>('/companies', query);
+    return this.api.list<Company>('/super-admin/companies', query);
   }
 
   getById(id: number): Observable<Company> {
-    return this.api.get<Company>(`/companies/${id}`);
+    return this.api.get<Company>(`/super-admin/companies/${id}`);
   }
 
   create(payload: Record<string, unknown>): Observable<CompanyCreateResult> {
-    return this.api.post<CompanyCreateResult>('/companies', payload);
+    return this.api.post<CompanyCreateResult>('/super-admin/companies', payload);
   }
 
   update(id: number, payload: Record<string, unknown>): Observable<Company> {
-    return this.api.put<Company>(`/companies/${id}`, payload);
+    return this.api.put<Company>(`/super-admin/companies/${id}`, payload);
   }
 
   toggleStatus(id: number, status?: Status): Observable<{ id: number; status: Status }> {
-    return this.api.patch<{ id: number; status: Status }>(`/companies/${id}/status`, status ? { status } : {});
+    return this.api.patch<{ id: number; status: Status }>(`/super-admin/companies/${id}/status`, status ? { status } : {});
   }
 
   remove(id: number): Observable<{ id: number }> {
-    return this.api.delete<{ id: number }>(`/companies/${id}`);
+    return this.api.delete<{ id: number }>(`/super-admin/companies/${id}`);
   }
 
   restore(id: number): Observable<{ id: number }> {
-    return this.api.post<{ id: number }>(`/companies/${id}/restore`);
+    return this.api.post<{ id: number }>(`/super-admin/companies/${id}/restore`);
   }
 
   /* ------------------------------ billing ------------------------------ */
 
   listSubscriptions(companyId: number): Observable<Subscription[]> {
-    return this.api.get<Subscription[]>(`/companies/${companyId}/subscriptions`);
+    return this.api.get<Subscription[]>(`/super-admin/companies/${companyId}/subscriptions`);
   }
 
   assignPlan(
@@ -76,27 +76,27 @@ export class CompanyService {
     payload: AssignPlanPayload
   ): Observable<{ subscription: Subscription; transaction: Transaction | null }> {
     return this.api.post<{ subscription: Subscription; transaction: Transaction | null }>(
-      `/companies/${companyId}/subscriptions`,
+      `/super-admin/companies/${companyId}/subscriptions`,
       payload
     );
   }
 
   cancelSubscription(companyId: number, subscriptionId: number): Observable<{ id: number }> {
-    return this.api.post<{ id: number }>(`/companies/${companyId}/subscriptions/${subscriptionId}/cancel`);
+    return this.api.post<{ id: number }>(`/super-admin/companies/${companyId}/subscriptions/${subscriptionId}/cancel`);
   }
 
   listTransactions(companyId: number, query: ListQuery = {}): Observable<PagedResult<Transaction>> {
-    return this.api.list<Transaction>(`/companies/${companyId}/transactions`, query);
+    return this.api.list<Transaction>(`/super-admin/companies/${companyId}/transactions`, query);
   }
 
   createTransaction(companyId: number, payload: Record<string, unknown>): Observable<Transaction> {
-    return this.api.post<Transaction>(`/companies/${companyId}/transactions`, payload);
+    return this.api.post<Transaction>(`/super-admin/companies/${companyId}/transactions`, payload);
   }
 
   /* ------------------------------ branches ----------------------------- */
 
   listBranches(companyId: number, query: ListQuery = {}): Observable<PagedResult<Branch>> {
-    return this.api.list<Branch>(`/companies/${companyId}/branches`, query);
+    return this.api.list<Branch>(`/super-admin/companies/${companyId}/branches`, query);
   }
 
   /**
@@ -104,18 +104,18 @@ export class CompanyService {
    * Add button and the guard that would refuse the request never disagree.
    */
   branchQuota(companyId: number): Observable<QuotaView> {
-    return this.api.get<QuotaView>(`/companies/${companyId}/branches/quota`);
+    return this.api.get<QuotaView>(`/super-admin/companies/${companyId}/branches/quota`);
   }
 
   createBranch(companyId: number, payload: Record<string, unknown>): Observable<Branch> {
-    return this.api.post<Branch>(`/companies/${companyId}/branches`, payload);
+    return this.api.post<Branch>(`/super-admin/companies/${companyId}/branches`, payload);
   }
 
   updateBranch(companyId: number, branchId: number, payload: Record<string, unknown>): Observable<Branch> {
-    return this.api.put<Branch>(`/companies/${companyId}/branches/${branchId}`, payload);
+    return this.api.put<Branch>(`/super-admin/companies/${companyId}/branches/${branchId}`, payload);
   }
 
   removeBranch(companyId: number, branchId: number): Observable<{ id: number }> {
-    return this.api.delete<{ id: number }>(`/companies/${companyId}/branches/${branchId}`);
+    return this.api.delete<{ id: number }>(`/super-admin/companies/${companyId}/branches/${branchId}`);
   }
 }

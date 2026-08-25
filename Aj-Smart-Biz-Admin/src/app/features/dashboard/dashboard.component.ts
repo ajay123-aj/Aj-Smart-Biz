@@ -47,7 +47,7 @@ export class DashboardComponent {
 
   load(): void {
     this.loading.set(true);
-    this.api.get<AdminDashboard>('/dashboard/admin').subscribe({
+    this.api.get<AdminDashboard>('/admin/dashboard').subscribe({
       next: (result) => {
         this.data.set(result);
         this.loading.set(false);

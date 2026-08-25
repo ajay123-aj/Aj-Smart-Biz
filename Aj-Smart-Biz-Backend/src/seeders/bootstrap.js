@@ -321,6 +321,104 @@ async function ensureSlideLinks() {
   if (moved) logger.info(`Repointed ${moved} slide button(s) from removed page anchors`);
 }
 
+/**
+ * Carries every existing tenant across the day Figures stopped being part of
+ * About us and became a functionality of its own.
+ *
+ * Without this the split is a silent regression on live websites: the band is
+ * gated on `figures`, no plan sold before today lists it, so every company that
+ * had figures on its home page this morning would have none tonight — for a
+ * change of ours, not a change of theirs. Nobody was asked whether they wanted
+ * that, and the answer would have been no.
+ *
+ * Three passes, in the order the grant is actually read:
+ *
+ *   1. **Plans.** Anything that sells About us now sells Figures too. That is
+ *      what the two keys were when they were one, so it is what a customer paid
+ *      for. A platform that wants to sell them apart from here on can simply
+ *      untick one — this only ever adds, and only to a plan that lacks it.
+ *   2. **Live subscriptions.** The grant is read off `planSnapshot` when a term
+ *      has one, precisely so re-pricing a plan cannot change what a running
+ *      subscription was sold. That protection would freeze this fix out, so the
+ *      snapshots are amended with it.
+ *   3. **The switch rows.** A company with figures already written and About
+ *      switched on had a band on its website. It gets a `figures` row switched
+ *      on to match, so the band it had is the band it keeps. A company with no
+ *      figures written gets nothing: it had no band, and switching a feature on
+ *      for somebody is not ours to do beyond restoring what was already there.
+ *
+ * Idempotent throughout — every pass skips what already carries the key — so
+ * it costs three cheap queries on every boot after the first.
+ */
+async function ensureFiguresGrant() {
+  const withFigures = (list) => {
+    if (!Array.isArray(list)) return null;
+    if (!list.includes(FUNCTIONALITY.ABOUT_US) || list.includes(FUNCTIONALITY.FIGURES)) return null;
+    return [...list, FUNCTIONALITY.FIGURES];
+  };
+
+  /* ---- 1. the plans ---- */
+  let plans = 0;
+  for (const plan of await db.Plan.findAll({ attributes: ['id', 'functionalities'] })) {
+    const next = withFigures(plan.functionalities);
+    if (!next) continue;
+    // eslint-disable-next-line no-await-in-loop
+    await plan.update({ functionalities: next });
+    plans += 1;
+  }
+
+  /* ---- 2. the snapshots on running terms ---- */
+  let terms = 0;
+  for (const term of await db.CompanySubscription.findAll({ attributes: ['id', 'planSnapshot'] })) {
+    const snapshot = term.planSnapshot;
+    if (!snapshot || typeof snapshot !== 'object') continue;
+
+    const next = withFigures(snapshot.functionalities);
+    if (!next) continue;
+    // A new object rather than a mutation: sequelize compares JSON columns by
+    // reference, and an in-place push would not be seen as a change to save.
+    // eslint-disable-next-line no-await-in-loop
+    await term.update({ planSnapshot: { ...snapshot, functionalities: next } });
+    terms += 1;
+  }
+
+  /* ---- 3. the switch rows, for anyone who actually had a band ---- */
+  let switched = 0;
+  const companiesWithFigures = await db.CompanyStat.findAll({
+    attributes: ['companyId'],
+    group: ['companyId'],
+    raw: true,
+  });
+
+  for (const { companyId } of companiesWithFigures) {
+    // eslint-disable-next-line no-await-in-loop
+    const [about, existing] = await Promise.all([
+      db.CompanyFunctionality.findOne({ where: { companyId, key: FUNCTIONALITY.ABOUT_US } }),
+      db.CompanyFunctionality.findOne({ where: { companyId, key: FUNCTIONALITY.FIGURES } }),
+    ]);
+
+    // Only ever mirrors what About was: a company that had it switched off had
+    // no band either, and must not gain one from a migration.
+    if (existing || about?.status !== STATUS.ACTIVE) continue;
+
+    // eslint-disable-next-line no-await-in-loop
+    await db.CompanyFunctionality.create({
+      companyId,
+      key: FUNCTIONALITY.FIGURES,
+      status: STATUS.ACTIVE,
+      settings: null,
+      createdBy: null,
+    });
+    switched += 1;
+  }
+
+  if (plans || terms || switched) {
+    logger.info(
+      `Figures split: ${plans} plan(s), ${terms} subscription snapshot(s), ${switched} company switch row(s)`
+    );
+  }
+}
+
 async function runBootstrap() {
   await ensureSuperAdmin();
   await ensureSystemMenus();
@@ -328,6 +426,7 @@ async function runBootstrap() {
   await ensureReferenceData();
   await ensureDefaultSliders();
   await ensureAboutRows();
+  await ensureFiguresGrant();
   await ensureSlideLinks();
 }
 
@@ -339,5 +438,6 @@ module.exports = {
   ensureReferenceData,
   ensureDefaultSliders,
   ensureAboutRows,
+  ensureFiguresGrant,
   ensureSlideLinks,
 };

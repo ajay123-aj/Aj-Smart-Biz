@@ -1,55 +1,33 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
 import { CompanyService } from '../../core/services/company.service';
 import { ConfirmService } from '../../core/services/confirm.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { messageOf } from '../../core/interceptors/auth.interceptor';
-import {
-  AboutSettings,
-  AboutView,
-  CompanyStat,
-  Functionality,
-  StatMode,
-  StatUnit,
-} from '../../core/models/domain.model';
-import { touchAll } from '../../shared/utils';
-import { FieldErrorComponent } from '../../shared/ui/field-error.component';
+import { AboutSettings, AboutView, Functionality } from '../../core/models/domain.model';
 import { FeatureGateComponent } from '../../shared/ui/feature-gate.component';
-import { ModalComponent } from '../../shared/ui/modal.component';
-import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
-
-const UNITS: { value: StatUnit; label: string }[] = [
-  { value: 'years', label: 'Years' },
-  { value: 'months', label: 'Months' },
-  { value: 'days', label: 'Days' },
-];
 
 /**
- * The About tab: the section's prose, and the band of figures under it.
+ * The About screen: the page's prose, per branch.
  *
- * Two different kinds of editing, so two different shapes. The prose is one
- * form saved as a whole. The figures are cards — added, edited, reordered and
- * deleted one at a time — because a company that wants five of them, or wants
- * "Frames delivered" instead of "Projects delivered", should not be editing a
- * fixed set of four slots.
+ * One form saved as a whole, and nothing else. The band of figures was here
+ * until Figures became a functionality of its own — it is sold, switched on
+ * and written separately now, on its own screen, because it appears on the home
+ * page where none of this copy does. See `FiguresManagerComponent`.
  *
- * The `since_date` mode is the reason the band is worth having: a hardcoded
- * "12+ years" is wrong every January, and a company will not remember to fix
- * it. A card that counts from a date is right forever.
+ * What is left is branch-aware in a way the other website screens are not: a
+ * branch either has its own copy or inherits the company-wide one, and the
+ * banner at the top says which, because "nothing written here" and "the same as
+ * everyone" look identical otherwise.
  */
 @Component({
   selector: 'app-about-manager',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'card' },
-  imports: [
-    ReactiveFormsModule,
-    FeatureGateComponent,
-    StatusBadgeComponent,
-    ModalComponent,
-    FieldErrorComponent,
-  ],
+  imports: [ReactiveFormsModule, RouterLink, FeatureGateComponent],
   templateUrl: './about-manager.component.html',
   styles: [
     `
@@ -66,45 +44,6 @@ const UNITS: { value: StatUnit; label: string }[] = [
       .scope-note { font-size: 12.5px; color: var(--text-3); }
       .scope-note-own { color: var(--success); font-weight: 500; }
 
-      .stat-row {
-        display: flex; align-items: center; gap: 14px;
-        padding: 12px 0; border-bottom: 1px solid var(--border);
-      }
-      .stat-row:last-of-type { border-bottom: 0; }
-
-      /* The figure as the website will print it, so the tenant is editing
-         against what a visitor sees rather than against raw fields. */
-      .stat-figure {
-        flex: none; min-width: 78px;
-        font-size: 21px; font-weight: 750; letter-spacing: -0.02em;
-        font-variant-numeric: tabular-nums;
-      }
-      .stat-main { flex: 1; min-width: 0; }
-      .stat-label { font-weight: 600; }
-      .stat-note { font-size: 12px; color: var(--text-3); margin-top: 2px; }
-      .stat-empty { padding: 20px 0; text-align: center; color: var(--text-3); font-size: 13px; }
-
-      .seq { display: flex; align-items: center; gap: 3px; flex: none; }
-      .seq-num { min-width: 20px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-3); font-size: 12px; }
-
-      .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 4px; }
-      .mode {
-        display: flex; gap: 10px; align-items: flex-start; cursor: pointer;
-        padding: 11px 13px; border: 1px solid var(--border); border-radius: 9px;
-        transition: border-color .15s, background .15s;
-      }
-      .mode:hover { border-color: var(--border-strong); }
-      .mode-on { border-color: var(--primary); background: rgba(37, 99, 235, .05); }
-      .mode input { margin-top: 2px; flex: none; }
-      .mode-name { font-weight: 600; font-size: 13px; }
-      .mode-hint { font-size: 11.5px; color: var(--text-3); line-height: 1.4; display: block; }
-
-      .preview {
-        margin-top: 10px; padding: 10px 13px;
-        background: var(--surface-2); border-radius: 8px;
-        font-size: 12.5px; color: var(--text-2);
-      }
-      .preview strong { font-size: 17px; font-variant-numeric: tabular-nums; }
     `,
   ],
 })
@@ -114,7 +53,6 @@ export class AboutManagerComponent {
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
   private readonly confirm = inject(ConfirmService);
-  private readonly stats = this.companies.cards<CompanyStat>('stats');
 
   /**
    * Writes are the main admin's, as with the company profile and domains.
@@ -123,10 +61,7 @@ export class AboutManagerComponent {
    */
   readonly canEdit = computed(() => this.auth.isCompanyAdmin());
 
-  readonly units = UNITS;
-
   readonly feature = signal<Functionality | null>(null);
-  readonly cards = signal<CompanyStat[]>([]);
 
   /**
    * Which scope is being edited: `null` is the company-wide copy, an id is one
@@ -140,9 +75,6 @@ export class AboutManagerComponent {
   readonly overridden = computed(() => this.view()?.overridden ?? true);
   readonly loading = signal(true);
   readonly saving = signal(false);
-  readonly reordering = signal(false);
-  readonly modalOpen = signal(false);
-  readonly editing = signal<CompanyStat | null>(null);
 
   /** Both the plan grant and the main-admin rule have to allow it. */
   readonly writable = computed(() => this.canEdit() && (this.feature()?.granted ?? false));
@@ -153,17 +85,6 @@ export class AboutManagerComponent {
     title: [''],
     lead: [''],
     body: [''],
-  });
-
-  readonly statForm = this.fb.nonNullable.group({
-    label: ['', [Validators.required, Validators.minLength(1)]],
-    mode: ['fixed' as StatMode],
-    value: [''],
-    sinceDate: [''],
-    unit: ['years' as StatUnit],
-    prefix: [''],
-    suffix: [''],
-    status: ['active'],
   });
 
   constructor() {
@@ -188,7 +109,7 @@ export class AboutManagerComponent {
     });
   }
 
-  /** Loads the copy and the figures for whichever scope is selected. */
+  /** Loads the copy for whichever scope is selected. */
   private loadScope(): void {
     this.companies.about(this.scope()).subscribe({
       next: (view) => {
@@ -198,19 +119,9 @@ export class AboutManagerComponent {
       },
       error: (error: HttpErrorResponse) => this.toast.error('Could not load the About copy', messageOf(error)),
     });
-    this.loadCards();
   }
 
-  private loadCards(): void {
-    // `'none'` asks for the company-wide figures specifically; omitting it
-    // would return every scope's at once.
-    this.stats.list(this.scope() ?? 'none').subscribe({
-      next: (rows) => this.cards.set(rows),
-      error: () => this.cards.set([]),
-    });
-  }
-
-  /** Switching scope reloads both halves; nothing is carried across. */
+  /** Switching scope reloads the copy; nothing is carried across. */
   onScope(value: string): void {
     this.scope.set(value ? Number(value) : null);
     this.loadScope();
@@ -285,172 +196,6 @@ export class AboutManagerComponent {
         this.loadScope();
       },
       error: (error: HttpErrorResponse) => this.toast.error('Could not clear the override', messageOf(error)),
-    });
-  }
-
-  /* ------------------------------ stat cards ------------------------------ */
-
-  /**
-   * The figure exactly as the website will print it.
-   *
-   * Recomputed here rather than read from the API so the modal's preview
-   * updates as the tenant types. The rule is the API's — prefix, the number,
-   * suffix — and `sinceDate` counts whole units, so a date later today still
-   * reads 0 rather than rounding up.
-   */
-  figureOf(row: Pick<CompanyStat, 'mode' | 'value' | 'sinceDate' | 'unit' | 'prefix' | 'suffix'>): string {
-    const core = row.mode === 'since_date' ? String(this.elapsed(row.sinceDate, row.unit)) : String(row.value ?? '');
-    if (!core) return '—';
-    return `${row.prefix ?? ''}${core}${row.suffix ?? ''}`;
-  }
-
-  /** Calendar-aware, matching the API: a leap year must not tick over early. */
-  private elapsed(from: string | null | undefined, unit: StatUnit): number {
-    if (!from) return 0;
-    const start = new Date(from);
-    const now = new Date();
-    if (Number.isNaN(start.getTime()) || start > now) return 0;
-
-    if (unit === 'days') return Math.floor((now.getTime() - start.getTime()) / 86400000);
-
-    let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-    if (now.getDate() < start.getDate()) months -= 1;
-    months = Math.max(0, months);
-
-    return unit === 'months' ? months : Math.floor(months / 12);
-  }
-
-  /** What the card is doing, in words, under its label in the list. */
-  describe(row: CompanyStat): string {
-    if (row.mode !== 'since_date') return 'Fixed figure';
-    const unit = UNITS.find((entry) => entry.value === row.unit)?.label.toLowerCase() ?? row.unit;
-    return row.sinceDate ? `Counts ${unit} since ${row.sinceDate.slice(0, 10)}` : `Counts ${unit} — no date set`;
-  }
-
-  /** Live preview inside the modal, from whatever is currently typed. */
-  readonly previewFigure = computed(() => '');
-
-  previewOf(): string {
-    const raw = this.statForm.getRawValue();
-    return this.figureOf(raw);
-  }
-
-  modeIs(mode: StatMode): boolean {
-    return this.statForm.controls.mode.value === mode;
-  }
-
-  setMode(mode: StatMode): void {
-    this.statForm.controls.mode.setValue(mode);
-    this.statForm.controls.mode.markAsDirty();
-  }
-
-  openCard(row: CompanyStat | null): void {
-    this.editing.set(row);
-    this.statForm.reset({
-      label: row?.label ?? '',
-      mode: row?.mode ?? 'fixed',
-      value: row?.value ?? '',
-      sinceDate: row?.sinceDate ? String(row.sinceDate).slice(0, 10) : '',
-      unit: row?.unit ?? 'years',
-      prefix: row?.prefix ?? '',
-      suffix: row?.suffix ?? '',
-      status: row?.status ?? 'active',
-    });
-    this.modalOpen.set(true);
-  }
-
-  saveCard(): void {
-    if (this.statForm.invalid) {
-      touchAll(this.statForm);
-      return;
-    }
-
-    const raw = this.statForm.getRawValue();
-
-    // The mode decides which field carries the figure; the other is cleared
-    // rather than left behind, so switching mode cannot resurrect a stale value.
-    if (raw.mode === 'fixed' && !raw.value.trim()) {
-      this.toast.error('A fixed figure needs a value', 'Type what the card should show, e.g. 250+');
-      return;
-    }
-    if (raw.mode === 'since_date' && !raw.sinceDate) {
-      this.toast.error('A counted figure needs a date', 'Pick the date it should count from.');
-      return;
-    }
-
-    const payload: Record<string, unknown> = {
-      // A figure added while looking at one branch belongs to that branch;
-      // landing it company-wide would silently put it on every site.
-      branchId: this.scope(),
-      label: raw.label,
-      mode: raw.mode,
-      value: raw.mode === 'fixed' ? raw.value : null,
-      sinceDate: raw.mode === 'since_date' ? raw.sinceDate : null,
-      unit: raw.unit,
-      prefix: raw.prefix || null,
-      suffix: raw.suffix || null,
-      status: raw.status,
-    };
-
-    const row = this.editing();
-    this.saving.set(true);
-
-    const request = row ? this.stats.update(row.id, payload) : this.stats.create(payload);
-    request.subscribe({
-      next: () => {
-        this.saving.set(false);
-        this.modalOpen.set(false);
-        this.toast.success(row ? 'Figure updated' : 'Figure added');
-        this.loadCards();
-      },
-      error: (error: HttpErrorResponse) => {
-        this.saving.set(false);
-        this.toast.error('Could not save the figure', messageOf(error));
-      },
-    });
-  }
-
-  toggleCard(row: CompanyStat): void {
-    this.stats.toggleStatus(row.id).subscribe({
-      next: () => {
-        this.toast.success(`${row.label} is now ${row.status === 'active' ? 'inactive' : 'active'}`);
-        this.loadCards();
-      },
-      error: (error: HttpErrorResponse) => this.toast.error('Could not change the status', messageOf(error)),
-    });
-  }
-
-  /** Moves one card and sends the whole resulting order, like the sliders. */
-  move(row: CompanyStat, direction: -1 | 1): void {
-    const items = [...this.cards()];
-    const from = items.findIndex((item) => item.id === row.id);
-    const to = from + direction;
-    if (from < 0 || to < 0 || to >= items.length) return;
-
-    [items[from], items[to]] = [items[to], items[from]];
-    this.reordering.set(true);
-
-    this.stats.reorder(items.map((item) => item.id)).subscribe({
-      next: () => {
-        this.reordering.set(false);
-        this.loadCards();
-      },
-      error: (error: HttpErrorResponse) => {
-        this.reordering.set(false);
-        this.toast.error('Could not reorder the figures', messageOf(error));
-      },
-    });
-  }
-
-  async removeCard(row: CompanyStat): Promise<void> {
-    if (!(await this.confirm.askDelete(`the figure "${row.label}"`))) return;
-
-    this.stats.remove(row.id).subscribe({
-      next: () => {
-        this.toast.success('Figure deleted');
-        this.loadCards();
-      },
-      error: (error: HttpErrorResponse) => this.toast.error('Could not delete the figure', messageOf(error)),
     });
   }
 }

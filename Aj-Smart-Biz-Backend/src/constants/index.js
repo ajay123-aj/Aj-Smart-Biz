@@ -155,6 +155,26 @@ const PAYMENT_MODE = {
   BANK_TRANSFER: 'bank_transfer',
   OTHER: 'other',
 };
+const PAYMENT_MODE_VALUES = Object.values(PAYMENT_MODE);
+
+/**
+ * The payment modes with the wording a console should show, served from the
+ * catalogue endpoint.
+ *
+ * The list was written out in the platform console instead — twice, in two
+ * components — so adding a mode here would have left both offering the old set
+ * and neither saying so. A label is presentation, but it is presentation of a
+ * value this file owns, and the two belong together.
+ */
+const PAYMENT_MODE_CATALOGUE = [
+  { value: PAYMENT_MODE.CASH, label: 'Cash' },
+  { value: PAYMENT_MODE.UPI, label: 'UPI' },
+  { value: PAYMENT_MODE.CARD, label: 'Card' },
+  { value: PAYMENT_MODE.NET_BANKING, label: 'Net banking' },
+  { value: PAYMENT_MODE.CHEQUE, label: 'Cheque' },
+  { value: PAYMENT_MODE.BANK_TRANSFER, label: 'Bank transfer' },
+  { value: PAYMENT_MODE.OTHER, label: 'Other' },
+];
 
 /* ------------------------------------------------------------------ *
  * Optional functionality
@@ -178,9 +198,12 @@ const FUNCTIONALITY = {
   WHATSAPP: 'whatsapp',
   SHARE_LINK: 'share_link',
   ABOUT_US: 'about_us',
+  FIGURES: 'figures',
   TEAM: 'team',
   GALLERY: 'gallery',
   CONTACT_PAGE: 'contact_page',
+  TESTIMONIALS: 'testimonials',
+  FEATURES: 'features_benefits',
 };
 const FUNCTIONALITY_VALUES = Object.values(FUNCTIONALITY);
 
@@ -212,10 +235,19 @@ const FUNCTIONALITY_CATALOGUE = [
     key: FUNCTIONALITY.ABOUT_US,
     name: 'About us',
     icon: 'file-text',
-    summary: 'Write your own About section, with your own numbers.',
+    summary: 'Write your own About page, in your own words.',
     description:
-      'Replaces the template’s About copy with your own heading, introduction and paragraphs, plus a band of figures you define — some fixed, some counted from a date so "Years in business" is never out of date.',
+      'Replaces the template’s About copy with your own heading, introduction and paragraphs, written per branch where a branch needs to say something different.',
     sequence: 3,
+  },
+  {
+    key: FUNCTIONALITY.FIGURES,
+    name: 'Figures',
+    icon: 'bar-chart-3',
+    summary: 'A band of your own numbers, on the home page and the About page.',
+    description:
+      'Adds a band of figures to the website — a card per number with your own label and wording above the set. A figure can be fixed text, or counted from a date, so "Years in business" is right next year without anyone editing it. Sold separately from About us: the band is the first thing under the slider on the home page, and a company can want it without wanting a written About page.',
+    sequence: 4,
   },
   {
     key: FUNCTIONALITY.TEAM,
@@ -224,7 +256,7 @@ const FUNCTIONALITY_CATALOGUE = [
     summary: 'A Team section listing the people behind the business.',
     description:
       'Adds a Team section to the website with a card per person — photo, name, role and a short line about them.',
-    sequence: 4,
+    sequence: 5,
   },
   {
     key: FUNCTIONALITY.GALLERY,
@@ -233,7 +265,7 @@ const FUNCTIONALITY_CATALOGUE = [
     summary: 'A Gallery section for photographs of your work.',
     description:
       'Adds a Gallery section to the website — an ordered grid of images, each with an optional title and caption.',
-    sequence: 5,
+    sequence: 6,
   },
   {
     key: FUNCTIONALITY.CONTACT_PAGE,
@@ -242,7 +274,25 @@ const FUNCTIONALITY_CATALOGUE = [
     summary: 'A Contact page with your own wording and an enquiry form.',
     description:
       'Adds a Contact page to the website — your own heading and introduction, an enquiry form that reaches you by email or WhatsApp, and a card per branch with its address, phone and opening hours.',
-    sequence: 6,
+    sequence: 7,
+  },
+  {
+    key: FUNCTIONALITY.TESTIMONIALS,
+    name: 'Testimonials',
+    icon: 'quote',
+    summary: 'Customer reviews and feedback on the public website.',
+    description:
+      'Adds a Testimonials section to the website. Run it curated — only the reviews you enter yourself — or open it up so customers can write their own, which reach you for approval before anything is published.',
+    sequence: 8,
+  },
+  {
+    key: FUNCTIONALITY.FEATURES,
+    name: 'Features / Benefits',
+    icon: 'sparkles',
+    summary: 'Say what you offer, in your own words, with an icon each.',
+    description:
+      'Adds a Features / Benefits band to the website \u2014 a card per capability with your own heading, wording and an icon chosen from the platform\u2019s set. Switched off, the section is absent from the site entirely rather than shown with the template\u2019s words.',
+    sequence: 9,
   },
 ];
 
@@ -314,7 +364,27 @@ const ABOUT_DEFAULTS = {
 };
 
 /**
- * The stat band every company gets when it first switches About on, so the
+ * The words above the figures, when a company has not written its own.
+ *
+ * The band used to carry none: on the home page it was a row of numbers with
+ * nothing to say what they were, which reads as a widget rather than as a claim
+ * the business is making.
+ *
+ * Stored on the `figures` functionality's own `settings`, the same place Team,
+ * Gallery and Features keep theirs — one heading for the set, so it is a blob
+ * on the switch row rather than a column on any table. The figures themselves
+ * are branch-aware rows in `company_stats`; the heading over them is not, which
+ * is the same split those three sections already make.
+ */
+const STATS_DEFAULTS = {
+  eyebrow: 'By the numbers',
+  /** `{company}` is filled in by the website, as everywhere else. */
+  title: 'What {company} has to show for it',
+  lead: 'A few figures that say more about the work than a page of prose would.',
+};
+
+/**
+ * The stat band every company gets when it first switches Figures on, so the
  * section is never an empty row. Ordinary rows from that moment on.
  */
 const DEFAULT_STATS = [
@@ -395,6 +465,556 @@ const SHARE_LINK_DEFAULTS = {
   channels: [SHARE_CHANNEL.COPY, SHARE_CHANNEL.WHATSAPP, SHARE_CHANNEL.FACEBOOK, SHARE_CHANNEL.X],
 };
 
+/* ------------------------------------------------------------------ *
+ * Team and Gallery section copy
+ * ------------------------------------------------------------------ */
+
+/**
+ * The words above the Team and Gallery sections.
+ *
+ * These were the template's, hardcoded, which meant every business on the
+ * platform introduced its own staff with the same sentence. A company can
+ * already name its About, Contact, Testimonials and Features headings; there
+ * was no reason these two were different, and every reason they should not be.
+ *
+ * They ride on the functionality's own `settings` blob — the same place
+ * `share_link` and `testimonials` keep theirs — because they are one block per
+ * tenant rather than a list, and because both sections are already gated by a
+ * functionality that has a row to hang them on.
+ *
+ * A blank field falls back to the value here, so a tenant that never opens the
+ * screen gets a section that reads properly rather than one with no heading.
+ */
+const TEAM_DEFAULTS = {
+  eyebrow: 'Our team',
+  title: 'The people you will be working with',
+  lead: 'Small enough that you will know everyone by name, and reach them directly.',
+};
+
+const GALLERY_DEFAULTS = {
+  eyebrow: 'Our work',
+  title: 'A look at what we have made',
+  lead: 'A selection of recent work. Every piece here was made for someone.',
+};
+
+/* ------------------------------------------------------------------ *
+ * Testimonials
+ * ------------------------------------------------------------------ */
+
+/**
+ * How a company runs its Testimonials section. The tenant picks one on the
+ * Testimonials screen; it is stored on the functionality's own `settings` blob,
+ * the same place `share_link` keeps its configuration.
+ *
+ *   static   a curated wall. Only reviews the company enters itself, in the
+ *            order it arranged them. The website shows no form.
+ *   dynamic  open to customers. The website carries a form, a submission
+ *            arrives as `pending` and is published only once the company
+ *            approves it — and the section then shows the most recent
+ *            `TESTIMONIAL_FEED_LIMIT`, newest first, rather than a fixed wall.
+ *
+ * Switching between them never deletes anything: a company that goes back to
+ * static keeps every approved visitor review, it simply stops collecting new
+ * ones and returns to showing its own order.
+ */
+const TESTIMONIAL_MODE = { STATIC: 'static', DYNAMIC: 'dynamic' };
+const TESTIMONIAL_MODE_VALUES = Object.values(TESTIMONIAL_MODE);
+
+/**
+ * Where the "Write a review" button on a `dynamic` section sends someone.
+ *
+ * Two destinations, and exactly one of them is live at a time — a section that
+ * offered both would be asking a customer to choose where to do the company a
+ * favour, which is the surest way to have them do neither.
+ *
+ *   form  the platform's own dialog. The review arrives as `pending`, the
+ *         company approves it, and it is published on the company's own
+ *         website. The company owns the words.
+ *   link  a URL the company gives us — its Google Business review page, a
+ *         Justdial listing, a form of its own. The button leaves the site and
+ *         nothing comes back here: reviews written that way live wherever they
+ *         were written, so the queue below stays empty and the wall goes on
+ *         showing whatever the company has already published.
+ *
+ * `link` therefore closes the public write path as firmly as `static` does —
+ * see `submitTestimonial`, which refuses a submission either way.
+ *
+ * It means nothing on a `static` section, which carries no button at all.
+ */
+const TESTIMONIAL_REVIEW_TARGET = { FORM: 'form', LINK: 'link' };
+const TESTIMONIAL_REVIEW_TARGET_VALUES = Object.values(TESTIMONIAL_REVIEW_TARGET);
+
+/** How many reviews a `dynamic` section shows, newest first. */
+const TESTIMONIAL_FEED_LIMIT = 10;
+
+/**
+ * Who wrote a row.
+ *
+ *   admin    typed into the console by the company
+ *   visitor  submitted through the form on the public website
+ *
+ * Kept separate from the moderation state because they answer different
+ * questions: a company needs to know which of its published reviews are its own
+ * copy and which are a customer's actual words.
+ */
+const TESTIMONIAL_SOURCE = { ADMIN: 'admin', VISITOR: 'visitor' };
+const TESTIMONIAL_SOURCE_VALUES = Object.values(TESTIMONIAL_SOURCE);
+
+/**
+ * Whether a row may be published.
+ *
+ * Only `approved` ever reaches the public API — a pending or rejected review is
+ * absent from `/public/company-details` entirely rather than hidden by the
+ * template, which is the same rule every other feature here follows.
+ *
+ * Anything the company types itself is born `approved`: asking a business to
+ * approve its own copy would be a queue with one person on both ends. A visitor
+ * submission is born `pending`, always, and no public route can create anything
+ * else — see `publicSubmitTestimonial`.
+ */
+const TESTIMONIAL_MODERATION = { PENDING: 'pending', APPROVED: 'approved', REJECTED: 'rejected' };
+const TESTIMONIAL_MODERATION_VALUES = Object.values(TESTIMONIAL_MODERATION);
+
+/** Ratings are out of five, and optional — a written review with no star is fine. */
+const TESTIMONIAL_RATING_MAX = 5;
+
+/** What a company gets on the Testimonials screen before it changes anything. */
+const TESTIMONIAL_DEFAULTS = {
+  eyebrow: 'Testimonials',
+  title: 'What our customers say',
+  lead: '',
+  mode: TESTIMONIAL_MODE.STATIC,
+  /**
+   * The button on a `dynamic` section, and where it goes. `formTitle` is its
+   * label whichever destination is chosen, so a company that switches to a
+   * Google link keeps the wording it wrote.
+   */
+  reviewTarget: TESTIMONIAL_REVIEW_TARGET.FORM,
+  /** Read only when `reviewTarget` is `link`; empty is what "not set" is. */
+  reviewUrl: '',
+  /** Wording above the form, shown only in `dynamic` mode. */
+  formTitle: 'Write a review',
+  formNote: 'Your review reaches us first and appears here once we have published it.',
+  /** Whether the form asks for a star rating at all. */
+  showRating: true,
+};
+
+/* ------------------------------------------------------------------ *
+ * Lead management
+ * ------------------------------------------------------------------ */
+
+/**
+ * Where a lead has got to.
+ *
+ * A visit is a fact — it happened, and nothing a company does changes it — so
+ * the stage lives on the **lead**, not on any one visit. Every lead is born
+ * `new`; moving it along is the only thing the console writes to this table,
+ * which is why `PATCH /leads/:id` is the one write route the feature has.
+ *
+ * `lost` is deliberately not a delete. A device that stopped converting still
+ * counts in the analytics, and the same person coming back six months later
+ * should show up as a returning lead rather than a first-time visitor.
+ */
+const LEAD_STAGE = {
+  NEW: 'new',
+  CONTACTED: 'contacted',
+  QUALIFIED: 'qualified',
+  CONVERTED: 'converted',
+  LOST: 'lost',
+};
+const LEAD_STAGE_VALUES = Object.values(LEAD_STAGE);
+
+/** What kind of machine the visit came from, parsed from the user agent. */
+const DEVICE_TYPE = {
+  MOBILE: 'mobile',
+  TABLET: 'tablet',
+  DESKTOP: 'desktop',
+  BOT: 'bot',
+  UNKNOWN: 'unknown',
+};
+const DEVICE_TYPE_VALUES = Object.values(DEVICE_TYPE);
+
+/**
+ * The five campaign parameters that get their own columns.
+ *
+ * Every `utm_*` key the URL carried is kept in the visit's `utm` JSON — a
+ * marketing team invents its own the week after you ship — but these five are
+ * what "which campaign produced this lead" is actually grouped by, so they are
+ * denormalised onto both tables where an index can reach them.
+ */
+const UTM_COLUMNS = ['source', 'medium', 'campaign', 'term', 'content'];
+
+/**
+ * Attribution parameters that mean the same thing as a `utm_*` key but are not
+ * spelled like one. Ad platforms append these themselves, so a campaign can
+ * arrive carrying nothing but one of these and no `utm_` at all.
+ */
+const CLICK_ID_PARAMS = [
+  'gclid',
+  'gbraid',
+  'wbraid',
+  'fbclid',
+  'msclkid',
+  'ttclid',
+  'twclid',
+  'li_fat_id',
+  'igshid',
+  'dclid',
+  'yclid',
+];
+
+/** Caps on what one visit may park in a JSON column, so a crafted URL cannot. */
+const LEAD_TRACKING_LIMITS = {
+  /** Distinct `utm_*` / click-id keys kept per visit. */
+  utmKeys: 40,
+  /** Longest value kept for any one of them. */
+  utmValue: 400,
+  /** Entries kept in the free-form `extra` blob a template may send. */
+  extraKeys: 40,
+  extraValue: 500,
+};
+
+/**
+ * How long two requests from one device stay the same **visit**.
+ *
+ * The site fires the tracking call on every launch, and a launch is any page
+ * load — so a visitor reading four pages would otherwise be four visits, and
+ * "visits" would measure page views under a different name. Inside this window
+ * the existing visit row is updated rather than a new one written; outside it,
+ * the person came back, and that is worth a row.
+ *
+ * Thirty minutes is the session length every analytics product settled on, and
+ * for the same reason: it is longer than reading a page and shorter than a
+ * lunch break.
+ */
+const LEAD_VISIT_SESSION_MINUTES = 30;
+
+/* ------------------------------------------------------------------ *
+ * Features / Benefits
+ * ------------------------------------------------------------------ */
+
+/**
+ * The glyph a benefit card carries.
+ *
+ * A **closed** set, and the platform's rather than the tenant's: the icons are
+ * drawn by whatever renders them — the website draws its own, the console draws
+ * the picker's — so a company chooses a name from this list instead of
+ * uploading artwork. That is what keeps six benefit cards looking like one set
+ * on every site the platform serves, and costs the website no request.
+ *
+ * This list is the contract. `key` is what is stored on the row and sent to the
+ * website; `paths` is the drawing, shipped so the console's picker has
+ * something to show without keeping a second copy of the artwork in step. A
+ * renderer that meets a key it does not know falls back to `spark` rather than
+ * leaving a hole in the card, so an entry may be added here before the website
+ * has learnt to draw it.
+ *
+ * Every path is stroked, never filled, inside a 24-unit box — see the website's
+ * `FeaturesSection`, which sets one line weight, cap and join for all of them.
+ */
+const FEATURE_ICONS = [
+  /* ------------------------------- general ------------------------------- */
+  {
+    key: 'spark',
+    label: 'Spark',
+    group: 'General',
+    paths: [
+      'M12 3.2 13.9 9a3.2 3.2 0 0 0 2.1 2.1L21.8 13l-5.8 1.9A3.2 3.2 0 0 0 13.9 17L12 22.8 10.1 17A3.2 3.2 0 0 0 8 14.9L2.2 13 8 11.1A3.2 3.2 0 0 0 10.1 9Z',
+    ],
+  },
+  {
+    key: 'star',
+    label: 'Star',
+    group: 'General',
+    paths: ['m12 3.5 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z'],
+  },
+  {
+    key: 'check',
+    label: 'Tick',
+    group: 'General',
+    paths: ['M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z', 'm8.2 12.3 2.6 2.6 5-5.4'],
+  },
+  {
+    key: 'lightbulb',
+    label: 'Idea',
+    group: 'General',
+    paths: [
+      'M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1.1 2h5c.1-.8.5-1.5 1.1-2A6 6 0 0 0 12 3Z',
+      'M9.5 18.4h5M10.4 21h3.2',
+    ],
+  },
+  {
+    key: 'target',
+    label: 'Target',
+    group: 'General',
+    paths: [
+      'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
+      'M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z',
+      'M13.5 12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z',
+    ],
+  },
+  {
+    key: 'layers',
+    label: 'Range',
+    group: 'General',
+    paths: ['m12 3 8.5 4.6L12 12.2 3.5 7.6Z', 'm3.5 12 8.5 4.6 8.5-4.6', 'm3.5 16.4 8.5 4.6 8.5-4.6'],
+  },
+
+  /* --------------------------- trust and quality -------------------------- */
+  {
+    key: 'shield',
+    label: 'Guarantee',
+    group: 'Trust and quality',
+    paths: ['M12 2.8 20 6v6c0 4.6-3.2 7.9-8 9.2-4.8-1.3-8-4.6-8-9.2V6Z', 'm8.8 12 2.3 2.4 4.1-4.6'],
+  },
+  {
+    key: 'award',
+    label: 'Award',
+    group: 'Trust and quality',
+    paths: ['M17.5 9a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0Z', 'm8.6 13.2-1.4 7.6L12 18.6l4.8 2.2-1.4-7.6'],
+  },
+  {
+    key: 'lock',
+    label: 'Secure',
+    group: 'Trust and quality',
+    paths: [
+      'M6.5 10.5h11a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19v-7a1.5 1.5 0 0 1 1.5-1.5Z',
+      'M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7',
+    ],
+  },
+  {
+    key: 'heart',
+    label: 'Care',
+    group: 'Trust and quality',
+    paths: ['M12 20.4S3.8 15.6 3.8 9.9A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 8.2 2.3c0 5.7-8.2 10.5-8.2 10.5Z'],
+  },
+
+  /* -------------------------- service and support ------------------------- */
+  {
+    key: 'headset',
+    label: 'Support',
+    group: 'Service and support',
+    paths: [
+      'M4.2 14v-2a7.8 7.8 0 0 1 15.6 0v2',
+      'M4.2 13.4h1.9a1.4 1.4 0 0 1 1.4 1.4v2.6a1.4 1.4 0 0 1-1.4 1.4H5.6a1.4 1.4 0 0 1-1.4-1.4ZM19.8 13.4h-1.9a1.4 1.4 0 0 0-1.4 1.4v2.6a1.4 1.4 0 0 0 1.4 1.4h.5a1.4 1.4 0 0 0 1.4-1.4Z',
+      'M18.4 18.8v.6a2.4 2.4 0 0 1-2.4 2.4h-2.6',
+    ],
+  },
+  {
+    key: 'people',
+    label: 'Team',
+    group: 'Service and support',
+    paths: [
+      'M12.8 8.5a3.3 3.3 0 1 1-6.6 0 3.3 3.3 0 0 1 6.6 0Z',
+      'M3.4 20a6.2 6.2 0 0 1 12.2 0',
+      'M16.4 5.6a3.3 3.3 0 0 1 0 6.4M17.6 14.4a6.2 6.2 0 0 1 3 5.6',
+    ],
+  },
+  {
+    key: 'phone',
+    label: 'Phone',
+    group: 'Service and support',
+    paths: [
+      'M20.4 16.9v2.6a1.8 1.8 0 0 1-2 1.8 17.6 17.6 0 0 1-7.7-2.7 17.3 17.3 0 0 1-5.3-5.3A17.6 17.6 0 0 1 2.7 5.5a1.8 1.8 0 0 1 1.8-2h2.6a1.8 1.8 0 0 1 1.8 1.5c.1.9.3 1.7.6 2.5a1.8 1.8 0 0 1-.4 1.9L8 10.5a14 14 0 0 0 5.3 5.3l1.1-1.1a1.8 1.8 0 0 1 1.9-.4c.8.3 1.6.5 2.5.6a1.8 1.8 0 0 1 1.6 1.9Z',
+    ],
+  },
+  {
+    key: 'message',
+    label: 'Conversation',
+    group: 'Service and support',
+    paths: ['M20.5 12a8 8 0 0 1-11.9 7l-4.1 1.5 1.5-4.1A8 8 0 1 1 20.5 12Z'],
+  },
+  {
+    key: 'calendar',
+    label: 'Scheduling',
+    group: 'Service and support',
+    paths: [
+      'M5.6 5.4h12.8a1.6 1.6 0 0 1 1.6 1.6v11.4a1.6 1.6 0 0 1-1.6 1.6H5.6A1.6 1.6 0 0 1 4 18.4V7a1.6 1.6 0 0 1 1.6-1.6Z',
+      'M8.4 3.2v4M15.6 3.2v4M4 10.4h16',
+    ],
+  },
+
+  /* -------------------------- speed and delivery -------------------------- */
+  {
+    key: 'clock',
+    label: 'On time',
+    group: 'Speed and delivery',
+    paths: ['M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z', 'M12 7v5.3l3.4 2'],
+  },
+  {
+    key: 'rocket',
+    label: 'Launch',
+    group: 'Speed and delivery',
+    paths: [
+      'M12 3.4c3 2.2 4.8 5.6 4.8 9.3l-2.4 2.4H9.6l-2.4-2.4c0-3.7 1.8-7.1 4.8-9.3Z',
+      'M9.6 15.1 7.4 20l3-1.3M14.4 15.1l2.2 4.9-3-1.3',
+      'M13.4 10.2a1.4 1.4 0 1 1-2.8 0 1.4 1.4 0 0 1 2.8 0Z',
+    ],
+  },
+  {
+    key: 'zap',
+    label: 'Fast',
+    group: 'Speed and delivery',
+    paths: ['M13.4 2.8 4.6 13.6h6.2l-.2 7.6 8.8-10.8h-6.2Z'],
+  },
+  {
+    key: 'truck',
+    label: 'Delivery',
+    group: 'Speed and delivery',
+    paths: [
+      'M3.4 6.6h9.2v10.2H3.4Z',
+      'M12.6 10.2h3.6l3 3v3.6h-6.6Z',
+      'M8.4 18.6a1.8 1.8 0 1 1-3.6 0 1.8 1.8 0 0 1 3.6 0ZM19.2 18.6a1.8 1.8 0 1 1-3.6 0 1.8 1.8 0 0 1 3.6 0Z',
+    ],
+  },
+  {
+    key: 'refresh',
+    label: 'Ongoing',
+    group: 'Speed and delivery',
+    paths: [
+      'M20.4 11.4A8.4 8.4 0 0 0 6.2 6.8L3.6 9.2',
+      'M3.6 4.6v4.6h4.6',
+      'M3.6 12.6a8.4 8.4 0 0 0 14.2 4.6l2.6-2.4',
+      'M20.4 19.4v-4.6h-4.6',
+    ],
+  },
+
+  /* --------------------------- value and pricing -------------------------- */
+  {
+    key: 'wallet',
+    label: 'Value',
+    group: 'Value and pricing',
+    paths: [
+      'M4.4 7.6h13.2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4.4Z',
+      'M4.4 7.6V6a1.6 1.6 0 0 1 1.6-1.6h9.4',
+      'M16.6 13.6h3',
+    ],
+  },
+  {
+    key: 'tag',
+    label: 'Price',
+    group: 'Value and pricing',
+    paths: [
+      'm11.2 3.6 8.4 8.4a1.8 1.8 0 0 1 0 2.5l-5.1 5.1a1.8 1.8 0 0 1-2.5 0L3.6 11.2V3.6Z',
+      'M8 8a.9.9 0 1 1-1.8 0A.9.9 0 0 1 8 8Z',
+    ],
+  },
+
+  /* --------------------------- results and reach -------------------------- */
+  {
+    key: 'chart',
+    label: 'Growth',
+    group: 'Results and reach',
+    paths: ['M3.6 20.4h16.8', 'M7 20.4v-5.2M12 20.4V9.6M17 20.4V5.2'],
+  },
+  {
+    key: 'globe',
+    label: 'Reach',
+    group: 'Results and reach',
+    paths: [
+      'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
+      'M3.4 12h17.2',
+      'M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18Z',
+    ],
+  },
+  {
+    key: 'map-pin',
+    label: 'Local',
+    group: 'Results and reach',
+    paths: [
+      'M19 10.2c0 5.4-7 11-7 11s-7-5.6-7-11a7 7 0 0 1 14 0Z',
+      'M14.4 10a2.4 2.4 0 1 1-4.8 0 2.4 2.4 0 0 1 4.8 0Z',
+    ],
+  },
+  {
+    key: 'leaf',
+    label: 'Sustainable',
+    group: 'Results and reach',
+    paths: [
+      'M20.2 4.4C10.6 3.6 4.6 8 4.6 14.4a5.4 5.4 0 0 0 5.4 5.4c6 0 10.2-6 10.2-15.4Z',
+      'M4.6 20.4c2.6-4.6 6.2-7.8 10.6-9.6',
+    ],
+  },
+  {
+    key: 'tools',
+    label: 'Craft',
+    group: 'Results and reach',
+    paths: [
+      'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9l-3.8 3.8Z',
+    ],
+  },
+];
+
+/** Just the names — what a row may store, and what the validator checks against. */
+const FEATURE_ICON_KEYS = FEATURE_ICONS.map((icon) => icon.key);
+
+/** Where an unrecognised name lands. A blank card is never the answer. */
+const FEATURE_ICON_FALLBACK = 'spark';
+
+/**
+ * The Features / Benefits section's own wording, before a company changes it.
+ *
+ * Kept on the functionality's `settings` blob rather than in a table of its
+ * own, the same way `share_link` keeps its configuration: it is one short block
+ * per company, not something a branch overrides. The *cards* are a table, and
+ * those are branch-aware — see `CompanyFeature`.
+ */
+const FEATURE_DEFAULTS = {
+  eyebrow: 'What you get',
+  title: 'Why people work with {company}',
+  lead: 'The short version of how we work, and what it means for you once the job is underway.',
+  /** Sends the reader to the Contact page. Rendered only when that page exists. */
+  ctaLabel: 'Talk it through',
+};
+
+/**
+ * The cards a company gets the first time it switches Features on, so the
+ * section is never an empty band.
+ *
+ * Six of them because the website lays the grid out two-up and six divides it —
+ * five would leave a card alone on the last row. Ordinary rows from that moment
+ * on: a company that deletes them all does not get them back, and one that
+ * rewrites every word keeps nothing of these but the order.
+ */
+const DEFAULT_FEATURE_ITEMS = [
+  {
+    icon: 'spark',
+    title: 'One team, start to finish',
+    body: 'From the first conversation to the finished job it is the same people throughout — nothing is handed off to someone you have never spoken to.',
+    sequence: 1,
+  },
+  {
+    icon: 'shield',
+    title: 'Priced once, in writing',
+    body: 'You get a scope and a number before anything begins, and the number at the end is the one you agreed to at the start.',
+    sequence: 2,
+  },
+  {
+    icon: 'clock',
+    title: 'Delivered when we said',
+    body: 'Dates are committed to only once the work is properly understood. That is the whole reason we are able to keep them.',
+    sequence: 3,
+  },
+  {
+    icon: 'people',
+    title: 'People you can reach',
+    body: 'Small enough that you will know who is working on your job by name, and reach them directly rather than through a queue.',
+    sequence: 4,
+  },
+  {
+    icon: 'headset',
+    title: 'Answers, not ticket numbers',
+    body: 'A question on a Tuesday afternoon gets an answer on a Tuesday afternoon. Support is part of the work, not a separate contract.',
+    sequence: 5,
+  },
+  {
+    icon: 'chart',
+    title: 'Built to keep working',
+    body: 'Handed over documented and maintainable, so what you have on the last day still serves you a year after we finished.',
+    sequence: 6,
+  },
+];
+
 /** Permission actions stored per (role, menu) pair. */
 const PERMISSION_ACTIONS = ['canView', 'canCreate', 'canEdit', 'canDelete', 'canExport'];
 
@@ -421,6 +1041,8 @@ module.exports = {
   PLAN_REQUEST_TYPE_VALUES,
   TRANSACTION_STATUS,
   PAYMENT_MODE,
+  PAYMENT_MODE_VALUES,
+  PAYMENT_MODE_CATALOGUE,
   PERMISSION_ACTIONS,
   FUNCTIONALITY,
   FUNCTIONALITY_VALUES,
@@ -437,10 +1059,37 @@ module.exports = {
   STAT_UNIT,
   STAT_UNIT_VALUES,
   ABOUT_DEFAULTS,
+  STATS_DEFAULTS,
   DEFAULT_STATS,
+  FEATURE_ICONS,
+  FEATURE_ICON_KEYS,
+  FEATURE_ICON_FALLBACK,
+  FEATURE_DEFAULTS,
+  DEFAULT_FEATURE_ITEMS,
   CONTACT_FORM_TARGET,
   CONTACT_FORM_TARGET_VALUES,
   CONTACT_DEFAULTS,
+  TEAM_DEFAULTS,
+  GALLERY_DEFAULTS,
+  TESTIMONIAL_MODE,
+  TESTIMONIAL_MODE_VALUES,
+  TESTIMONIAL_REVIEW_TARGET,
+  TESTIMONIAL_REVIEW_TARGET_VALUES,
+  TESTIMONIAL_FEED_LIMIT,
+  TESTIMONIAL_SOURCE,
+  TESTIMONIAL_SOURCE_VALUES,
+  TESTIMONIAL_MODERATION,
+  TESTIMONIAL_MODERATION_VALUES,
+  TESTIMONIAL_RATING_MAX,
+  TESTIMONIAL_DEFAULTS,
   NAV_PAGES,
   NAV_LABEL_MAX,
+  LEAD_STAGE,
+  LEAD_STAGE_VALUES,
+  DEVICE_TYPE,
+  DEVICE_TYPE_VALUES,
+  UTM_COLUMNS,
+  CLICK_ID_PARAMS,
+  LEAD_TRACKING_LIMITS,
+  LEAD_VISIT_SESSION_MINUTES,
 };

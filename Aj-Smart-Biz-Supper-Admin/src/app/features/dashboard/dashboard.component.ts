@@ -68,7 +68,7 @@ export class DashboardComponent {
 
   load(): void {
     this.loading.set(true);
-    this.api.get<SuperAdminDashboard>('/dashboard/super-admin').subscribe({
+    this.api.get<SuperAdminDashboard>('/super-admin/dashboard').subscribe({
       next: (result) => {
         this.data.set(result);
         this.loading.set(false);

@@ -133,7 +133,16 @@ export interface Slider extends AuditFields {
 /* --------------------------- optional functionality --------------------------- */
 
 /** A key the platform implements. Mirrors `FUNCTIONALITY` in the API. */
-export type FunctionalityKey = 'whatsapp' | 'share_link' | 'about_us' | 'team' | 'gallery' | 'contact_page';
+export type FunctionalityKey =
+  | 'whatsapp'
+  | 'share_link'
+  | 'about_us'
+  | 'figures'
+  | 'team'
+  | 'gallery'
+  | 'contact_page'
+  | 'testimonials'
+  | 'features_benefits';
 
 /** What a WhatsApp number is for, and therefore which button it lands on. */
 export type WhatsappType = 'inquiry' | 'contact' | 'support' | 'orders';
@@ -173,6 +182,27 @@ export interface FunctionalityCatalogue {
   shareDefaults: ShareLinkSettings;
   statModes: StatMode[];
   statUnits: StatUnit[];
+  /** The glyphs a benefit card may carry, with the artwork to draw them. */
+  featureIcons: FeatureIconMeta[];
+}
+
+/**
+ * One glyph from the platform's icon library.
+ *
+ * Read from the API rather than kept here, so the picker offers exactly what
+ * the website can draw — a list hard-coded in this app would go stale the
+ * first time a glyph was added, and would offer a tenant an icon their site
+ * would then render as a spark.
+ *
+ * `paths` is the drawing itself: `d` attributes for a 24-unit box, stroked
+ * rather than filled. The picker renders them as-is.
+ */
+export interface FeatureIconMeta {
+  key: string;
+  label: string;
+  /** What the picker groups it under, e.g. "Trust and quality". */
+  group: string;
+  paths: string[];
 }
 
 /** The share button's copy and the channels it offers. */
@@ -234,7 +264,16 @@ export interface ContactView {
 export type StatMode = 'fixed' | 'since_date';
 export type StatUnit = 'years' | 'months' | 'days';
 
-/** One figure in the About section's stat band. */
+/**
+ * The words above the band of figures.
+ *
+ * The same three fields Team and Gallery keep, stored the same way — on the
+ * `figures` functionality's own settings blob. The figures themselves are
+ * branch-aware cards; one heading for the set is not.
+ */
+export type FiguresSettings = SectionCopy;
+
+/** One figure in the band. */
 export interface CompanyStat extends AuditFields {
   companyId: number;
   /**
@@ -296,6 +335,146 @@ export interface GalleryItem extends AuditFields {
   caption?: string | null;
   altText?: string | null;
   sequence: number;
+}
+
+/**
+ * One card in the website's Features / Benefits band.
+ *
+ * The plainest of the card lists: a glyph, a heading and a sentence. What the
+ * screen spends its effort on is the glyph — `icon` is a key from the
+ * platform's library (`FeatureIconMeta`), not an upload, so a company chooses
+ * from a set the website is known to draw rather than supplying artwork.
+ */
+export interface FeatureCard extends AuditFields {
+  companyId: number;
+  /**
+   * Branch this belongs to; null means the whole company.
+   *
+   * Same rule the sliders follow: a branch-pinned site shows the branch's own,
+   * and falls back to the company-wide ones when it has none.
+   */
+  branchId?: number | null;
+  branch?: { id: number; name: string; code: string } | null;
+  /** A key from the icon library. Anything unknown draws as `spark`. */
+  icon: string;
+  title: string;
+  /** Optional — a good heading can stand on its own. */
+  body?: string | null;
+  sequence: number;
+}
+
+/**
+ * The Features / Benefits section's own wording.
+ *
+ * Saved through the functionality's settings route rather than with the cards,
+ * because it is one block per company rather than a list — the same place
+ * `share_link` keeps its configuration. Clearing a field is not a blank heading
+ * on the website: the API fills an empty one from the platform's defaults.
+ */
+export interface FeaturesSettings {
+  eyebrow: string;
+  /** `{company}` is filled in by the website. */
+  title: string;
+  lead: string;
+  /** The label on the button under the lede. */
+  ctaLabel: string;
+}
+
+/* ---------------------------- testimonials ---------------------------- */
+
+/** How a company runs its wall. See `TestimonialsSettings`. */
+export type TestimonialMode = 'static' | 'dynamic';
+
+/**
+ * Where the "Write a review" button goes on an open section — the platform's
+ * own form, or a link off the site. Exactly one is live at a time, and `link`
+ * closes the public submit endpoint as firmly as a curated wall does.
+ */
+export type TestimonialReviewTarget = 'form' | 'link';
+
+/** Who wrote a review — the company itself, or one of its customers. */
+export type TestimonialSource = 'admin' | 'visitor';
+
+/** Whether a review may be published. Only `approved` reaches the website. */
+export type TestimonialModeration = 'pending' | 'approved' | 'rejected';
+
+export interface Testimonial extends AuditFields {
+  companyId: number;
+  /** Branch this belongs to; null means the whole company. */
+  branchId?: number | null;
+  branch?: { id: number; name: string; code: string } | null;
+  authorName: string;
+  authorRole?: string | null;
+  photo?: string | null;
+  /**
+   * How to reach whoever wrote it. Shown on this screen and nowhere else — the
+   * public API does not carry either field.
+   */
+  authorEmail?: string | null;
+  authorPhone?: string | null;
+  rating?: number | null;
+  body: string;
+  source: TestimonialSource;
+  moderation: TestimonialModeration;
+  moderatedAt?: string | null;
+  sequence: number;
+}
+
+/**
+ * The section's own settings, on the functionality's `settings` blob.
+ *
+ * `mode` is the one that matters: `static` is a curated wall the company fills
+ * itself, `dynamic` opens a form on the website and shows the ten most recent
+ * approved reviews. Switching between them never deletes anything.
+ */
+export interface TestimonialsSettings {
+  mode: TestimonialMode;
+  /** Only meaningful in `dynamic` mode; a curated wall has no button at all. */
+  reviewTarget: TestimonialReviewTarget;
+  /** `http`/`https`, absolute. Read only when `reviewTarget` is `link`. */
+  reviewUrl: string;
+  eyebrow: string;
+  /** `{company}` is filled in by the website. */
+  title: string;
+  lead: string;
+  /**
+   * The label on the review button, and the heading of the dialog when the
+   * button opens one. Kept across a switch of `reviewTarget`, so a company that
+   * renamed it does not lose the wording by pointing it at Google.
+   */
+  formTitle: string;
+  formNote: string;
+  /** Whether the form asks for a star rating at all. */
+  showRating: boolean;
+}
+
+/**
+ * `GET /my-company/testimonials` — the rows, and the counts the screen is built
+ * around.
+ *
+ * The counts come from the API rather than being derived here on purpose: a
+ * count the browser works out from a filtered list is a count of that filter,
+ * and the pending badge has to be right whatever tab is open.
+ */
+export interface TestimonialListView {
+  items: Testimonial[];
+  counts: { pending: number; approved: number; rejected: number };
+}
+
+/**
+ * The words above a section's cards, on the functionality's `settings` blob.
+ *
+ * Shared by Team, Gallery and Figures, which store nothing else there. The API
+ * resolves
+ * them on read — its own wording fills anything the tenant left blank — so
+ * these are never empty coming back, and a blank field going out means "use the
+ * standard wording".
+ */
+export interface SectionCopy {
+  eyebrow: string;
+  /** `{company}` is filled in by the website. */
+  title: string;
+  lead: string;
 }
 
 /** Every card list answers with the same envelope. */
@@ -679,4 +858,192 @@ export interface AdminDashboard {
     limits: { maxAdmins: number | null; maxBranches: number | null; maxUsers: number | null };
   } | null;
   recentAdmins: CompanyAdmin[];
+}
+
+/* --------------------------------- leads -------------------------------- */
+
+/**
+ * Where a lead has got to. Mirrors `LEAD_STAGE` in the API.
+ *
+ * `lost` is not a delete: the visits behind it still count in the analytics,
+ * and the same device coming back six months later is a returning lead rather
+ * than a brand new one.
+ */
+export type LeadStage = 'new' | 'contacted' | 'qualified' | 'converted' | 'lost';
+
+export const LEAD_STAGES: readonly LeadStage[] = ['new', 'contacted', 'qualified', 'converted', 'lost'] as const;
+
+export type DeviceType = 'mobile' | 'tablet' | 'desktop' | 'bot' | 'unknown';
+
+/**
+ * One device that has opened the company's public website.
+ *
+ * **One row per device, never one per visit.** Someone who has been back four
+ * times is a single lead with `visitCount: 4`; the four visits themselves are
+ * `LeadVisit[]`, loaded by the detail screen. That is the whole reason the two
+ * shapes are separate — see the API's `lead.model.js`.
+ */
+export interface Lead {
+  id: number;
+  companyId: number;
+  branchId: number | null;
+  /** The visitor's browser-held id; `anon_…` when the server had to derive one. */
+  deviceId: string;
+  stage: LeadStage;
+
+  /** Filled in only once someone identifies them. Empty for a pure browser. */
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  notes?: string | null;
+
+  /** Present only where the visitor granted notifications. */
+  fcmToken: string | null;
+
+  visitCount: number;
+  pageViewCount: number;
+  firstSeenAt: string | null;
+  lastSeenAt: string | null;
+
+  deviceType: DeviceType;
+  deviceVendor: string | null;
+  deviceModel: string | null;
+  os: string | null;
+  osVersion: string | null;
+  browser: string | null;
+  browserVersion: string | null;
+
+  ip: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  timezone: string | null;
+  language?: string | null;
+  latitude?: string | number | null;
+  longitude?: string | number | null;
+
+  /** First touch — the campaign that produced this lead, never overwritten. */
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  utmTerm?: string | null;
+  utmContent?: string | null;
+  firstUtm?: Record<string, string> | null;
+  firstReferrerHost: string | null;
+  firstLandingUrl?: string | null;
+
+  /** Last touch — where they came from most recently. */
+  lastReferrerHost: string | null;
+  lastLandingUrl?: string | null;
+  lastUtm?: Record<string, string> | null;
+
+  isBot: boolean;
+  status: Status;
+  createdAt?: string;
+
+  branch?: Option | null;
+  company?: Option | null;
+}
+
+/** One visit behind a lead — several page loads inside one session. */
+export interface LeadVisit {
+  id: number;
+  leadId: number;
+  branchId: number | null;
+  sessionId: string | null;
+  visitedAt: string;
+  lastActivityAt: string | null;
+  pageViewCount: number;
+
+  pageUrl: string | null;
+  path: string | null;
+  pageTitle: string | null;
+  host: string | null;
+  referrer: string | null;
+  referrerHost: string | null;
+
+  /** Every `utm_*` key and click id the landing URL carried. */
+  utm: Record<string, string> | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+
+  fcmToken: string | null;
+  userAgent: string | null;
+  deviceType: DeviceType;
+  deviceVendor: string | null;
+  deviceModel: string | null;
+  os: string | null;
+  osVersion: string | null;
+  browser: string | null;
+  browserVersion: string | null;
+  engine: string | null;
+  isBot: boolean;
+
+  screenWidth: number | null;
+  screenHeight: number | null;
+  viewportWidth: number | null;
+  viewportHeight: number | null;
+  pixelRatio: string | number | null;
+  orientation: string | null;
+  /** The long tail the schema has no column for — cores, memory, connection. */
+  device: Record<string, unknown> | null;
+
+  ip: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  timezone: string | null;
+  timezoneOffset: number | null;
+  language: string | null;
+  languages: string[] | null;
+  latitude: string | number | null;
+  longitude: string | number | null;
+  locationAccuracy: number | null;
+  locationSource: string | null;
+  location: Record<string, unknown> | null;
+
+  extra: Record<string, unknown> | null;
+
+  branch?: Option | null;
+}
+
+export interface LeadDetail {
+  lead: Lead;
+  visits: LeadVisit[];
+}
+
+/** The counter strip above the table. */
+export interface LeadSummary {
+  total: number;
+  today: number;
+  thisWeek: number;
+  withPushToken: number;
+  totalVisits: number;
+  stages: Record<LeadStage, number>;
+  devices: { label: string; total: number }[];
+}
+
+/** One bar in any of the analytics breakdowns. */
+export interface LeadTally {
+  label: string;
+  total: number;
+}
+
+export interface LeadAnalytics {
+  totals: { leads: number; visits: number; visitsPerLead: number };
+  stages: Record<LeadStage, number>;
+  devices: LeadTally[];
+  sources: LeadTally[];
+  mediums: LeadTally[];
+  campaigns: LeadTally[];
+  referrers: LeadTally[];
+  cities: LeadTally[];
+  countries: LeadTally[];
+  browsers: LeadTally[];
+  operatingSystems: LeadTally[];
+  daily: { day: string; total: number }[];
+  /** Empty in the tenant console — only the platform sees across companies. */
+  companies: { companyId: number; name: string; code: string | null; total: number; visits: number }[];
+  branches: { branchId: number | null; name: string; code: string | null; total: number }[];
 }

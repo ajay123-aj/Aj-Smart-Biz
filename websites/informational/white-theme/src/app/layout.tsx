@@ -1,10 +1,13 @@
 import type { Metadata } from 'next';
-import type { CSSProperties, ReactNode } from 'react';
+import { Suspense, type CSSProperties, type ReactNode } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { WhatsAppFab } from '@/components/WhatsAppButton';
 import { ShareFab } from '@/components/ShareButton';
+import LeadTracker from '@/components/LeadTracker';
 import { getCompanyDetails } from '@/lib/company.server';
+import ServiceUnavailable from '@/components/ServiceUnavailable';
+import { SERVICE_UNAVAILABLE } from '@/config/site';
 import { fillCompany, shareLinkOf, toFileUrl, type CompanyDetails } from '@/lib/company';
 import './globals.css';
 
@@ -24,6 +27,21 @@ export async function generateMetadata(): Promise<Metadata> {
    * uploaded a favicon — which is most of them.
    */
   const favicon = toFileUrl(company.favicon) ?? DEFAULT_FAVICON;
+
+  /**
+   * With the API unreachable there is no tenant to name, and `company.name`
+   * holds the platform's placeholder — so putting it in the tab would tell a
+   * visitor they had reached a company nobody confirmed, and would let a
+   * crawler record that name against this domain. The page says what is
+   * actually true instead, and asks not to be indexed at all.
+   */
+  if (!company.apiReachable) {
+    return {
+      title: SERVICE_UNAVAILABLE.title,
+      icons: { icon: [{ url: DEFAULT_FAVICON }] },
+      robots: { index: false, follow: false },
+    };
+  }
 
   return {
     title: company.name,
@@ -86,6 +104,26 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const served = company.service.active;
 
   /**
+   * The API could not be reached, so nothing on this page would be the
+   * tenant's — see `getCompanyDetails`. The site is replaced entirely, and the
+   * chrome goes with it: a header carrying the platform's placeholder name and
+   * a footer carrying a placeholder address are exactly the invented content
+   * this is here to prevent.
+   *
+   * Returned before the tracker, too. A visit reported against a company the
+   * site could not identify is a row of noise in somebody's lead report.
+   */
+  if (!company.apiReachable) {
+    return (
+      <html lang="en">
+        <body>
+          <ServiceUnavailable />
+        </body>
+      </html>
+    );
+  }
+
+  /**
    * The floating actions. Both are absent unless the tenant is actually
    * entitled to them, and each component returns null on its own, so this needs
    * no condition beyond knowing whether the WhatsApp bubble is taking the
@@ -97,6 +135,23 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     <html lang="en">
       <body style={themeVariables(company)}>
+        {/**
+         * Website launch, reported.
+         *
+         * Outside the `served` branch on purpose: a company whose plan has
+         * lapsed is showing a holding page, and the fact that people are still
+         * arriving is exactly what its owner needs to see before deciding
+         * whether to renew. Dropping those visits would make the site look
+         * abandoned in the one report that could argue otherwise.
+         *
+         * `Suspense` because the tracker reads the query string, and Next
+         * requires a boundary around any component that does — without one the
+         * whole route opts out of static rendering.
+         */}
+        <Suspense fallback={null}>
+          <LeadTracker />
+        </Suspense>
+
         {served ? (
           <>
             <a className="skip-link" href="#main">

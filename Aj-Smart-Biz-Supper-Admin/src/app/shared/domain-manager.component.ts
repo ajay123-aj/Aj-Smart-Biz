@@ -17,7 +17,8 @@ const HOSTNAME = /^(?!https?:)(?!.*\/)[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([
 
 /**
  * Domain management for a company. `basePath` differs per portal —
- * `/companies/:id/domains` for the super admin, `/my-company/domains` for the
+ * `/super-admin/companies/:id/domains` for the platform console,
+ * `/admin/company/domains` for the
  * tenant — so the same panel serves both.
  */
 @Component({
@@ -27,7 +28,7 @@ const HOSTNAME = /^(?!https?:)(?!.*\/)[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([
   templateUrl: './domain-manager.component.html',
 })
 export class DomainManagerComponent {
-  /** `/companies/12/domains` or `/my-company/domains`. */
+  /** `/super-admin/companies/12/domains` or `/admin/company/domains`. */
   readonly basePath = input.required<string>();
   /** Branches available to pin a domain to. */
   readonly branches = input<Option[]>([]);

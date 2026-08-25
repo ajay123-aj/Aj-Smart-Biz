@@ -56,7 +56,7 @@ export class SuperAdminListComponent {
   });
 
   readonly page = new CrudPage<SuperAdmin>({
-    client: inject(CrudFactory).for<SuperAdmin>('/super-admins'),
+    client: inject(CrudFactory).for<SuperAdmin>('/super-admin/super-admins'),
     label: 'super admin',
     toast: inject(ToastService),
     confirm: inject(ConfirmService),
@@ -115,7 +115,7 @@ export class SuperAdminListComponent {
 
     this.resetting.set(true);
     this.api
-      .patch(`/super-admins/${target.id}/reset-password`, this.resetForm.getRawValue())
+      .patch(`/super-admin/super-admins/${target.id}/reset-password`, this.resetForm.getRawValue())
       .subscribe({
         next: () => {
           this.resetting.set(false);

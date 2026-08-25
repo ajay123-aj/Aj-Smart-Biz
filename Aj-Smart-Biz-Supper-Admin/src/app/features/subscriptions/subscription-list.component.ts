@@ -4,9 +4,10 @@ import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { CrudFactory, MASTER_PATHS } from '../../core/services/crud.service';
+import { CrudFactory, MASTER_PATHS, FUNCTIONALITY_CATALOGUE_PATH } from '../../core/services/crud.service';
 import { ConfirmService } from '../../core/services/confirm.service';
 import { SubscriptionService, SubscriptionListQuery } from '../../core/services/subscription.service';
+import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { messageOf } from '../../core/interceptors/auth.interceptor';
 import {
@@ -16,6 +17,8 @@ import {
   Subscription,
   SubscriptionStatus,
   SubscriptionSummary,
+  PaymentModeOption,
+  FunctionalityCatalogue,
 } from '../../core/models/domain.model';
 import { ListStore } from '../../shared/list-store';
 import { formatMoney } from '../../shared/utils';
@@ -49,7 +52,12 @@ const QUICK_VIEWS: QuickView[] = [
 /** Keys a quick view may set, so switching views clears the previous one cleanly. */
 const VIEW_KEYS = ['status', 'expiringInDays', 'expiredOnly'] as const;
 
-const PAYMENT_MODES = [
+/**
+ * Shown only until the catalogue arrives — see `loadPaymentModes`. The API's
+ * list replaces it, so this exists to stop the select being empty for the one
+ * render before that, not to be a second source of truth.
+ */
+const PAYMENT_MODE_FALLBACK: PaymentModeOption[] = [
   { value: '', label: 'Do not record a payment' },
   { value: 'cash', label: 'Cash' },
   { value: 'upi', label: 'UPI' },
@@ -137,11 +145,16 @@ export class SubscriptionListComponent {
   private readonly fb = inject(FormBuilder);
   private readonly subscriptions = inject(SubscriptionService);
   private readonly crud = inject(CrudFactory);
+  private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
 
   readonly quickViews = QUICK_VIEWS;
-  readonly paymentModes = PAYMENT_MODES;
+  /**
+   * The platform's payment modes, from the catalogue endpoint. A signal rather
+   * than a constant because it arrives after the first render.
+   */
+  readonly paymentModes = signal<PaymentModeOption[]>(PAYMENT_MODE_FALLBACK);
 
   readonly plans = signal<Plan[]>([]);
   readonly summary = signal<SubscriptionSummary | null>(null);
@@ -232,6 +245,7 @@ export class SubscriptionListComponent {
   });
 
   constructor() {
+    this.loadPaymentModes();
     this.crud
       .for<Plan>(MASTER_PATHS.plans)
       .list({ limit: 200, sortBy: 'sequence', sortOrder: 'asc' })
@@ -653,4 +667,25 @@ export class SubscriptionListComponent {
       },
     });
   }
+
+  /**
+   * Reads the platform's payment modes once, from the same catalogue endpoint
+   * this console already calls for functionalities and share channels.
+   *
+   * Nothing on the screen waits for it: the fallback above renders immediately
+   * and this replaces it. A catalogue that fails to load therefore costs a
+   * possibly-stale list rather than an empty select on a form somebody is
+   * trying to submit.
+   */
+  private loadPaymentModes(): void {
+    this.api.get<FunctionalityCatalogue>(FUNCTIONALITY_CATALOGUE_PATH).subscribe({
+      next: (catalogue) => {
+        if (catalogue.paymentModes?.length) this.paymentModes.set(catalogue.paymentModes);
+      },
+      error: () => {
+        /* Keep the fallback. */
+      },
+    });
+  }
+
 }

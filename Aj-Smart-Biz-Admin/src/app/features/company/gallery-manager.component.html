@@ -4,6 +4,46 @@
   } @else {
     <app-feature-gate [feature]="feature()" />
 
+    <!-- The words above the section on the website. One form, saved as a
+         whole, because these three belong to the band rather than to any card
+         in it. -->
+    <form class="section-form" [formGroup]="copyForm" (ngSubmit)="saveCopy()">
+      <h4 style="margin:0 0 4px">How the section reads</h4>
+      <p class="tiny muted" style="margin:0 0 14px;max-width:64ch">
+        The heading above the pictures below on your website. Leave a field empty to use the
+        standard wording.
+      </p>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="gal-eyebrow">Eyebrow</label>
+          <input id="gal-eyebrow" class="input" formControlName="eyebrow" placeholder="Our work" />
+          <span class="hint">The small line above the heading.</span>
+        </div>
+
+        <div class="field">
+          <label for="gal-title">Heading</label>
+          <input id="gal-title" class="input" formControlName="title" placeholder="A look at what we have made" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="gal-lead">Introduction</label>
+        <textarea id="gal-lead" class="textarea" formControlName="lead"
+                  placeholder="A selection of recent work. Every piece here was made for someone."></textarea>
+      </div>
+
+      @if (writable()) {
+        <div class="row-end" style="gap:8px">
+          <button type="button" class="btn btn-ghost" [disabled]="savingCopy()" (click)="resetCopy()">Reset</button>
+          <button type="submit" class="btn btn-primary" [disabled]="savingCopy()">
+            {{ savingCopy() ? 'Saving…' : 'Save wording' }}
+          </button>
+        </div>
+      }
+    </form>
+
+
     <div class="row-between" style="align-items:flex-start;gap:12px">
       <div>
         <h4 style="margin:0 0 4px">Pictures of your work</h4>

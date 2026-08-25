@@ -170,7 +170,7 @@ export class CompanyDetailComponent {
       error: (error: HttpErrorResponse) => {
         this.loading.set(false);
         this.toast.error('Could not load the company', messageOf(error));
-        void this.router.navigate(['/companies']);
+        void this.router.navigate(['/super-admin/companies']);
       },
     });
   }

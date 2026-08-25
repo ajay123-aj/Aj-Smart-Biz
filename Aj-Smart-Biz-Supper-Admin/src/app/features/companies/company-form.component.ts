@@ -4,9 +4,10 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { CompanyService } from '../../core/services/company.service';
-import { CrudFactory, MASTER_PATHS } from '../../core/services/crud.service';
+import { CrudFactory, MASTER_PATHS, FUNCTIONALITY_CATALOGUE_PATH } from '../../core/services/crud.service';
 import { ConfirmService } from '../../core/services/confirm.service';
 import { SubscriptionService } from '../../core/services/subscription.service';
+import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { messageOf } from '../../core/interceptors/auth.interceptor';
 import {
@@ -16,6 +17,8 @@ import {
   Plan,
   PlanChangePreview,
   Subscription,
+  PaymentModeOption,
+  FunctionalityCatalogue,
 } from '../../core/models/domain.model';
 import { cleanPayload, formatMoney, touchAll, strongPassword } from '../../shared/utils';
 import { FieldErrorComponent } from '../../shared/ui/field-error.component';
@@ -25,8 +28,12 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { PlanTimerComponent } from '../../shared/ui/plan-timer.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 
-const PAYMENT_MODES = [
-  { value: '', label: 'Do not record a payment' },
+/**
+ * Shown only until the catalogue arrives — see `loadPaymentModes`. The API's
+ * list replaces it, so this exists to stop the select being empty for the one
+ * render before that, not to be a second source of truth.
+ */
+const PAYMENT_MODE_FALLBACK: PaymentModeOption[] = [
   { value: 'cash', label: 'Cash' },
   { value: 'upi', label: 'UPI' },
   { value: 'card', label: 'Card' },
@@ -73,11 +80,16 @@ export class CompanyFormComponent {
   private readonly companies = inject(CompanyService);
   private readonly subscriptions = inject(SubscriptionService);
   private readonly crud = inject(CrudFactory);
+  private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
   private readonly router = inject(Router);
 
-  readonly paymentModes = PAYMENT_MODES;
+  /**
+   * The platform's payment modes, from the catalogue endpoint. A signal rather
+   * than a constant because it arrives after the first render.
+   */
+  readonly paymentModes = signal<PaymentModeOption[]>(PAYMENT_MODE_FALLBACK);
 
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -179,6 +191,7 @@ export class CompanyFormComponent {
   });
 
   constructor() {
+    this.loadPaymentModes();
     this.crud.for<Option>(MASTER_PATHS.businessTypes).dropdown().subscribe((rows) => this.businessTypes.set(rows));
     this.crud.for<Option>(MASTER_PATHS.themes).dropdown().subscribe((rows) => this.themes.set(rows));
     this.crud.for<Option>(MASTER_PATHS.states).dropdown().subscribe((rows) => this.states.set(rows));
@@ -496,4 +509,25 @@ export class CompanyFormComponent {
     this.credentials.set(null);
     void this.router.navigate(['/companies']);
   }
+
+  /**
+   * Reads the platform's payment modes once, from the same catalogue endpoint
+   * this console already calls for functionalities and share channels.
+   *
+   * Nothing on the screen waits for it: the fallback above renders immediately
+   * and this replaces it. A catalogue that fails to load therefore costs a
+   * possibly-stale list rather than an empty select on a form somebody is
+   * trying to submit.
+   */
+  private loadPaymentModes(): void {
+    this.api.get<FunctionalityCatalogue>(FUNCTIONALITY_CATALOGUE_PATH).subscribe({
+      next: (catalogue) => {
+        if (catalogue.paymentModes?.length) this.paymentModes.set(catalogue.paymentModes);
+      },
+      error: () => {
+        /* Keep the fallback. */
+      },
+    });
+  }
+
 }

@@ -9,6 +9,7 @@ const branchRoutes = require('./branch.routes');
 const domainRoutes = require('./companyDomain.routes');
 const sliderRoutes = require('./slider.routes');
 const functionalityRoutes = require('./functionality.routes');
+const leadRoutes = require('./lead.routes');
 const validate = require('../middlewares/validate');
 const schema = require('../validators/company.validator');
 const { companyAdminOnly, requirePermission } = require('../middlewares/auth');
@@ -80,12 +81,36 @@ const websiteSettingsGuard = [
 
 router.use('/functionalities', ...websiteSettingsGuard, functionalityRoutes.functionalities);
 router.use('/whatsapp-numbers', ...websiteSettingsGuard, functionalityRoutes.whatsapp);
-/** The About copy, its stat band, the Team section and the Gallery — same guard, same reason. */
+/** The About copy, the figures, the Team section and the Gallery — same guard, same reason. */
 router.use('/about', ...websiteSettingsGuard, functionalityRoutes.about);
 router.use('/contact', ...websiteSettingsGuard, functionalityRoutes.contact);
 router.use('/stats', ...websiteSettingsGuard, functionalityRoutes.stats);
 router.use('/team', ...websiteSettingsGuard, functionalityRoutes.team);
 router.use('/gallery', ...websiteSettingsGuard, functionalityRoutes.gallery);
+/**
+ * The Features / Benefits cards. Same guard as the rest of the section: what
+ * they say is what the website says about the business, so writing them is the
+ * main admin's.
+ */
+router.use('/features', ...websiteSettingsGuard, functionalityRoutes.features);
+/**
+ * Testimonials. Same guard as the rest of the section — reading open to anyone
+ * who can view the company, writing to the main admin — which is what puts
+ * approving a stranger's review in the same hands as changing the domain it
+ * would be published on.
+ */
+router.use('/testimonials', ...websiteSettingsGuard, functionalityRoutes.testimonials);
+
+/**
+ * Website visitors, and what is known about each of them.
+ *
+ * Its own menu rather than a tab of Company Details: the rest of that section
+ * is the company describing itself, and this is the company reading about
+ * other people — a different job, done by different staff. The per-action
+ * rights are checked inside the router, so a role can be given the list
+ * without the ability to move a lead along.
+ */
+router.use('/leads', leadRoutes.admin);
 
 /**
  * Domains that resolve to this company (and optionally one of its branches).

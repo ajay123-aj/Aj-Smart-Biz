@@ -1,5 +1,5 @@
 import { ABOUT_FALLBACK } from '@/config/site';
-import { fillCompany, type AboutStat, type CompanyDetails } from './company';
+import { fillCompany, type CompanyDetails } from './company';
 
 /**
  * What the About page should say, whichever of three sources it comes from.
@@ -12,17 +12,15 @@ import { fillCompany, type AboutStat, type CompanyDetails } from './company';
  *   3. the template's placeholder prose, only when the host resolved to no
  *      tenant at all and there is nothing to say about anybody
  *
- * The stat band belongs to the first case alone. A company that has not written
- * its own figures gets no band rather than the template's invented ones: "250+
- * projects delivered" is a claim, and the template has no business making it on
- * a real business's behalf.
+ * The figures are deliberately not here any more. They are their own feature
+ * with their own block on the payload — see `resolveFigures` — because they
+ * are shown on the home page, which resolves no About copy at all.
  */
 export interface ResolvedAbout {
   eyebrow: string;
   title: string;
   lead: string;
   paragraphs: string[];
-  stats: AboutStat[];
   /** True when the tenant actually wrote this, rather than it being derived. */
   authored: boolean;
 }
@@ -62,7 +60,6 @@ export function resolveAbout(company: CompanyDetails): ResolvedAbout {
     title: fillCompany(about?.title?.trim() || ABOUT_FALLBACK.title, company),
     lead,
     paragraphs: [...paragraphs, ...derived],
-    stats: about?.stats ?? [],
     authored: Boolean(about),
   };
 }

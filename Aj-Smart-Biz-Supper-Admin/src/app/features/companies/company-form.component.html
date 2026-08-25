@@ -175,7 +175,10 @@
             <div class="field">
               <label for="planPayMode">Record payment as</label>
               <select id="planPayMode" class="select" formControlName="paymentMode">
-                @for (mode of paymentModes; track mode.value) {
+                <!-- This form's own choice, not a platform payment mode, which
+                     is why it is here and not in the catalogue. -->
+                <option value="">Do not record a payment</option>
+                @for (mode of paymentModes(); track mode.value) {
                   <option [value]="mode.value">{{ mode.label }}</option>
                 }
               </select>

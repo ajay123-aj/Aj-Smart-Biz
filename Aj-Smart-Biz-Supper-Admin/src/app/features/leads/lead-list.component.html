@@ -1,0 +1,209 @@
+<app-page-header
+  title="Lead Management"
+  subtitle="Every tenant's website visitors — one row per device, across the whole platform."
+>
+  <button type="button" class="btn btn-ghost" (click)="reload()" [disabled]="store.loading()">↻ Refresh</button>
+  <a class="btn btn-primary" routerLink="/leads/analytics">📊 Analysis</a>
+</app-page-header>
+
+@if (summary(); as s) {
+  <section class="grid grid-4" style="margin-bottom:18px">
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--brand-100);color:var(--brand-700)">🎯</span>
+        <span class="tile-label">Leads</span>
+      </div>
+      <div class="tile-value">{{ s.total }}</div>
+      <div class="tile-foot"><span class="tiny muted">{{ s.totalVisits }} visits in total</span></div>
+    </article>
+
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--success-bg);color:var(--success)">📅</span>
+        <span class="tile-label">Seen today</span>
+      </div>
+      <div class="tile-value">{{ s.today }}</div>
+      <div class="tile-foot"><span class="tiny muted">{{ s.thisWeek }} in the last 7 days</span></div>
+    </article>
+
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--info-bg);color:var(--info)">🆕</span>
+        <span class="tile-label">Not yet contacted</span>
+      </div>
+      <div class="tile-value">{{ s.stages.new }}</div>
+      <div class="tile-foot">
+        <span class="badge badge-warning">{{ s.stages.contacted }} contacted</span>
+        <span class="badge badge-success">{{ s.stages.converted }} converted</span>
+      </div>
+    </article>
+
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--warning-bg);color:var(--warning)">📱</span>
+        <span class="tile-label">By device</span>
+      </div>
+      <div class="tile-value" style="font-size:20px">{{ s.withPushToken }} <span class="tiny muted">push-ready</span></div>
+      <div class="tile-foot">
+        @for (device of s.devices; track device.label) {
+          <span class="badge badge-muted">{{ device.label }} {{ device.total }}</span>
+        }
+      </div>
+    </article>
+  </section>
+}
+
+<div class="card">
+  <div class="card-head filters">
+    <input
+      class="input"
+      style="max-width:250px"
+      type="search"
+      placeholder="Name, email, phone, device, campaign…"
+      (input)="onSearch($event)"
+    />
+
+    <select class="select" style="width:auto" (change)="apply({ companyId: selectValue($event) })">
+      <option value="">All companies</option>
+      @for (company of companyOptions(); track company.id) {
+        <option [value]="company.id">{{ company.name }}</option>
+      }
+    </select>
+
+    <select class="select" style="width:auto" (change)="apply({ stage: selectValue($event) })">
+      <option value="">All stages</option>
+      @for (stage of stages; track stage) {
+        <option [value]="stage">{{ stage | titlecase }}</option>
+      }
+    </select>
+
+    <select class="select" style="width:auto" (change)="apply({ deviceType: selectValue($event) })">
+      <option value="">All devices</option>
+      <option value="mobile">Mobile</option>
+      <option value="tablet">Tablet</option>
+      <option value="desktop">Desktop</option>
+    </select>
+
+    <div class="date-filter">
+      <input class="input" type="date" title="Seen from" (change)="apply({ from: inputValue($event) })" />
+      <span class="tiny muted">to</span>
+      <input class="input" type="date" title="Seen up to" (change)="apply({ to: inputValue($event) })" />
+    </div>
+
+    <label class="bot-toggle" title="Crawlers and link previewers are recorded but left out of the counts">
+      <input type="checkbox" (change)="apply({ includeBots: checked($event) })" />
+      Include bots
+    </label>
+  </div>
+
+  <div class="card-body tight">
+    <app-table-state
+      [loading]="store.loading()"
+      [empty]="!store.loading() && store.items().length === 0"
+      icon="🎯"
+      title="No leads recorded"
+      message="Leads appear as soon as a tenant's website is opened by a visitor."
+    />
+
+    @if (!store.loading() && store.items().length > 0) {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Company</th>
+              <th>Lead</th>
+              <th>Source</th>
+              <th>Device</th>
+              <th>Location</th>
+              <th class="sortable" (click)="store.toggleSort('visit_count')">
+                Visits{{ store.sortIcon('visit_count') }}
+              </th>
+              <th class="sortable" (click)="store.toggleSort('last_seen_at')">
+                Last seen{{ store.sortIcon('last_seen_at') }}
+              </th>
+              <th>Stage</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of store.items(); track row.id) {
+              <tr>
+                <td>
+                  <div class="stack">
+                    <span class="strong">{{ row.company?.name || '—' }}</span>
+                    <!-- Which of the tenant's sites they landed on. Company-wide
+                         is a real answer, not a missing branch. -->
+                    <span class="tiny muted">{{ row.branch?.name || 'Company-wide site' }}</span>
+                  </div>
+                </td>
+
+                <td>
+                  <div class="who">
+                    <span class="strong">{{ who(row) }}</span>
+                    <span class="who-id" [title]="row.deviceId">{{ row.deviceId }}</span>
+                    @if (row.isBot) {
+                      <span class="badge badge-muted">Bot</span>
+                    }
+                  </div>
+                </td>
+
+                <td>
+                  <div class="stack">
+                    <span>{{ source(row) }}</span>
+                    @if (row.utmMedium) {
+                      <span class="tiny muted">{{ row.utmMedium }}</span>
+                    }
+                  </div>
+                </td>
+
+                <td>
+                  <div class="stack">
+                    <span>{{ device(row.deviceType) }}</span>
+                    <span class="tiny muted">{{ machine(row) }}</span>
+                  </div>
+                </td>
+
+                <td>
+                  <div class="stack">
+                    <span>{{ place(row) }}</span>
+                    @if (row.timezone) {
+                      <span class="tiny muted">{{ row.timezone }}</span>
+                    }
+                  </div>
+                </td>
+
+                <td>
+                  <span class="visits-n">{{ row.visitCount }}</span>
+                  <span class="tiny muted"> / {{ row.pageViewCount }} pages</span>
+                </td>
+
+                <td>
+                  <div class="stack">
+                    <span>{{ row.lastSeenAt | date: 'dd MMM yyyy' }}</span>
+                    <span class="tiny muted">{{ row.lastSeenAt | date: 'shortTime' }}</span>
+                  </div>
+                </td>
+
+                <td><app-lead-stage-badge [value]="row.stage" /></td>
+
+                <td>
+                  <div class="row-end">
+                    <a class="btn btn-sm btn-ghost" [routerLink]="['/leads', row.id]">View</a>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (showingBots()) {
+        <p class="tiny muted" style="padding:10px 14px 0">
+          Crawlers and link previewers are included — real requests, but not people.
+        </p>
+      }
+
+      <app-pager [meta]="store.meta()" (pageChange)="store.setPage($event)" (limitChange)="store.setLimit($event)" />
+    }
+  </div>
+</div>

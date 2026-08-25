@@ -1,0 +1,33 @@
+/* ------------------------------------------------------------------ *
+ * The five-star row, wherever it appears.
+ * ------------------------------------------------------------------ */
+
+.stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  line-height: 0;
+}
+
+.stars svg {
+  width: 1em;
+  height: 1em;
+  flex: none;
+}
+
+/*
+ * The accent, which is the tenant's own third colour — not a fixed gold. A
+ * hard-coded `#f5b301` is the one thing on this page that would belong to no
+ * company using the template.
+ */
+.on {
+  fill: var(--accent);
+}
+
+/*
+ * An unfilled star is drawn, not omitted. A row that shrinks from five shapes
+ * to three stops reading as "three out of five" and starts reading as "three".
+ */
+.off {
+  fill: color-mix(in srgb, var(--accent) 22%, transparent);
+}

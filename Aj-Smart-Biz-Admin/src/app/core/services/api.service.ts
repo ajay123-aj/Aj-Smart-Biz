@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { ApiResponse, EMPTY_META, ListQuery, PagedResult } from '../models/api.model';
+import { ApiResponse, EMPTY_META, ListQuery, PageMeta, PagedResult } from '../models/api.model';
 
 /**
  * Thin HttpClient wrapper that unwraps the `{ success, message, data, meta }`
@@ -27,6 +27,21 @@ export class ApiService {
     return this.http
       .get<ApiResponse<T[]>>(`${this.base}${path}`, { params: this.toParams(query) })
       .pipe(map((res) => ({ items: res.data ?? [], meta: res.meta ?? { ...EMPTY_META } })));
+  }
+
+  /**
+   * GET that keeps the envelope's `meta` alongside its `data`.
+   *
+   * For a paginated list whose payload is not simply the rows — the
+   * testimonial queue sends the moderation counts with them, because a count
+   * the browser works out from a filtered page is a count of that page. `list`
+   * cannot carry those, and `get` throws the page away, so this returns both
+   * halves and lets the caller decide what each is for.
+   */
+  getWithMeta<T>(path: string, query: ListQuery = {}): Observable<{ data: T; meta: PageMeta }> {
+    return this.http
+      .get<ApiResponse<T>>(`${this.base}${path}`, { params: this.toParams(query) })
+      .pipe(map((res) => ({ data: res.data, meta: res.meta ?? { ...EMPTY_META } })));
   }
 
   get<T>(path: string, query: ListQuery = {}): Observable<T> {

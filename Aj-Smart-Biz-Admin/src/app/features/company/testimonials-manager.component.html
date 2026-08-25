@@ -1,0 +1,503 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:360px"></div>
+  } @else {
+    <app-feature-gate [feature]="feature()" />
+
+    <!-- ------------------------------------------------------------------
+         The mode, and the wording around it.
+
+         The mode leads because it decides what the rest of the screen is for:
+         on a static wall the queue below never fills, and on a dynamic one the
+         website carries a form anyone can write into.
+         ------------------------------------------------------------------ -->
+    <form class="section-form" [formGroup]="copyForm" (ngSubmit)="saveCopy()">
+      <h4 style="margin:0 0 4px">Who can leave a review</h4>
+      <p class="tiny muted" style="margin:0 0 14px;max-width:64ch">
+        Switching between these never deletes anything &mdash; going back to a curated wall keeps
+        every review you have already published, it just stops collecting new ones.
+      </p>
+
+      <div class="modes">
+        <label class="mode" [class.mode-on]="!isDynamic()">
+          <input type="radio" formControlName="mode" value="static" />
+          <span class="mode-head"><span class="mode-dot"></span> Curated &mdash; only what you add</span>
+          <p class="mode-note">
+            Your website shows the reviews you enter below, in the order you arrange them.
+            There is no form on the site and nobody outside your company can add anything.
+          </p>
+        </label>
+
+        <label class="mode" [class.mode-on]="isDynamic()">
+          <input type="radio" formControlName="mode" value="dynamic" />
+          <span class="mode-head"><span class="mode-dot"></span> Open &mdash; customers can write</span>
+          <p class="mode-note">
+            Your website carries a <strong>Write a review</strong> button, and the section shows
+            your ten most recent published reviews, newest first. You choose below where the
+            button goes &mdash; our own form, or your Google review page.
+          </p>
+        </label>
+      </div>
+
+      <!-- The chosen card is not the live setting until it is saved, and the
+           difference decides whether your website has a form on it. -->
+      @if (modeUnsaved()) {
+        <p class="tiny" style="margin:-6px 0 14px;color:var(--warning, #8a5a12)">
+          Not saved yet &mdash; your website is still {{ savedBehaviour() }}.
+        </p>
+      }
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="tst-eyebrow">Eyebrow</label>
+          <input id="tst-eyebrow" class="input" formControlName="eyebrow" placeholder="Testimonials" />
+          <span class="hint">The small line above the heading.</span>
+        </div>
+
+        <div class="field">
+          <label for="tst-title">Heading</label>
+          <input id="tst-title" class="input" formControlName="title" placeholder="What our customers say" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="tst-lead">Introduction</label>
+        <textarea id="tst-lead" class="textarea" formControlName="lead"
+                  placeholder="Every review here was written by someone we have worked for."></textarea>
+        <span class="hint">
+          Leave a field empty to use the standard wording &mdash;
+          <code>&#123;company&#125;</code> is replaced with your company name.
+        </span>
+      </div>
+
+      <!-- Only shown while there is a button on the website to configure. -->
+      @if (isDynamic()) {
+        <div class="form-copy">
+          <h4 style="margin:0 0 4px">Where the review button goes</h4>
+          <p class="tiny muted" style="margin:0 0 14px;max-width:64ch">
+            One or the other, never both. Reviews written on Google stay on Google &mdash; they will
+            not appear in the list below and you will not be approving them here.
+          </p>
+
+          <div class="modes">
+            <label class="mode" [class.mode-on]="opensForm()">
+              <input type="radio" formControlName="reviewTarget" value="form" />
+              <span class="mode-head"><span class="mode-dot"></span> Open our review form</span>
+              <p class="mode-note">
+                The button opens a form on your own site. What a customer writes arrives below as
+                <strong>pending</strong> and appears on your website only once you approve it.
+              </p>
+            </label>
+
+            <label class="mode" [class.mode-on]="opensLink()">
+              <input type="radio" formControlName="reviewTarget" value="link" />
+              <span class="mode-head"><span class="mode-dot"></span> Send them to a link</span>
+              <p class="mode-note">
+                The button opens your Google review page &mdash; or any other link &mdash; in a new
+                tab. Good for building up your Google rating, but nothing written there comes back
+                to this screen or onto your website.
+              </p>
+            </label>
+          </div>
+
+          <div class="field">
+            <label for="tst-form-title">Button label</label>
+            <input id="tst-form-title" class="input" formControlName="formTitle" placeholder="Write a review" />
+            <span class="hint">
+              What the button on your website says. It stays the same wording whichever destination
+              you pick.
+            </span>
+          </div>
+
+          @if (opensLink()) {
+            <div class="field">
+              <label for="tst-review-url">Review link</label>
+              <input id="tst-review-url" class="input" type="url" formControlName="reviewUrl"
+                     placeholder="https://g.page/r/xxxxxxxx/review" />
+              <app-field-error [control]="copyForm.controls.reviewUrl" label="Review link" />
+              <span class="hint">
+                Must start with <code>https://</code>. In Google Business Profile this is under
+                <strong>Ask for reviews</strong> &mdash; the short link it gives you opens the
+                review box directly.
+              </span>
+            </div>
+          } @else {
+            <div class="form-grid">
+              <div class="field">
+                <label for="tst-rating">Ask for a star rating</label>
+                <select id="tst-rating" class="select" formControlName="showRating">
+                  <option [ngValue]="true">Yes &mdash; show the star picker</option>
+                  <option [ngValue]="false">No &mdash; written reviews only</option>
+                </select>
+                <span class="hint">Turning this off also hides the average score on your website.</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="tst-form-note">Note under the heading</label>
+              <textarea id="tst-form-note" class="textarea" formControlName="formNote"
+                        placeholder="Your review reaches us first and appears here once we have published it."></textarea>
+              <span class="hint">
+                What a customer reads before they write. Say plainly that you read reviews before
+                publishing them &mdash; people are more willing to write when they know.
+              </span>
+            </div>
+          }
+        </div>
+      }
+
+      @if (writable()) {
+        <div class="row-end" style="gap:8px">
+          <button type="button" class="btn btn-ghost" [disabled]="savingCopy()" (click)="resetCopy()">Reset</button>
+          <button type="submit" class="btn btn-primary" [disabled]="savingCopy()">
+            {{ savingCopy() ? 'Saving…' : 'Save settings' }}
+          </button>
+        </div>
+      }
+    </form>
+
+    <!-- ------------------------------------------------------------------
+         The reviews, as a queue first and a table second.
+         ------------------------------------------------------------------ -->
+    <div class="row-between" style="align-items:flex-start;gap:12px">
+      <div>
+        <h4 style="margin:0 0 4px">Reviews</h4>
+        <p class="tiny muted" style="margin:0 0 14px;max-width:64ch">
+          Only published reviews reach your website. Rejecting one keeps it here without publishing
+          it, so you can look again later.
+        </p>
+        <!-- The queue cannot fill while the button leaves the site, and an
+             empty one with no explanation reads as something being broken. -->
+        @if (savedMode() === 'dynamic' && savedTarget() === 'link') {
+          <p class="tiny" style="margin:-8px 0 14px;max-width:64ch;color:var(--text-3)">
+            Your review button currently opens your link, so nothing new arrives here. The reviews
+            below are the ones already published on your website &mdash; you can still add, edit and
+            reorder them yourself.
+          </p>
+        }
+      </div>
+      @if (writable()) {
+        <button type="button" class="btn btn-sm btn-primary" (click)="open(null)">＋ Add review</button>
+      }
+    </div>
+
+    @if (!feature()?.granted) {
+      <div class="empty-note">Testimonials are not part of your plan.</div>
+    } @else {
+      <!-- The counts come from the API, so the pending badge is the tenant's
+           whole total whatever tab is open. -->
+      <!-- One toolbar. The tabs pick the queue, the fields narrow it; they were
+           two stacked rows doing one job. -->
+      <div class="toolbar">
+      <div class="tabs">
+        <button type="button" class="tab" [class.tab-on]="tab() === ''" (click)="setTab('')">All</button>
+        <button type="button" class="tab" [class.tab-on]="tab() === 'pending'" (click)="setTab('pending')">
+          Waiting for you
+          <span class="tab-count" [class.tab-count-due]="counts().pending > 0">{{ counts().pending }}</span>
+        </button>
+        <button type="button" class="tab" [class.tab-on]="tab() === 'approved'" (click)="setTab('approved')">
+          Published <span class="tab-count">{{ counts().approved }}</span>
+        </button>
+        <button type="button" class="tab" [class.tab-on]="tab() === 'rejected'" (click)="setTab('rejected')">
+          Rejected <span class="tab-count">{{ counts().rejected }}</span>
+        </button>
+      </div>
+
+      <div class="filters">
+        <input
+          class="input search"
+          type="search"
+          placeholder="Search a name or the words in a review…"
+          (change)="onSearch(inputValue($event))"
+        />
+
+        <!-- Who wrote it. The reason a tenant opens this screen is usually the
+             reviews they did *not* write, so it is a filter of its own. -->
+        <select class="select" (change)="onSourceFilter(selectValue($event))">
+          <option value="">Anyone</option>
+          <option value="visitor">From your website</option>
+          <option value="admin">Added by you</option>
+        </select>
+
+        <!-- Same branch fallback as the sliders. -->
+        @if (branches().length > 0) {
+          <select class="select" (change)="onBranchFilter(selectValue($event))">
+            <option value="">All branches</option>
+            <option value="none">Company-wide only</option>
+            @for (branch of branches(); track branch.id) {
+              <option [value]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+        }
+
+      </div>
+      </div>
+
+      @if (reorderNeedsScope()) {
+        <p class="tiny muted" style="margin:0 0 12px">
+          Pick one branch to arrange the order of its wall.
+        </p>
+      }
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              @if (canReorder()) {
+                <th style="width:96px">Order</th>
+              }
+              <th class="col-review">Review</th>
+              <th class="sortable col-who" (click)="store.toggleSort('author_name')">Who{{ store.sortIcon('author_name') }}</th>
+              <th class="sortable col-rating" (click)="store.toggleSort('rating')">Rating{{ store.sortIcon('rating') }}</th>
+              <th class="sortable col-when" (click)="store.toggleSort('created_at')">Received{{ store.sortIcon('created_at') }}</th>
+              <th class="col-state">State</th>
+              <th class="text-right col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of store.items(); track row.id) {
+              <tr [class.row-pending]="row.moderation === 'pending'" [class.row-inactive]="row.status !== 'active'">
+                <!-- Hand-ordering is meaningless on a dynamic section, which
+                     orders by recency, and on a review nobody has published. -->
+                @if (canReorder()) {
+                  <td>
+                    @if (row.moderation === 'approved') {
+                      <div class="seq">
+                        <span class="seq-num">{{ row.sequence }}</span>
+                        <button type="button" class="btn btn-sm btn-ghost" title="Move up"
+                                [disabled]="reordering()" (click)="move(row, -1)">↑</button>
+                        <button type="button" class="btn btn-sm btn-ghost" title="Move down"
+                                [disabled]="reordering()" (click)="move(row, 1)">↓</button>
+                      </div>
+                    } @else {
+                      <span class="tiny muted">&mdash;</span>
+                    }
+                  </td>
+                }
+
+                <td class="col-review">
+                  <p class="review-text">{{ row.body }}</p>
+                </td>
+
+                <td>
+                  <div class="who">
+                    @if (photoUrl(row.photo); as src) {
+                      <img class="avatar" [src]="src" alt="" />
+                    } @else {
+                      <span class="avatar avatar-fallback" aria-hidden="true">
+                        {{ row.authorName.charAt(0).toUpperCase() }}
+                      </span>
+                    }
+                    <div class="who-main">
+                      <span class="strong">{{ row.authorName }}</span>
+                      @if (row.authorRole) {
+                        <div class="tiny muted">{{ row.authorRole }}</div>
+                      }
+
+                      <!--
+                        Where it came from, and which site it is on. Both were
+                        columns of their own and neither earned one: they are
+                        facts about this person, they read fine under the name,
+                        and between them they were 250px the Actions column
+                        needed. A branch is named only when it is a specific
+                        one — "All branches" on every row is noise.
+                      -->
+                      <div class="who-tags">
+                        @if (row.source === 'visitor') {
+                          <span class="pill pill-visitor">From your website</span>
+                        } @else {
+                          <span class="pill pill-own">Added by you</span>
+                        }
+                        @if (row.branch?.name) {
+                          <span class="tiny muted">{{ row.branch?.name }}</span>
+                        }
+                      </div>
+
+                      <!-- Never published. Here so you can answer a review, or
+                           check one before you publish it. -->
+                      @if (row.authorEmail || row.authorPhone) {
+                        <div class="tiny muted who-contact">{{ row.authorEmail || row.authorPhone }}</div>
+                      }
+                    </div>
+                  </div>
+                </td>
+
+                <td>
+                  @if (row.rating) {
+                    <span class="stars" [title]="row.rating + ' out of 5'">
+                      @for (on of starSlots(row.rating); track $index) {
+                        <svg viewBox="0 0 24 24" [class.off]="!on" aria-hidden="true">
+                          <path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.44l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95z" />
+                        </svg>
+                      }
+                    </span>
+                  } @else {
+                    <span class="tiny muted">No rating</span>
+                  }
+                </td>
+
+                <td class="tiny muted nowrap col-when">{{ row.createdAt | date: 'dd MMM yyyy' }}</td>
+
+                <td class="col-state">
+                  @if (row.moderation === 'pending') {
+                    <span class="pill pill-pending">Pending</span>
+                  } @else if (row.moderation === 'rejected') {
+                    <span class="pill pill-rejected">Rejected</span>
+                  } @else {
+                    <span class="pill pill-approved">Published</span>
+                  }
+
+                  <!--
+                    Only when it says something the pill above does not. Every
+                    row carried an "Active" badge under its state, which is the
+                    ordinary case and therefore no information — it just made
+                    every row two lines tall. A hidden review is the exception
+                    and is the one worth marking.
+                  -->
+                  @if (row.status !== 'active') {
+                    <div class="tiny muted" style="margin-top:3px">Hidden</div>
+                  }
+                </td>
+
+                <td class="col-actions">
+                  <div class="row-end actions">
+                    @if (writable()) {
+                      <!-- The one gate between a stranger's typing and your
+                           website, so it leads the row rather than hiding in a
+                           menu. -->
+                      @if (row.moderation !== 'approved') {
+                        <button type="button" class="btn btn-sm btn-primary" (click)="moderate(row, 'approved')">
+                          Publish
+                        </button>
+                      }
+                      @if (row.moderation === 'pending') {
+                        <button type="button" class="btn btn-sm btn-ghost" (click)="moderate(row, 'rejected')">
+                          Reject
+                        </button>
+                      }
+                      @if (row.moderation === 'approved') {
+                        <button type="button" class="btn btn-sm btn-ghost" (click)="toggle(row)">
+                          {{ row.status === 'active' ? 'Hide' : 'Show' }}
+                        </button>
+                      }
+                      <button type="button" class="btn btn-sm btn-ghost" (click)="open(row)">Edit</button>
+                      <button type="button" class="btn btn-sm btn-danger" (click)="remove(row)">Delete</button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <app-table-state
+          [loading]="store.loading()"
+          [empty]="!store.loading() && store.items().length === 0"
+          icon="💬"
+          [title]="tab() === 'pending' ? 'Nothing waiting' : 'No reviews here'"
+          [message]="
+            tab() === 'pending'
+              ? 'Every review has been dealt with.'
+              : savedMode() === 'dynamic'
+                ? 'The section is on your website with its form, ready for the first one.'
+                : 'The section stays off your website until you publish one.'
+          "
+        />
+      </div>
+
+      <app-pager [meta]="store.meta()" (pageChange)="store.setPage($event)" (limitChange)="store.setLimit($event)" />
+    }
+  }
+</div>
+
+@if (modalOpen()) {
+  <app-modal
+    [title]="editing() ? 'Edit review' : 'Add review'"
+    size="md"
+    [closeOnBackdrop]="false"
+    (closed)="modalOpen.set(false)"
+  >
+    <form [formGroup]="form" (ngSubmit)="save()" id="testimonial-form">
+      <div class="field">
+        <label for="tst-branch">Shows on</label>
+        <select id="tst-branch" class="select" formControlName="branchId">
+          <option value="">All branches (company-wide)</option>
+          @for (branch of branches(); track branch.id) {
+            <option [value]="branch.id">{{ branch.name }}</option>
+          }
+        </select>
+        <p class="tiny muted mb-0">
+          A branch site shows its own reviews as well as the company-wide ones.
+        </p>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="tst-author">Name <span class="req">*</span></label>
+          <input id="tst-author" class="input" formControlName="authorName" placeholder="Asha Patel" />
+          <app-field-error [control]="form.controls.authorName" label="Name" />
+        </div>
+
+        <div class="field">
+          <label for="tst-role">Role or company</label>
+          <input id="tst-role" class="input" formControlName="authorRole"
+                 placeholder="Managing Director, Acme Traders" />
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="tst-email">Email</label>
+          <input id="tst-email" class="input" formControlName="authorEmail" placeholder="asha@acme.test" />
+          <span class="hint">Never published &mdash; kept so you can reach them.</span>
+        </div>
+
+        <div class="field">
+          <label for="tst-phone">Phone</label>
+          <input id="tst-phone" class="input" formControlName="authorPhone" placeholder="98765 43210" />
+        </div>
+      </div>
+
+      <div class="field" style="max-width:220px">
+        <label for="tst-rating-value">Rating</label>
+        <select id="tst-rating-value" class="select" formControlName="rating">
+          <option value="">No rating</option>
+          <option value="5">5 &mdash; excellent</option>
+          <option value="4">4</option>
+          <option value="3">3</option>
+          <option value="2">2</option>
+          <option value="1">1</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="tst-body">Review <span class="req">*</span></label>
+        <textarea id="tst-body" class="textarea" rows="5" formControlName="body"
+                  placeholder="They quoted once, in writing, and the number at the end was the one we agreed at the start."></textarea>
+        <app-field-error [control]="form.controls.body" label="Review" />
+      </div>
+
+      <div class="field" style="max-width:220px">
+        <label for="tst-status">Status</label>
+        <select id="tst-status" class="select" formControlName="status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+
+      @if (editing()?.source === 'visitor') {
+        <p class="tiny muted">
+          This review was written by a visitor to your website. Editing it here does not change
+          whether it is published &mdash; use <strong>Publish</strong> or <strong>Reject</strong> for that.
+        </p>
+      }
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+      <button type="submit" form="testimonial-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Add review' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

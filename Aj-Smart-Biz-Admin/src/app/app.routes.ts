@@ -94,6 +94,14 @@ export const routes: Routes = [
               import('./features/company/about-manager.component').then((m) => m.AboutManagerComponent),
           },
           {
+            path: 'figures',
+            title: 'Figures',
+            loadComponent: () =>
+              import('./features/company/figures-manager.component').then(
+                (m) => m.FiguresManagerComponent
+              ),
+          },
+          {
             path: 'team',
             title: 'Team',
             loadComponent: () =>
@@ -112,6 +120,22 @@ export const routes: Routes = [
               import('./features/company/contact-manager.component').then((m) => m.ContactManagerComponent),
           },
           {
+            path: 'features',
+            title: 'Features / Benefits',
+            loadComponent: () =>
+              import('./features/company/features-manager.component').then(
+                (m) => m.FeaturesManagerComponent
+              ),
+          },
+          {
+            path: 'testimonials',
+            title: 'Testimonials',
+            loadComponent: () =>
+              import('./features/company/testimonials-manager.component').then(
+                (m) => m.TestimonialsManagerComponent
+              ),
+          },
+          {
             path: 'subscription',
             title: 'Plan & billing',
             loadComponent: () =>
@@ -126,6 +150,30 @@ export const routes: Routes = [
         canActivate: [permissionGuard('my-plan')],
         title: 'My Plan',
         loadComponent: () => import('./features/plan/my-plan.component').then((m) => m.MyPlanComponent),
+      },
+      /**
+       * Lead management. `analytics` is declared before `:id`, or the router
+       * would match it as a lead id and the detail screen would ask the API for
+       * a lead called "analytics".
+       */
+      {
+        path: 'leads',
+        canActivate: [permissionGuard('lead-management')],
+        title: 'Lead Management',
+        loadComponent: () => import('./features/leads/lead-list.component').then((m) => m.LeadListComponent),
+      },
+      {
+        path: 'leads/analytics',
+        canActivate: [permissionGuard('lead-management')],
+        title: 'Lead analysis',
+        loadComponent: () =>
+          import('./features/leads/lead-analytics.component').then((m) => m.LeadAnalyticsComponent),
+      },
+      {
+        path: 'leads/:id',
+        canActivate: [permissionGuard('lead-management')],
+        title: 'Lead',
+        loadComponent: () => import('./features/leads/lead-detail.component').then((m) => m.LeadDetailComponent),
       },
       {
         path: 'roles',

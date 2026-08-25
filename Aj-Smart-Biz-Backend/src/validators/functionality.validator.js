@@ -11,6 +11,13 @@ const {
   STAT_MODE_VALUES,
   STAT_UNIT_VALUES,
   CONTACT_FORM_TARGET_VALUES,
+  TESTIMONIAL_MODE_VALUES,
+  TESTIMONIAL_REVIEW_TARGET,
+  TESTIMONIAL_REVIEW_TARGET_VALUES,
+  TESTIMONIAL_MODERATION_VALUES,
+  TESTIMONIAL_SOURCE_VALUES,
+  TESTIMONIAL_RATING_MAX,
+  FEATURE_ICON_KEYS,
   NAV_LABEL_MAX,
 } = require('../constants');
 
@@ -48,10 +55,103 @@ const SETTINGS_SCHEMA = {
   [FUNCTIONALITY.ABOUT_US]: Joi.object({}),
   // WhatsApp keeps its configuration in its own table, so its switch row has
   // nothing to store. Written out rather than omitted so an unexpected body is
-  // refused instead of silently saved. Team and Gallery are the same.
+  // refused instead of silently saved.
   [FUNCTIONALITY.WHATSAPP]: Joi.object({}),
-  [FUNCTIONALITY.TEAM]: Joi.object({}),
-  [FUNCTIONALITY.GALLERY]: Joi.object({}),
+
+  /**
+   * Team and Gallery store the words above their cards, and nothing else — the
+   * people and the pictures are rows in their own tables.
+   *
+   * Every field is optional and may be blank: clearing one is how a tenant goes
+   * back to the platform's wording, which `sectionCopy` fills in on the way out.
+   */
+  [FUNCTIONALITY.TEAM]: Joi.object({
+    eyebrow: Joi.string().allow('', null).max(80),
+    title: Joi.string().allow('', null).max(160),
+    lead: Joi.string().allow('', null).max(400),
+  }),
+  [FUNCTIONALITY.GALLERY]: Joi.object({
+    eyebrow: Joi.string().allow('', null).max(80),
+    title: Joi.string().allow('', null).max(160),
+    lead: Joi.string().allow('', null).max(400),
+  }),
+  /**
+   * Figures keeps the words above the band and nothing else. The numbers are
+   * branch-aware rows in `company_stats` — a list the tenant adds to, reorders
+   * and pins to branches — and none of that belongs in a settings blob.
+   */
+  [FUNCTIONALITY.FIGURES]: Joi.object({
+    eyebrow: Joi.string().allow('', null).max(80),
+    title: Joi.string().allow('', null).max(160),
+    lead: Joi.string().allow('', null).max(400),
+  }),
+  /**
+   * Testimonials is the one card list whose switch row does carry settings: the
+   * static/dynamic mode belongs to the feature as a whole, not to any one
+   * review, and it is what decides whether the public website carries a form.
+   *
+   * The mode is `.valid()`-constrained here as well as normalised in the
+   * service. Both are deliberate — this refuses a bad write, the service
+   * survives a bad read — because the value decides whether the public internet
+   * can write rows into a tenant's database.
+   */
+  [FUNCTIONALITY.TESTIMONIALS]: Joi.object({
+    mode: Joi.string().valid(...TESTIMONIAL_MODE_VALUES),
+    eyebrow: Joi.string().allow('', null).max(80),
+    title: Joi.string().allow('', null).max(160),
+    lead: Joi.string().allow('', null).max(400),
+    /**
+     * Where the review button goes — our own form, or somewhere else
+     * entirely. See `TESTIMONIAL_REVIEW_TARGET`.
+     */
+    reviewTarget: Joi.string().valid(...TESTIMONIAL_REVIEW_TARGET_VALUES),
+    /**
+     * The destination, when there is one, and the only field on the platform a
+     * tenant supplies that ends up in an `href` on its own public website.
+     *
+     * `http`/`https` only, and never relative. Joi's default scheme list is
+     * "anything that parses", which includes `javascript:` — a scheme that in
+     * an `href` is script execution on the tenant's own domain rather than a
+     * link. A relative URL is refused for a quieter reason: it would resolve
+     * against whichever site rendered it, so the same setting would point
+     * somewhere different on every host a tenant owns.
+     *
+     * Required when the button is set to `link`, because the alternative is a
+     * button on a live website that goes nowhere. The check reads the sibling
+     * value rather than the stored one, which is safe here: settings are
+     * replaced whole by `updateSettings`, so `reviewTarget` is always in the
+     * same body when it matters.
+     */
+    reviewUrl: Joi.string()
+      .uri({ scheme: ['http', 'https'], allowRelative: false })
+      .max(500)
+      .allow('', null)
+      .when('reviewTarget', {
+        is: TESTIMONIAL_REVIEW_TARGET.LINK,
+        then: Joi.string().required().disallow('', null).messages({
+          'any.required': 'reviewUrl is required when the review button opens a link',
+          'any.invalid': 'reviewUrl is required when the review button opens a link',
+        }),
+      }),
+    formTitle: Joi.string().allow('', null).max(120),
+    formNote: Joi.string().allow('', null).max(300),
+    showRating: Joi.boolean(),
+  }),
+  /**
+   * Features / Benefits keeps the section's own wording here — the heading,
+   * the lede and the label on the button under it. The cards themselves are
+   * rows, not settings; see `featureCreate` below.
+   *
+   * Every field is optional and may be cleared. An empty one is not a blank
+   * heading on the website: the service fills it from `FEATURE_DEFAULTS`, so
+   * clearing a field is how a tenant asks for the platform's wording back.
+   */
+  [FUNCTIONALITY.FEATURES]: Joi.object({
+    eyebrow: Joi.string().allow('', null).max(80),
+    title: Joi.string().allow('', null).max(160),
+    lead: Joi.string().allow('', null).max(400),
+    ctaLabel: Joi.string().allow('', null).max(60),
+  }),
 };
 
 /**
@@ -219,6 +319,143 @@ const galleryFields = {
 const galleryCreate = { body: Joi.object({ ...galleryFields, image: galleryFields.image.required() }) };
 const galleryUpdate = { params: idParam, body: Joi.object(galleryFields).min(1) };
 
+/* ------------------------------------------------------------------ *
+ * Testimonials
+ * ------------------------------------------------------------------ */
+
+/**
+ * What the console may write on a review.
+ *
+ * `source` is absent on purpose and cannot be set through any route: it records
+ * where a row actually came from, and a console that could stamp a review
+ * `visitor` would be able to pass the company's own copy off as a customer's.
+ * The controller sets it, once, at creation.
+ */
+const testimonialFields = {
+  branchId,
+  authorName: Joi.string().min(1).max(150),
+  authorRole: Joi.string().allow('', null).max(150),
+  photo: Joi.string().allow('', null).max(255),
+  authorEmail: Joi.string().allow('', null).max(160),
+  authorPhone: Joi.string().allow('', null).max(20),
+  rating: Joi.number().integer().min(1).max(TESTIMONIAL_RATING_MAX).allow(null),
+  body: Joi.string().min(1).max(2000),
+  /** The console may publish or park a review directly; see `moderate`. */
+  moderation: Joi.string().valid(...TESTIMONIAL_MODERATION_VALUES),
+  sequence: Joi.number().integer().min(0).max(9999),
+  status,
+};
+
+const testimonialCreate = {
+  body: Joi.object({
+    ...testimonialFields,
+    authorName: testimonialFields.authorName.required(),
+    body: testimonialFields.body.required(),
+  }),
+};
+
+const testimonialUpdate = { params: idParam, body: Joi.object(testimonialFields).min(1) };
+
+/** PATCH /testimonials/:id/moderation — approve or reject one review. */
+const testimonialModerate = {
+  params: idParam,
+  body: Joi.object({
+    moderation: Joi.string()
+      .valid(...TESTIMONIAL_MODERATION_VALUES)
+      .required(),
+  }),
+};
+
+/**
+ * The console's list filters. `moderation` is what the pending queue is: the
+ * screen asks for `?moderation=pending` and gets exactly the reviews waiting on
+ * someone, rather than filtering a full list in the browser.
+ */
+const testimonialListQuery = {
+  query: listQuery({
+    branchId: Joi.alternatives().try(id, Joi.string().valid('none', 'null')),
+    moderation: Joi.string().valid(...TESTIMONIAL_MODERATION_VALUES),
+    source: Joi.string().valid(...TESTIMONIAL_SOURCE_VALUES),
+  }),
+};
+
+/* ------------------------------------------------------------------ *
+ * The public submission
+ * ------------------------------------------------------------------ */
+
+/**
+ * `POST /public/testimonials` — the form on the tenant's own website.
+ *
+ * Tighter than the console's schema and deliberately so: this is the one body
+ * on the platform that arrives from an unauthenticated stranger. Every field
+ * that decides whether a row is published — `moderation`, `status`, `source`,
+ * `sequence`, `companyId` — is absent, so no request can reach for one. What is
+ * left is what a person writing a review actually types.
+ *
+ * `domain` is how the endpoint knows which tenant is being reviewed on a local
+ * dev server, matching `?domain=` on `/public/company-details`. In production
+ * the Host header answers it and the field is never sent.
+ */
+const testimonialSubmit = {
+  body: Joi.object({
+    domain: Joi.string().allow('', null).max(255),
+    authorName: Joi.string().trim().min(2).max(150).required(),
+    /**
+     * No `authorRole` here, deliberately.
+     *
+     * The form on the website does not ask for one, so this body stays exactly
+     * what a person writing a review types. `validate` runs with
+     * `stripUnknown`, so a hand-rolled request that sends one is not refused —
+     * the key is simply dropped before the controller sees it, and the row is
+     * written with `authorRole` null.
+     *
+     * Reviews the company enters itself still carry a role: that is
+     * `testimonialFields`, above, and the admin screen still offers the field.
+     */
+    authorEmail: Joi.string().trim().email().allow('', null).max(160),
+    authorPhone: Joi.string().trim().allow('', null).max(20),
+    rating: Joi.number().integer().min(1).max(TESTIMONIAL_RATING_MAX).allow(null),
+    /**
+     * A floor as well as a ceiling. "Good" is not a review, and a wall of
+     * one-word entries is what an open form degrades into without one.
+     */
+    body: Joi.string().trim().min(20).max(2000).required(),
+  }),
+};
+
+/* ------------------------------------------------------------------ *
+ * Features / Benefits
+ * ------------------------------------------------------------------ */
+
+/**
+ * What a benefit card may carry.
+ *
+ * `icon` is constrained to the platform's library rather than left as free
+ * text. The website draws these from a closed set of its own — a name it does
+ * not know falls back to `spark` — so an unchecked field would let a tenant
+ * save `icon: 'flame'`, see a spark on their site, and have no way of knowing
+ * why. Refusing it here is what makes the picker in the console the whole truth
+ * about what is available.
+ */
+const featureFields = {
+  branchId,
+  icon: Joi.string().valid(...FEATURE_ICON_KEYS),
+  title: Joi.string().trim().min(1).max(150),
+  /** Optional — a good heading can stand on its own. */
+  body: Joi.string().trim().allow('', null).max(600),
+  sequence: Joi.number().integer().min(0).max(9999),
+  status,
+};
+
+const featureCreate = {
+  body: Joi.object({
+    ...featureFields,
+    title: featureFields.title.required(),
+  }),
+};
+
+const featureUpdate = { params: idParam, body: Joi.object(featureFields).min(1) };
+
 /** Every card list reorders the same way: the whole order, in one call. */
 const reorder = {
   body: Joi.object({
@@ -226,8 +463,18 @@ const reorder = {
   }),
 };
 
+/**
+ * One functionality's settings schema, by key.
+ *
+ * Exported for the OpenAPI build, which documents each of them as its own
+ * component — see `docs/openapi`. Reading the same object `validateSettings`
+ * runs is the whole point: the documented shape is the enforced shape.
+ */
+const settingsSchema = (key) => SETTINGS_SCHEMA[key] ?? null;
+
 module.exports = {
   keyParam: { params: keyParam },
+  settingsSchema,
   toggle,
   settings,
   validateSettings,
@@ -243,6 +490,13 @@ module.exports = {
   teamUpdate,
   galleryCreate,
   galleryUpdate,
+  testimonialCreate,
+  testimonialUpdate,
+  testimonialModerate,
+  testimonialListQuery,
+  testimonialSubmit,
+  featureCreate,
+  featureUpdate,
   reorder,
   cardListQuery: {
     // `none` asks for the company-wide cards, which have no branch id at all.

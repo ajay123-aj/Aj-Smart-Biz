@@ -225,7 +225,7 @@ cannot be used to enumerate tenants.
 
 The public websites in [`websites/`](websites/) resolve their tenant the same
 way, through a second endpoint built for them: `GET
-/public/company-details?domain=<host>`. Where `/branding` returns just enough to
+/website/company-details?domain=<host>`. Where `/branding` returns just enough to
 paint a login screen, this one returns the whole public profile — legal name,
 business type, contact details, address, locale, the branch a domain is pinned
 to, the head office and every active branch — while still withholding GST, PAN,
@@ -267,9 +267,9 @@ top on a phone — so the headline stays readable without erasing the picture.
 
 ## Optional functionality
 
-Some of what a website can do is sold, not given. Five things are, today, and
-they are one mechanism rather than five bolted on — adding a sixth means adding
-an entry to `FUNCTIONALITY_CATALOGUE`, and nothing else enumerates them.
+Some of what a website can do is sold, not given. Several things are, and they
+are one mechanism rather than several bolted on — adding another means adding an
+entry to `FUNCTIONALITY_CATALOGUE`, and nothing else enumerates them.
 
 | Key | What it buys |
 | --- | --- |
@@ -279,6 +279,7 @@ an entry to `FUNCTIONALITY_CATALOGUE`, and nothing else enumerates them.
 | `team` | A Team section listing the people |
 | `gallery` | A Gallery section of the company's own photographs |
 | `contact_page` | A Contact page with the tenant's own wording and an enquiry form |
+| `features_benefits` | A Features / Benefits band the tenant writes, an icon per card |
 
 **Three switches, all of which must be on** before a visitor sees anything:
 
@@ -291,7 +292,7 @@ an entry to `FUNCTIONALITY_CATALOGUE`, and nothing else enumerates them.
 `active = granted && enabled && served`, decided in one place
 (`services/functionality.service.js`). The tenant's toggle renders that answer
 rather than working it out, the write routes guard on it, and
-`/public/company-details` embeds it — so a locked switch, a refused request and
+`/website/company-details` embeds it — so a locked switch, a refused request and
 a missing button on the website can never tell different stories.
 
 The grant is **snapshotted onto the subscription** at activation, exactly like
@@ -407,12 +408,53 @@ Gallery images need only the image. Titles and captions are optional, and alt
 text falls back to the title; an image with neither is marked decorative rather
 than given a meaningless description.
 
+### Features / Benefits
+
+The band of reasons to choose a business — what it offers, and what each thing
+is worth to the person reading. It was the template's own copy until now: the
+same six paragraphs on every site the platform served, about businesses the
+words had never met. This functionality is what makes it the tenant's.
+
+It follows the Team and Gallery rule rather than the About one, and the
+difference is the whole argument. About falls back to something built from the
+company profile, because the platform holds facts — a name, a trade, a city —
+that a section can honestly be built from. It holds nothing whatever about a
+company's **capabilities**. So there is no fallback here: switched off, not
+granted, or granted with nothing written, the band is **absent from the page**,
+and the template's old six cards are gone rather than waiting behind a flag.
+
+**Icons are chosen, not uploaded.** Each card carries a glyph named from the
+platform's library — `FEATURE_ICONS` in the backend constants, around thirty
+of them grouped by what they say (trust, support, speed, value, results). The
+website draws them itself from that name: one line weight, one 24-unit box, no
+request. Which is the point — six cards of uploaded artwork look like six
+uploads, and six of these look like a set.
+
+The name is the contract and the drawing is not. The API refuses to save a key
+that is not in the library, both consoles render the picker from
+`GET /masters/functionalities` so neither keeps a list that can go stale, and
+every renderer falls back to `spark` for a name it does not recognise — so a
+glyph added to the platform before a template is redeployed shows the wrong
+picture at worst, never a hole in a card.
+
+Six cards are seeded the first time the section is switched on, so a tenant
+finds the words they already had and edits them rather than facing a blank
+screen. Ordinary rows from that moment on: rewrite them, reorder them, delete
+them all. The section's heading, lede and button label are one short block saved
+with the functionality's settings, and clearing a field asks for the platform's
+wording back rather than leaving a blank heading.
+
 ### The template writes nothing
 
-"What we do" and "Why us" are gone. They were the last two blocks of the
-template's own invented copy, and with About, Team, Gallery and Contact all
+"What we do" and "Why us" are gone as *the template's*. They were the last two
+blocks of its own invented copy, and with About, Team, Gallery and Contact all
 tenant-written, they were the only thing on a live site that a real business had
 not said about itself.
+
+"Why us" has since come back as something a company writes — see Features /
+Benefits above — which is the same principle rather than a reversal of it: the
+band is on a site because a tenant filled it in, and absent from every site that
+has not.
 
 What that leaves is three pages, each entirely the tenant's: a **home page** of
 their hero slides and a closing invitation, **`/about`** with their story,
@@ -453,7 +495,7 @@ not being published.
 
 ### The menu is the tenant's, and the API builds it
 
-The website's menu is not a list in the template. `/public/company-details`
+The website's menu is not a list in the template. `/website/company-details`
 returns a `nav` array — one entry per page **this** tenant is publishing,
 already named the way they named it — and the header and footer render exactly
 what arrives:
@@ -489,9 +531,9 @@ nor the console has to be taught about it separately.
 
 ### All of it is branch-aware
 
-About, its figures, the team, the gallery and the Contact page settings all
-follow the fallback the sliders have always used, and it is now the only one in
-the product:
+About, its figures, the team, the gallery, the benefit cards and the Contact
+page settings all follow the fallback the sliders have always used, and it is
+now the only one in the product:
 
 ```
 branch-pinned domain ──► that branch's own content
@@ -510,8 +552,8 @@ described as *giving this branch its own*. Dropping the override puts it back to
 inheriting. The company-wide copy cannot be cleared — there is nothing above it
 to fall back to.
 
-Team, Gallery and the figures each get a branch filter and a **Shows on** field,
-the same pair Slider Management has. A card added while the list is filtered to
+Team, Gallery, Features and the figures each get a branch filter and a **Shows
+on** field, the same pair Slider Management has. A card added while the list is filtered to
 one branch belongs to that branch, rather than silently landing on every site.
 
 ### Company Details is a section, not a screen
@@ -530,6 +572,7 @@ now, nested under Company Details:
 | Team | `/company/team` | `company-details` | `team` |
 | Gallery | `/company/gallery` | `company-details` | `gallery` |
 | Contact page | `/company/contact` | `company-details` | `contact_page` |
+| Features / Benefits | `/company/features` | `company-details` | `features_benefits` |
 | Plan & billing | `/company/subscription` | `company-details` | — |
 
 Each is a real route, so it can be linked to and bookmarked — the "switch it on"
@@ -537,8 +580,8 @@ button on a locked section goes straight to `/company/functionality` rather than
 opening a page and then a tab. `/company` redirects to the profile, and the old
 `/sliders` redirects to `/company/sliders`.
 
-**A submenu the plan does not pay for is not in the sidebar.** The four in the
-last column above are dropped from `/auth/me` when the running subscription does
+**A submenu the plan does not pay for is not in the sidebar.** The ones with a
+grant in the last column above are dropped from `/auth/me` when the running subscription does
 not grant them, so a tenant is not offered a screen it cannot use. Being
 switched **off** is a different thing and does *not* hide the entry: that is the
 tenant's own choice, made on the Functionality screen, and they need the way
@@ -573,7 +616,7 @@ extra request.
 
 ## When a plan lapses, the website stops
 
-A tenant's plan is what pays for its website, so `/public/company-details`
+A tenant's plan is what pays for its website, so `/website/company-details`
 reports whether the platform will still serve it:
 
 ```

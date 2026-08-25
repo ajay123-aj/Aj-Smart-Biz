@@ -17,7 +17,7 @@ import { DomainManagerComponent } from '../../shared/domain-manager.component';
   template: `
     <div class="card">
       <app-domain-manager
-        basePath="/my-company/domains"
+        basePath="/admin/company/domains"
         [branches]="ctx.branchOptions()"
         [canEdit]="ctx.canEdit()"
       />

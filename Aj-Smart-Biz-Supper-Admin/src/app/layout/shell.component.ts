@@ -132,6 +132,8 @@ export class ShellComponent {
       items: [
         { label: 'Company Management', route: '/companies', icon: '🏢' },
         { label: 'Company Plans', route: '/subscriptions', icon: '🗓️' },
+        /** Website traffic across every tenant, with the company-wise analysis. */
+        { label: 'Lead Management', route: '/leads', icon: '🎯' },
         { label: 'Plan Management', route: '/plans', icon: '💳' },
       ],
     },

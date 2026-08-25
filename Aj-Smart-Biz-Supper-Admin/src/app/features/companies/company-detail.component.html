@@ -160,7 +160,7 @@
     <!-- ------------------------------- DOMAINS ------------------------------ -->
     @if (tab() === 'domains') {
       <app-domain-manager
-        [basePath]="'/companies/' + c.id + '/domains'"
+        [basePath]="'/super-admin/companies/' + c.id + '/domains'"
         [branches]="branchOptions()"
         (countChange)="domainCount.set($event)"
       />

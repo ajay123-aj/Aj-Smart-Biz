@@ -124,6 +124,21 @@ export const ABOUT_FALLBACK = {
   ],
 };
 
+/**
+ * Headings for the band of figures. The figures themselves come from the API,
+ * and so does this wording — the tenant writes it on the About screen.
+ *
+ * What is left here is the standing `ABOUT_FALLBACK` has: the words to use if
+ * the block arrives with a field blank, or does not arrive at all because the
+ * API predates it. Safe to invent, unlike the figures: a heading over a
+ * company's own numbers makes no claim the numbers do not already make.
+ */
+export const STATS_COPY = {
+  eyebrow: 'By the numbers',
+  title: 'What {company} has to show for it',
+  lead: 'A few figures that say more about the work than a page of prose would.',
+} as const;
+
 /** Headings for the Team section. The people themselves come from the API. */
 export const TEAM_COPY = {
   eyebrow: 'Our team',
@@ -148,6 +163,26 @@ export const CONTACT_FALLBACK = {
   address: 'Address to be configured',
   hours: 'Mon\u2013Sat, 9:30am \u2013 6:30pm',
 };
+
+/**
+ * Shown instead of the website when the API cannot be reached.
+ *
+ * Distinct from `PLAN_NOTICE`, which is for a tenant the platform has stopped
+ * serving — that is a decision, this is a failure, and they read differently.
+ * Nothing here names the company, because with the API down nothing here knows
+ * which company it is.
+ */
+export const SERVICE_UNAVAILABLE = {
+  title: 'This website is temporarily unavailable',
+  body: 'We could not load the page just now. Nothing is wrong at your end — please try again in a moment.',
+  retry: 'Try again',
+  /**
+   * Enough for whoever runs the site to know where to look, and no more. Naming
+   * the host or the port of an internal service on a public page is not a
+   * visitor's business.
+   */
+  note: 'If you are the site owner: the website could not reach its API.',
+} as const;
 
 /* ------------------------------------------------------------------ *
  * Holding page
@@ -190,4 +225,74 @@ export const PLAN_NOTICE = {
     body: '{company} has not published its website yet. Please check back shortly.',
     ownerNote: 'Are you the owner? Choose a plan to publish this site.',
   },
+} as const;
+
+/* ------------------------------------------------------------------ *
+ * Features / Benefits
+ * ------------------------------------------------------------------ */
+
+/**
+ * The glyphs this template can draw.
+ *
+ * Drawn in `FeaturesSection` rather than uploaded, so the set is consistent
+ * across every tenant and costs no request: one line weight, one 24-unit box,
+ * one cap and join. A company picks a name from the platform's library in the
+ * admin, and the API sends the name back here.
+ *
+ * The union mirrors that library — `FEATURE_ICONS` in the backend's constants,
+ * which is the contract — but is not a promise to match it forever. The library
+ * may grow a glyph before this template learns to draw it, which is exactly why
+ * `BenefitCard.icon` is a plain string and why `Glyph` falls back to `spark`
+ * instead of leaving a hole in the card.
+ */
+export type FeatureIcon =
+  | 'spark'
+  | 'star'
+  | 'check'
+  | 'lightbulb'
+  | 'target'
+  | 'layers'
+  | 'shield'
+  | 'award'
+  | 'lock'
+  | 'heart'
+  | 'headset'
+  | 'people'
+  | 'phone'
+  | 'message'
+  | 'calendar'
+  | 'clock'
+  | 'rocket'
+  | 'zap'
+  | 'truck'
+  | 'refresh'
+  | 'wallet'
+  | 'tag'
+  | 'chart'
+  | 'globe'
+  | 'map-pin'
+  | 'leaf'
+  | 'tools';
+
+/**
+ * The section's wording of last resort.
+ *
+ * Not the tenant's, and no longer the page's usual source either: the cards and
+ * the copy both come from the API now, and the section is absent altogether
+ * from a site whose company has not switched Features on. What is left here is
+ * the same standing `ABOUT_FALLBACK` has — the words to use if a block arrives
+ * with a field blank, so a heading is never an empty line.
+ *
+ * There are deliberately no `items`. Six paragraphs about how a business works,
+ * written by nobody who has met it, is wording no one can stand behind; a
+ * tenant with nothing to say here shows no section rather than the template's
+ * claims. The starting cards a company gets to edit live in the backend's
+ * `DEFAULT_FEATURE_ITEMS`, seeded the first time it switches the section on.
+ */
+export const FEATURES_COPY = {
+  eyebrow: 'What you get',
+  title: 'Why people work with {company}',
+  lede: 'The short version of how we work, and what it means for you once the job is underway.',
+  /** Sends people to the Contact page. Rendered only when that page exists. */
+  cta: 'Talk it through',
 } as const;

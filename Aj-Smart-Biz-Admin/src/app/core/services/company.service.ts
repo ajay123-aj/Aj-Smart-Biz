@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
-import { ListQuery, PagedResult } from '../models/api.model';
+import { ListQuery, PageMeta, PagedResult } from '../models/api.model';
 import {
   Branch,
   BranchContact,
@@ -17,6 +17,8 @@ import {
   QuotaView,
   Status,
   Subscription,
+  TestimonialListView,
+  TestimonialModeration,
   Transaction,
   WhatsappNumber,
   WhatsappNumberView,
@@ -67,7 +69,7 @@ export class CardClient<T> {
 }
 
 /**
- * Everything under `/my-company` is implicitly scoped to the signed-in admin's
+ * Everything under `/admin/company` is implicitly scoped to the signed-in admin's
  * tenant by the API — no company id is ever sent from the client.
  */
 @Injectable({ providedIn: 'root' })
@@ -75,15 +77,15 @@ export class CompanyService {
   private readonly api = inject(ApiService);
 
   get(): Observable<Company> {
-    return this.api.get<Company>('/my-company');
+    return this.api.get<Company>('/admin/company');
   }
 
   update(payload: Record<string, unknown>): Observable<Company> {
-    return this.api.put<Company>('/my-company', payload);
+    return this.api.put<Company>('/admin/company', payload);
   }
 
   subscriptions(): Observable<Subscription[]> {
-    return this.api.get<Subscription[]>('/my-company/subscriptions');
+    return this.api.get<Subscription[]>('/admin/company/subscriptions');
   }
 
   /**
@@ -92,18 +94,18 @@ export class CompanyService {
    * one call. Read-only: plans are sold and changed by the platform.
    */
   plan(): Observable<MyPlanView> {
-    return this.api.get<MyPlanView>('/my-company/plan');
+    return this.api.get<MyPlanView>('/admin/company/plan');
   }
 
   /* ---------------------------- plan requests --------------------------- */
 
   /** The plans this company could move to, each compared against its current one. */
   availablePlans(): Observable<PlanCatalogue> {
-    return this.api.get<PlanCatalogue>('/my-company/plans');
+    return this.api.get<PlanCatalogue>('/admin/company/plans');
   }
 
   planRequests(): Observable<PlanRequest[]> {
-    return this.api.get<PlanRequest[]>('/my-company/plan-requests');
+    return this.api.get<PlanRequest[]>('/admin/company/plan-requests');
   }
 
   /**
@@ -111,15 +113,15 @@ export class CompanyService {
    * the platform decides, which is why the button says "request".
    */
   requestPlan(planId: number, note?: string | null): Observable<PlanRequest> {
-    return this.api.post<PlanRequest>('/my-company/plan-requests', { planId, note: note || null });
+    return this.api.post<PlanRequest>('/admin/company/plan-requests', { planId, note: note || null });
   }
 
   cancelPlanRequest(id: number): Observable<{ id: number }> {
-    return this.api.post<{ id: number }>(`/my-company/plan-requests/${id}/cancel`);
+    return this.api.post<{ id: number }>(`/admin/company/plan-requests/${id}/cancel`);
   }
 
   transactions(query: ListQuery = {}): Observable<PagedResult<Transaction>> {
-    return this.api.list<Transaction>('/my-company/transactions', query);
+    return this.api.list<Transaction>('/admin/company/transactions', query);
   }
 
   /* -------------------------- functionality --------------------------- */
@@ -131,13 +133,13 @@ export class CompanyService {
    * tell different stories.
    */
   functionalities(): Observable<FunctionalityView> {
-    return this.api.get<FunctionalityView>('/my-company/functionalities');
+    return this.api.get<FunctionalityView>('/admin/company/functionalities');
   }
 
   /** Omitting `status` flips it, which is what the switch sends. */
   toggleFunctionality(key: FunctionalityKey, status?: Status): Observable<Functionality> {
     return this.api.patch<Functionality>(
-      `/my-company/functionalities/${key}/status`,
+      `/admin/company/functionalities/${key}/status`,
       status ? { status } : {}
     );
   }
@@ -147,40 +149,79 @@ export class CompanyService {
     key: FunctionalityKey,
     settings: Record<string, unknown>
   ): Observable<Functionality> {
-    return this.api.put<Functionality>(`/my-company/functionalities/${key}/settings`, settings);
+    return this.api.put<Functionality>(`/admin/company/functionalities/${key}/settings`, settings);
   }
 
   /* ------------------------- whatsapp numbers ------------------------- */
 
   whatsappNumbers(): Observable<WhatsappNumberView> {
-    return this.api.get<WhatsappNumberView>('/my-company/whatsapp-numbers');
+    return this.api.get<WhatsappNumberView>('/admin/company/whatsapp-numbers');
   }
 
   createWhatsappNumber(payload: Record<string, unknown>): Observable<WhatsappNumber> {
-    return this.api.post<WhatsappNumber>('/my-company/whatsapp-numbers', payload);
+    return this.api.post<WhatsappNumber>('/admin/company/whatsapp-numbers', payload);
   }
 
   updateWhatsappNumber(id: number, payload: Record<string, unknown>): Observable<WhatsappNumber> {
-    return this.api.put<WhatsappNumber>(`/my-company/whatsapp-numbers/${id}`, payload);
+    return this.api.put<WhatsappNumber>(`/admin/company/whatsapp-numbers/${id}`, payload);
   }
 
   toggleWhatsappNumber(id: number): Observable<{ id: number; status: Status }> {
-    return this.api.patch<{ id: number; status: Status }>(`/my-company/whatsapp-numbers/${id}/status`, {});
+    return this.api.patch<{ id: number; status: Status }>(`/admin/company/whatsapp-numbers/${id}/status`, {});
   }
 
   removeWhatsappNumber(id: number): Observable<{ id: number }> {
-    return this.api.delete<{ id: number }>(`/my-company/whatsapp-numbers/${id}`);
+    return this.api.delete<{ id: number }>(`/admin/company/whatsapp-numbers/${id}`);
   }
 
   /* -------------------------- website content ------------------------- */
 
   /**
-   * The About stat band, the Team section and the Gallery are the same shape of
-   * thing — an ordered list of cards the tenant adds, edits, reorders and
-   * deletes — so they share one client rather than three near-identical ones.
+   * The About stat band, the Team section, the Gallery and the Features /
+   * Benefits cards are the same shape of thing — an ordered list of cards the
+   * tenant adds, edits, reorders and deletes — so they share one client rather
+   * than four near-identical ones.
    */
-  cards<T>(path: 'stats' | 'team' | 'gallery'): CardClient<T> {
-    return new CardClient<T>(this.api, `/my-company/${path}`);
+  cards<T>(path: 'stats' | 'team' | 'gallery' | 'features' | 'testimonials'): CardClient<T> {
+    return new CardClient<T>(this.api, `/admin/company/${path}`);
+  }
+
+  /* --------------------------- testimonials --------------------------- */
+
+  /**
+   * The reviews — one page of them, the counts, and where that page sits.
+   *
+   * Not `cards().list()`, which would drop both extras on the floor. This list
+   * differs from the other card lists in the two ways its screen is built on:
+   *
+   *  - **It counts.** The number waiting on someone is the point of opening the
+   *    screen, and it has to come from the API so it is the whole tenant's
+   *    rather than the open tab's — a count derived from a filtered page is a
+   *    count of that page.
+   *  - **It pages.** The other lists are short and edited whole. This one is
+   *    fed by the public internet and grows for as long as the site is up.
+   *
+   * The counts arrive in `data` and the page in `meta`, which is what each of
+   * them is about. Everything else on a row (create, update, reorder, delete)
+   * still goes through the shared card client.
+   */
+  listTestimonials(query: ListQuery = {}): Observable<{ data: TestimonialListView; meta: PageMeta }> {
+    return this.api.getWithMeta<TestimonialListView>('/admin/company/testimonials', query);
+  }
+
+  /**
+   * Approve or reject one review — the only thing standing between a stranger's
+   * typing and the tenant's public website, so it is its own call rather than a
+   * field on the general update.
+   */
+  moderateTestimonial(
+    id: number,
+    moderation: TestimonialModeration
+  ): Observable<{ id: number; moderation: TestimonialModeration }> {
+    return this.api.patch<{ id: number; moderation: TestimonialModeration }>(
+      `/admin/company/testimonials/${id}/moderation`,
+      { moderation }
+    );
   }
 
   /* ---------------------------- about copy ---------------------------- */
@@ -193,19 +234,19 @@ export class CompanyService {
    * inherits, and the response says which.
    */
   about(branchId?: number | null): Observable<AboutView> {
-    return this.api.get<AboutView>('/my-company/about', branchId ? { branchId: String(branchId) } : {});
+    return this.api.get<AboutView>('/admin/company/about', branchId ? { branchId: String(branchId) } : {});
   }
 
   saveAbout(branchId: number | null, copy: Record<string, unknown>): Observable<AboutView> {
     return this.api.put<AboutView>(
-      `/my-company/about${branchId ? `?branchId=${branchId}` : ''}`,
+      `/admin/company/about${branchId ? `?branchId=${branchId}` : ''}`,
       copy
     );
   }
 
   /** Drops a branch's override so it inherits the company-wide copy again. */
   clearAbout(branchId: number): Observable<AboutView> {
-    return this.api.delete<AboutView>(`/my-company/about?branchId=${branchId}`);
+    return this.api.delete<AboutView>(`/admin/company/about?branchId=${branchId}`);
   }
 
   /* --------------------------- contact page --------------------------- */
@@ -218,24 +259,24 @@ export class CompanyService {
    * routes only decide how it reads.
    */
   contact(branchId?: number | null): Observable<ContactView> {
-    return this.api.get<ContactView>('/my-company/contact', branchId ? { branchId: String(branchId) } : {});
+    return this.api.get<ContactView>('/admin/company/contact', branchId ? { branchId: String(branchId) } : {});
   }
 
   saveContact(branchId: number | null, settings: Record<string, unknown>): Observable<ContactView> {
     return this.api.put<ContactView>(
-      `/my-company/contact${branchId ? `?branchId=${branchId}` : ''}`,
+      `/admin/company/contact${branchId ? `?branchId=${branchId}` : ''}`,
       settings
     );
   }
 
   clearContact(branchId: number): Observable<ContactView> {
-    return this.api.delete<ContactView>(`/my-company/contact?branchId=${branchId}`);
+    return this.api.delete<ContactView>(`/admin/company/contact?branchId=${branchId}`);
   }
 
   /* ------------------------------ branches ----------------------------- */
 
   listBranches(query: ListQuery = {}): Observable<PagedResult<Branch>> {
-    return this.api.list<Branch>('/my-company/branches', query);
+    return this.api.list<Branch>('/admin/company/branches', query);
   }
 
   /**
@@ -244,44 +285,44 @@ export class CompanyService {
    * guard that would refuse the request.
    */
   branchQuota(): Observable<QuotaView> {
-    return this.api.get<QuotaView>('/my-company/branches/quota');
+    return this.api.get<QuotaView>('/admin/company/branches/quota');
   }
 
   getBranch(branchId: number): Observable<Branch> {
-    return this.api.get<Branch>(`/my-company/branches/${branchId}`);
+    return this.api.get<Branch>(`/admin/company/branches/${branchId}`);
   }
 
   createBranch(payload: Record<string, unknown>): Observable<Branch> {
-    return this.api.post<Branch>('/my-company/branches', payload);
+    return this.api.post<Branch>('/admin/company/branches', payload);
   }
 
   updateBranch(branchId: number, payload: Record<string, unknown>): Observable<Branch> {
-    return this.api.put<Branch>(`/my-company/branches/${branchId}`, payload);
+    return this.api.put<Branch>(`/admin/company/branches/${branchId}`, payload);
   }
 
   toggleBranchStatus(branchId: number): Observable<{ id: number; status: string }> {
-    return this.api.patch<{ id: number; status: string }>(`/my-company/branches/${branchId}/status`, {});
+    return this.api.patch<{ id: number; status: string }>(`/admin/company/branches/${branchId}/status`, {});
   }
 
   removeBranch(branchId: number): Observable<{ id: number }> {
-    return this.api.delete<{ id: number }>(`/my-company/branches/${branchId}`);
+    return this.api.delete<{ id: number }>(`/admin/company/branches/${branchId}`);
   }
 
   /* -------------------------- branch contacts -------------------------- */
 
   listContacts(branchId: number): Observable<BranchContact[]> {
-    return this.api.get<BranchContact[]>(`/my-company/branches/${branchId}/contacts`);
+    return this.api.get<BranchContact[]>(`/admin/company/branches/${branchId}/contacts`);
   }
 
   createContact(branchId: number, payload: Record<string, unknown>): Observable<BranchContact> {
-    return this.api.post<BranchContact>(`/my-company/branches/${branchId}/contacts`, payload);
+    return this.api.post<BranchContact>(`/admin/company/branches/${branchId}/contacts`, payload);
   }
 
   updateContact(branchId: number, contactId: number, payload: Record<string, unknown>): Observable<BranchContact> {
-    return this.api.put<BranchContact>(`/my-company/branches/${branchId}/contacts/${contactId}`, payload);
+    return this.api.put<BranchContact>(`/admin/company/branches/${branchId}/contacts/${contactId}`, payload);
   }
 
   removeContact(branchId: number, contactId: number): Observable<{ id: number }> {
-    return this.api.delete<{ id: number }>(`/my-company/branches/${branchId}/contacts/${contactId}`);
+    return this.api.delete<{ id: number }>(`/admin/company/branches/${branchId}/contacts/${contactId}`);
   }
 }

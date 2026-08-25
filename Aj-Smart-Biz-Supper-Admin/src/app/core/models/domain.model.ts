@@ -111,12 +111,33 @@ export interface Plan extends AuditFields {
 /* --------------------------- optional functionality --------------------------- */
 
 /** A key the platform implements. Mirrors `FUNCTIONALITY` in the API. */
-export type FunctionalityKey = 'whatsapp' | 'share_link' | 'about_us' | 'team' | 'gallery' | 'contact_page';
+export type FunctionalityKey =
+  | 'whatsapp'
+  | 'share_link'
+  | 'about_us'
+  | 'figures'
+  | 'team'
+  | 'gallery'
+  | 'contact_page'
+  | 'testimonials'
+  | 'features_benefits';
 
 /** What a WhatsApp number is for, and therefore which button it lands on. */
 export type WhatsappType = 'inquiry' | 'contact' | 'support' | 'orders';
 
 export type ShareChannel = 'copy' | 'whatsapp' | 'facebook' | 'x' | 'linkedin' | 'telegram' | 'email';
+
+/**
+ * One way a payment may be recorded, as the platform names it.
+ *
+ * From the catalogue endpoint rather than written out here: the values are a
+ * backend enum, and a copy in the browser goes stale the first time one is
+ * added — silently, because a select with a missing option looks fine.
+ */
+export interface PaymentModeOption {
+  value: string;
+  label: string;
+}
 
 /** One entry of `GET /masters/functionalities` — the platform's own list. */
 export interface FunctionalityMeta {
@@ -142,6 +163,8 @@ export interface WhatsappTypeMeta {
  * list that could drift from the API's.
  */
 export interface FunctionalityCatalogue {
+  /** How a payment may be recorded — see `PaymentModeOption`. */
+  paymentModes?: PaymentModeOption[];
   functionalities: FunctionalityMeta[];
   whatsappTypes: WhatsappTypeMeta[];
   shareChannels: ShareChannel[];
@@ -513,4 +536,192 @@ export interface SuperAdminDashboard {
   companiesByPlan: { planId: number; planName: string; total: number }[];
   recentCompanies: Company[];
   recentTransactions: Transaction[];
+}
+
+/* --------------------------------- leads -------------------------------- */
+
+/**
+ * Where a lead has got to. Mirrors `LEAD_STAGE` in the API.
+ *
+ * `lost` is not a delete: the visits behind it still count in the analytics,
+ * and the same device coming back six months later is a returning lead rather
+ * than a brand new one.
+ */
+export type LeadStage = 'new' | 'contacted' | 'qualified' | 'converted' | 'lost';
+
+export const LEAD_STAGES: readonly LeadStage[] = ['new', 'contacted', 'qualified', 'converted', 'lost'] as const;
+
+export type DeviceType = 'mobile' | 'tablet' | 'desktop' | 'bot' | 'unknown';
+
+/**
+ * One device that has opened the company's public website.
+ *
+ * **One row per device, never one per visit.** Someone who has been back four
+ * times is a single lead with `visitCount: 4`; the four visits themselves are
+ * `LeadVisit[]`, loaded by the detail screen. That is the whole reason the two
+ * shapes are separate — see the API's `lead.model.js`.
+ */
+export interface Lead {
+  id: number;
+  companyId: number;
+  branchId: number | null;
+  /** The visitor's browser-held id; `anon_…` when the server had to derive one. */
+  deviceId: string;
+  stage: LeadStage;
+
+  /** Filled in only once someone identifies them. Empty for a pure browser. */
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  notes?: string | null;
+
+  /** Present only where the visitor granted notifications. */
+  fcmToken: string | null;
+
+  visitCount: number;
+  pageViewCount: number;
+  firstSeenAt: string | null;
+  lastSeenAt: string | null;
+
+  deviceType: DeviceType;
+  deviceVendor: string | null;
+  deviceModel: string | null;
+  os: string | null;
+  osVersion: string | null;
+  browser: string | null;
+  browserVersion: string | null;
+
+  ip: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  timezone: string | null;
+  language?: string | null;
+  latitude?: string | number | null;
+  longitude?: string | number | null;
+
+  /** First touch — the campaign that produced this lead, never overwritten. */
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  utmTerm?: string | null;
+  utmContent?: string | null;
+  firstUtm?: Record<string, string> | null;
+  firstReferrerHost: string | null;
+  firstLandingUrl?: string | null;
+
+  /** Last touch — where they came from most recently. */
+  lastReferrerHost: string | null;
+  lastLandingUrl?: string | null;
+  lastUtm?: Record<string, string> | null;
+
+  isBot: boolean;
+  status: Status;
+  createdAt?: string;
+
+  branch?: Option | null;
+  company?: Option | null;
+}
+
+/** One visit behind a lead — several page loads inside one session. */
+export interface LeadVisit {
+  id: number;
+  leadId: number;
+  branchId: number | null;
+  sessionId: string | null;
+  visitedAt: string;
+  lastActivityAt: string | null;
+  pageViewCount: number;
+
+  pageUrl: string | null;
+  path: string | null;
+  pageTitle: string | null;
+  host: string | null;
+  referrer: string | null;
+  referrerHost: string | null;
+
+  /** Every `utm_*` key and click id the landing URL carried. */
+  utm: Record<string, string> | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+
+  fcmToken: string | null;
+  userAgent: string | null;
+  deviceType: DeviceType;
+  deviceVendor: string | null;
+  deviceModel: string | null;
+  os: string | null;
+  osVersion: string | null;
+  browser: string | null;
+  browserVersion: string | null;
+  engine: string | null;
+  isBot: boolean;
+
+  screenWidth: number | null;
+  screenHeight: number | null;
+  viewportWidth: number | null;
+  viewportHeight: number | null;
+  pixelRatio: string | number | null;
+  orientation: string | null;
+  /** The long tail the schema has no column for — cores, memory, connection. */
+  device: Record<string, unknown> | null;
+
+  ip: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  timezone: string | null;
+  timezoneOffset: number | null;
+  language: string | null;
+  languages: string[] | null;
+  latitude: string | number | null;
+  longitude: string | number | null;
+  locationAccuracy: number | null;
+  locationSource: string | null;
+  location: Record<string, unknown> | null;
+
+  extra: Record<string, unknown> | null;
+
+  branch?: Option | null;
+}
+
+export interface LeadDetail {
+  lead: Lead;
+  visits: LeadVisit[];
+}
+
+/** The counter strip above the table. */
+export interface LeadSummary {
+  total: number;
+  today: number;
+  thisWeek: number;
+  withPushToken: number;
+  totalVisits: number;
+  stages: Record<LeadStage, number>;
+  devices: { label: string; total: number }[];
+}
+
+/** One bar in any of the analytics breakdowns. */
+export interface LeadTally {
+  label: string;
+  total: number;
+}
+
+export interface LeadAnalytics {
+  totals: { leads: number; visits: number; visitsPerLead: number };
+  stages: Record<LeadStage, number>;
+  devices: LeadTally[];
+  sources: LeadTally[];
+  mediums: LeadTally[];
+  campaigns: LeadTally[];
+  referrers: LeadTally[];
+  cities: LeadTally[];
+  countries: LeadTally[];
+  browsers: LeadTally[];
+  operatingSystems: LeadTally[];
+  daily: { day: string; total: number }[];
+  /** Empty in the tenant console — only the platform sees across companies. */
+  companies: { companyId: number; name: string; code: string | null; total: number; visits: number }[];
+  branches: { branchId: number | null; name: string; code: string | null; total: number }[];
 }

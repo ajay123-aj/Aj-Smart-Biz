@@ -1,0 +1,196 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:320px"></div>
+  } @else {
+    <app-feature-gate [feature]="feature()" />
+
+    <!-- The section's own wording. One form, saved as a whole, because these
+         four fields belong to the band rather than to any card in it. -->
+    <form class="section-form" [formGroup]="copyForm" (ngSubmit)="saveCopy()">
+      <h4 style="margin:0 0 4px">How the section reads</h4>
+      <p class="tiny muted" style="margin:0 0 14px;max-width:64ch">
+        The heading above your benefits. Leave a field empty to use the standard wording &mdash;
+        <code>&#123;company&#125;</code> is replaced with your company name.
+      </p>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="feat-eyebrow">Eyebrow</label>
+          <input id="feat-eyebrow" class="input" formControlName="eyebrow" placeholder="What you get" />
+          <span class="hint">The small line above the heading.</span>
+        </div>
+
+        <div class="field">
+          <label for="feat-title">Heading</label>
+          <input id="feat-title" class="input" formControlName="title"
+                 placeholder="Why people work with {{ '{company}' }}" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="feat-lead">Introduction</label>
+        <textarea id="feat-lead" class="textarea" formControlName="lead"
+                  placeholder="The short version of how we work, and what it means for you once the job is underway."></textarea>
+      </div>
+
+      <div class="field" style="max-width:280px">
+        <label for="feat-cta">Button label</label>
+        <input id="feat-cta" class="input" formControlName="ctaLabel" placeholder="Talk it through" />
+        <span class="hint">Shown only while you are publishing a Contact page.</span>
+      </div>
+
+      @if (writable()) {
+        <div class="row-end" style="gap:8px">
+          <button type="button" class="btn btn-ghost" [disabled]="savingCopy()" (click)="resetCopy()">Reset</button>
+          <button type="submit" class="btn btn-primary" [disabled]="savingCopy()">
+            {{ savingCopy() ? 'Saving…' : 'Save wording' }}
+          </button>
+        </div>
+      }
+    </form>
+
+    <div class="row-between" style="align-items:flex-start;gap:12px">
+      <div>
+        <h4 style="margin:0 0 4px">Your benefits</h4>
+        <p class="tiny muted" style="margin:0 0 16px;max-width:64ch">
+          One card per reason to choose you, shown in the order below. Pick an icon for each &mdash;
+          they are drawn by the website, so a set of them looks like a set.
+        </p>
+      </div>
+      <div class="row-end" style="gap:8px">
+        <!-- Same branch fallback as the sliders: a branch site shows its own
+             cards, or the company-wide ones when it has none. -->
+        @if (feature()?.granted && branches().length > 0) {
+          <select class="select" style="width:auto" (change)="onBranchFilter(selectValue($event))">
+            <option value="">All benefits</option>
+            <option value="none">Company-wide only</option>
+            @for (branch of branches(); track branch.id) {
+              <option [value]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+        }
+        @if (writable()) {
+          <button type="button" class="btn btn-sm btn-primary" (click)="open(null)">＋ Add benefit</button>
+        }
+      </div>
+    </div>
+
+    @if (!feature()?.granted) {
+      <div class="empty-note">The Features / Benefits section is not part of your plan.</div>
+    } @else if (items().length === 0) {
+      <div class="empty-note">
+        No benefits yet &mdash; the section stays off your website until you add one.
+      </div>
+    } @else {
+      <div class="grid-cards">
+        @for (row of items(); track row.id; let first = $first; let last = $last) {
+          <article class="benefit" [class.benefit-inactive]="row.status !== 'active'">
+            <div class="benefit-body">
+              <!-- Drawn from the library the API sent, so this tile and the
+                   website's card are the same picture. -->
+              <span class="benefit-icon" [title]="labelOf(row.icon)" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  @for (d of pathsOf(row.icon); track $index) {
+                    <path [attr.d]="d" />
+                  }
+                </svg>
+              </span>
+
+              <div class="benefit-main">
+                <div class="benefit-title">{{ row.title }}</div>
+                @if (row.body) {
+                  <p class="benefit-text">{{ row.body }}</p>
+                } @else {
+                  <p class="benefit-untitled">No description</p>
+                }
+                <div style="margin-top:8px">
+                  <app-status-badge [value]="row.status" />
+                  @if (row.branch) {
+                    <span class="badge badge-info" style="margin-left:4px">{{ row.branch.name }}</span>
+                  }
+                </div>
+              </div>
+            </div>
+
+            @if (writable()) {
+              <div class="benefit-foot">
+                <span class="seq-num">{{ row.sequence }}</span>
+                <button type="button" class="btn btn-sm btn-ghost" title="Move up"
+                        [disabled]="first || reordering()" (click)="move(row, -1)">↑</button>
+                <button type="button" class="btn btn-sm btn-ghost" title="Move down"
+                        [disabled]="last || reordering()" (click)="move(row, 1)">↓</button>
+                <span class="spacer"></span>
+                <button type="button" class="btn btn-sm btn-ghost" (click)="toggle(row)">
+                  {{ row.status === 'active' ? 'Hide' : 'Show' }}
+                </button>
+                <button type="button" class="btn btn-sm btn-ghost" (click)="open(row)">Edit</button>
+                <button type="button" class="btn btn-sm btn-danger" (click)="remove(row)">Delete</button>
+              </div>
+            }
+          </article>
+        }
+      </div>
+      <p class="tiny muted" style="margin:14px 0 0">Only active benefits appear on the website.</p>
+    }
+  }
+</div>
+
+@if (modalOpen()) {
+  <app-modal
+    [title]="editing() ? 'Edit benefit' : 'Add benefit'"
+    size="md"
+    [closeOnBackdrop]="false"
+    (closed)="modalOpen.set(false)"
+  >
+    <form [formGroup]="form" (ngSubmit)="save()" id="feature-form">
+      <div class="field">
+        <label for="feat-branch">Shows on</label>
+        <select id="feat-branch" class="select" formControlName="branchId">
+          <option value="">All branches (company-wide)</option>
+          @for (branch of branches(); track branch.id) {
+            <option [value]="branch.id">{{ branch.name }}</option>
+          }
+        </select>
+        <p class="tiny muted mb-0">
+          A branch site shows its own. If it has none, it falls back to the company-wide ones.
+        </p>
+      </div>
+
+      <div class="field">
+        <label>Icon <span class="req">*</span></label>
+        <app-icon-picker formControlName="icon" [icons]="icons()" />
+      </div>
+
+      <div class="field">
+        <label for="feat-card-title">Benefit <span class="req">*</span></label>
+        <input id="feat-card-title" class="input" formControlName="title"
+               placeholder="Delivered when we said" />
+        <app-field-error [control]="form.controls.title" label="Benefit" />
+        <span class="hint">Say the benefit, not the feature &mdash; what it means for the reader.</span>
+      </div>
+
+      <div class="field">
+        <label for="feat-card-body">Description</label>
+        <textarea id="feat-card-body" class="textarea" formControlName="body"
+                  placeholder="Dates are committed to only once the work is properly understood. That is the whole reason we are able to keep them."></textarea>
+        <span class="hint">Optional &mdash; a good heading can stand on its own.</span>
+      </div>
+
+      <div class="field" style="max-width:220px">
+        <label for="feat-status">Status</label>
+        <select id="feat-status" class="select" formControlName="status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+      <button type="submit" form="feature-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Add benefit' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

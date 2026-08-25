@@ -1,0 +1,181 @@
+<app-page-header
+  title="Lead analysis"
+  subtitle="Website traffic across every tenant — company-wise, branch-wise, and by where it came from."
+>
+  <a class="btn btn-ghost" routerLink="/leads">← All leads</a>
+  <button type="button" class="btn btn-ghost" (click)="load()" [disabled]="loading()">↻ Refresh</button>
+</app-page-header>
+
+<div class="card" style="margin-bottom:18px">
+  <div class="card-head filters">
+    <select class="select" style="width:auto" (change)="apply({ companyId: selectValue($event) })">
+      <option value="">All companies</option>
+      @for (company of companyOptions(); track company.id) {
+        <option [value]="company.id">{{ company.name }}</option>
+      }
+    </select>
+
+    <div class="date-filter">
+      <input class="input" type="date" title="From" (change)="apply({ from: inputValue($event) })" />
+      <span class="tiny muted">to</span>
+      <input class="input" type="date" title="To" (change)="apply({ to: inputValue($event) })" />
+    </div>
+
+    <label class="tiny muted" style="display:inline-flex;align-items:center;gap:6px">
+      <input type="checkbox" (change)="apply({ includeBots: checked($event) })" />
+      Include bots
+    </label>
+  </div>
+</div>
+
+@if (loading() && !data()) {
+  <div class="grid grid-3">
+    @for (item of [1, 2, 3]; track item) {
+      <div class="skeleton" style="height:118px"></div>
+    }
+  </div>
+} @else if (data(); as d) {
+  <section class="grid grid-3" style="margin-bottom:18px">
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--brand-100);color:var(--brand-700)">🎯</span>
+        <span class="tile-label">Leads</span>
+      </div>
+      <div class="tile-value">{{ d.totals.leads }}</div>
+      <div class="tile-foot">
+        <span class="tiny muted">Across {{ d.companies.length || 0 }} companies</span>
+      </div>
+    </article>
+
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--info-bg);color:var(--info)">👣</span>
+        <span class="tile-label">Visits</span>
+      </div>
+      <div class="tile-value">{{ d.totals.visits }}</div>
+      <div class="tile-foot"><span class="tiny muted">A visit is one sitting, not one page</span></div>
+    </article>
+
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-icon" style="background:var(--success-bg);color:var(--success)">🔁</span>
+        <span class="tile-label">Visits per lead</span>
+      </div>
+      <div class="tile-value">{{ d.totals.visitsPerLead }}</div>
+      <div class="tile-foot"><span class="tiny muted">Above 1 means people are coming back</span></div>
+    </article>
+  </section>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Leads per company. The number this console exists to show, so it     -->
+  <!-- leads the page rather than sitting among the other breakdowns.       -->
+  <!-- ------------------------------------------------------------------ -->
+  <section class="card" style="margin-bottom:18px">
+    <div class="card-head">
+      <h3 class="card-title">Leads by company</h3>
+      <span class="tiny muted" style="margin-left:auto">Busiest first</span>
+    </div>
+    <div class="card-body tight">
+      @if (!d.companies.length) {
+        <p class="muted tiny" style="padding:14px">No tenant has recorded a lead in this period.</p>
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th style="width:52px">#</th>
+                <th>Company</th>
+                <th>Leads</th>
+                <th>Visits</th>
+                <th>Visits per lead</th>
+                <th class="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of d.companies; track row.companyId; let i = $index) {
+                <tr>
+                  <td class="muted">{{ i + 1 }}</td>
+                  <td>
+                    <span class="strong">{{ row.name }}</span>
+                    @if (row.code) {
+                      <span class="rank-code"> · {{ row.code }}</span>
+                    }
+                  </td>
+                  <td class="rank-n">{{ row.total }}</td>
+                  <td>{{ row.visits }}</td>
+                  <td>{{ returnRate(row.total, row.visits) }}</td>
+                  <td>
+                    <div class="row-end">
+                      <a class="btn btn-sm btn-ghost" [routerLink]="['/companies', row.companyId]">Company</a>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom:18px">
+    <div class="card-head"><h3 class="card-title">Pipeline</h3></div>
+    <div class="card-body">
+      <div class="funnel">
+        @for (stage of stages; track stage) {
+          <div class="funnel-step">
+            <div class="funnel-n">{{ d.stages[stage] }}</div>
+            <div class="funnel-label">{{ stage }}</div>
+          </div>
+        }
+      </div>
+      <p class="tiny muted" style="margin:12px 0 0">
+        Stages are set by each company in its own console. The platform reads them; it never writes them.
+      </p>
+    </div>
+  </section>
+
+  @if (d.daily.length) {
+    <section class="card" style="margin-bottom:18px">
+      <div class="card-head">
+        <h3 class="card-title">Leads by day</h3>
+        <span class="tiny muted" style="margin-left:auto">{{ d.daily.length }} days with activity</span>
+      </div>
+      <div class="card-body">
+        <div class="trend">
+          @for (day of d.daily; track day.day) {
+            <div class="trend-col" [title]="day.day + ' · ' + day.total + ' leads'">
+              <div class="trend-bar" [style.height.%]="barHeight(day.total)"></div>
+            </div>
+          }
+        </div>
+        <div class="trend-axis tiny muted">
+          <span>{{ dayLabel(d.daily[0].day) }}</span>
+          <span>{{ dayLabel(d.daily[d.daily.length - 1].day) }}</span>
+        </div>
+      </div>
+    </section>
+  }
+
+  <div class="grid grid-2">
+    <app-lead-breakdown title="Top companies" hint="by lead count" [rows]="companyRows()" />
+    <app-lead-breakdown title="Branch sites" [rows]="branchRows()" />
+    <app-lead-breakdown
+      title="Traffic sources"
+      hint="utm_source"
+      [rows]="d.sources"
+      emptyText="No tagged links recorded — tenants are not using utm_source on their campaign URLs."
+    />
+    <app-lead-breakdown title="Campaigns" hint="utm_campaign" [rows]="d.campaigns" />
+    <app-lead-breakdown title="Mediums" hint="utm_medium" [rows]="d.mediums" />
+    <app-lead-breakdown title="Referring sites" [rows]="d.referrers" />
+    <app-lead-breakdown title="Devices" [rows]="d.devices" />
+    <app-lead-breakdown title="Cities" [rows]="d.cities" />
+    <app-lead-breakdown title="Countries" [rows]="d.countries" />
+    <app-lead-breakdown title="Browsers" [rows]="d.browsers" />
+  </div>
+} @else {
+  <div class="card">
+    <div class="card-body"><p class="muted mb-0">The analysis could not be loaded.</p></div>
+  </div>
+}

@@ -349,7 +349,7 @@
         <div class="field">
           <label for="rmode2">Record payment as</label>
           <select id="rmode2" class="select" formControlName="paymentMode">
-            @for (mode of paymentModes; track mode.value) {
+            @for (mode of paymentModes(); track mode.value) {
               <option [value]="mode.value">{{ mode.label }}</option>
             }
           </select>
@@ -464,7 +464,7 @@
         <div class="field">
           <label for="cmode">Record payment as</label>
           <select id="cmode" class="select" formControlName="paymentMode">
-            @for (mode of paymentModes; track mode.value) {
+            @for (mode of paymentModes(); track mode.value) {
               <option [value]="mode.value">{{ mode.label }}</option>
             }
           </select>
@@ -533,7 +533,7 @@
         <div class="field">
           <label for="amode">Record payment as</label>
           <select id="amode" class="select" formControlName="paymentMode">
-            @for (mode of paymentModes; track mode.value) {
+            @for (mode of paymentModes(); track mode.value) {
               <option [value]="mode.value">{{ mode.label }}</option>
             }
           </select>

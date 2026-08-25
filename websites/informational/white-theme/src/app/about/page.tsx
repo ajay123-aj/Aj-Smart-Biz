@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import PlanNotice from '@/components/PlanNotice';
+import ServiceUnavailable from '@/components/ServiceUnavailable';
 import TeamSection from '@/components/TeamSection';
 import GallerySection from '@/components/GallerySection';
 import CtaBand from '@/components/CtaBand';
-import StatsGrid from '@/components/StatsGrid';
+import FiguresSection from '@/components/FiguresSection';
 import { ABOUT_PAGE } from '@/config/site';
 import { resolveAbout } from '@/lib/about';
 import { fillCompany, toFileUrl } from '@/lib/company';
@@ -39,6 +40,15 @@ export default async function AboutPage() {
   const company = await getCompanyDetails();
 
   // The plan is what pays for the content — same rule as the home page.
+  /**
+   * The layout declines to frame the site when the API is unreachable; the page
+   * has to decline to render it too. Skipping only the layout would still leave
+   * this page in the streamed RSC payload, where its markup — placeholder
+   * company and all — remains readable to anyone who looks. Same rule, and the
+   * same reason, as the plan check below.
+   */
+  if (!company.apiReachable) return <ServiceUnavailable />;
+
   if (!company.service.active) return <PlanNotice company={company} />;
 
   const about = resolveAbout(company);
@@ -88,13 +98,6 @@ export default async function AboutPage() {
             ) : null}
           </div>
 
-          {/*
-            The figures belong up here, not under the story: they are the
-            fastest thing on the page to read, and they gave the masthead the
-            substance it was missing when it was a heading on an empty band.
-            Renders nothing when the tenant has written none.
-          */}
-          <StatsGrid stats={about.stats} className={styles.stats} />
         </div>
       </header>
 
@@ -115,6 +118,9 @@ export default async function AboutPage() {
               <div className={styles.storyHead}>
                 <span className="eyebrow">{ABOUT_PAGE.storyEyebrow}</span>
                 <h2 className={styles.storyTitle}>{ABOUT_PAGE.storyTitle}</h2>
+                {/* Ties the narrow column to the panel beside it, so the heading
+                    does not read as a caption floating in white space. */}
+                <span className={styles.storyRule} aria-hidden="true" />
               </div>
             ) : null}
 
@@ -122,21 +128,24 @@ export default async function AboutPage() {
               The panel is the fix for a short story. Prose alone in a wide
               column left most of the row empty and made two sentences look like
               a mistake; inside a panel that fills the column, the same two
-              sentences look deliberate. The measure is capped within it, so a
-              long story still reads comfortably.
+              sentences look deliberate. The measure is capped on the text block
+              inside it — and centred there — so the panel never ends up as a
+              narrow ribbon of words against a wide field of white.
             */}
             <div className={styles.storyPanel}>
-              {about.paragraphs.map((paragraph) => (
-                <p className={styles.prose} key={paragraph.slice(0, 48)}>
-                  {paragraph}
-                </p>
-              ))}
+              <div className={styles.storyProse}>
+                {about.paragraphs.map((paragraph, index) => (
+                  <p className={styles.prose} key={`${index}-${paragraph.slice(0, 32)}`}>
+                    {paragraph}
+                  </p>
+                ))}
 
-              {/* A page with a heading and nothing under it is worse than one
-                  that says plainly there is nothing more yet. */}
-              {about.paragraphs.length === 0 ? (
-                <p className={styles.prose}>{fillCompany(ABOUT_PAGE.emptyStory, company)}</p>
-              ) : null}
+                {/* A page with a heading and nothing under it is worse than one
+                    that says plainly there is nothing more yet. */}
+                {about.paragraphs.length === 0 ? (
+                  <p className={styles.prose}>{fillCompany(ABOUT_PAGE.emptyStory, company)}</p>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
@@ -146,6 +155,20 @@ export default async function AboutPage() {
           has put something in it, so neither needs a guard here. */}
       <TeamSection company={company} />
       <GallerySection company={company} />
+
+      {/*
+        The figures, immediately before the closing band — the same place the
+        home page puts them, so a visitor meets the band in one position rather
+        than high on one page and low on the other.
+
+        They were directly under the masthead, which is the wrong end of this
+        page: the story, the people and the work are what a reader came to About
+        for, and the numbers mean more once those have been read than they do
+        above them. The same component, the same heading, the same cards.
+
+        Renders nothing when the tenant is not carrying the section.
+      */}
+      <FiguresSection company={company} />
 
       {/* The same band that closes the home page, from the same component. */}
       <CtaBand company={company} />

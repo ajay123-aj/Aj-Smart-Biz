@@ -19,6 +19,9 @@ const {
   STAT_MODE_VALUES,
   STAT_UNIT_VALUES,
   DEFAULT_STATS,
+  FEATURE_ICONS,
+  DEFAULT_FEATURE_ITEMS,
+  PAYMENT_MODE_CATALOGUE,
 } = require('../constants');
 
 /**
@@ -53,11 +56,26 @@ const catalogue = asyncHandler(async (req, res) =>
     message: 'Functionality catalogue fetched successfully',
     data: {
       functionalities: FUNCTIONALITY_CATALOGUE,
+      /**
+       * How a payment may be recorded. Here rather than in the console, which
+       * had the list written out in two components — see
+       * `PAYMENT_MODE_CATALOGUE`.
+       */
+      paymentModes: PAYMENT_MODE_CATALOGUE,
       whatsappTypes: WHATSAPP_TYPE_CATALOGUE,
       shareChannels: SHARE_CHANNEL_VALUES,
       shareDefaults: SHARE_LINK_DEFAULTS,
       statModes: STAT_MODE_VALUES,
       statUnits: STAT_UNIT_VALUES,
+      /**
+       * The glyphs a benefit card may carry, with the artwork to draw them.
+       *
+       * Sent from here so the console's icon picker shows exactly what the
+       * platform can render — a hard-coded list in the browser would go stale
+       * the first time a glyph is added, and offer a tenant something the
+       * website would then draw as a spark.
+       */
+      featureIcons: FEATURE_ICONS,
     },
   })
 );
@@ -100,7 +118,7 @@ async function switchRow(companyId, key, defaults = {}) {
  * same reason, and both read the same answer.
  */
 /**
- * Gives a company the starting stat band the first time it switches About on,
+ * Gives a company the starting stat band the first time it switches Figures on,
  * so the section is never an empty row of tiles.
  *
  * "Years in business" counts from the company record's own creation date,
@@ -125,6 +143,25 @@ async function seedDefaultStats(companyId, actorId) {
   );
 }
 
+/**
+ * Gives a company a starting set of benefit cards the first time it switches
+ * Features on, so the band is never an empty strip with a heading on it.
+ *
+ * The same bargain `seedDefaultStats` makes, and for the same reason: this
+ * section was the template's copy on every site until now, so a tenant
+ * switching it on should find the words they already had, editable, rather than
+ * a blank screen and six cards to write. Ordinary rows from that moment on —
+ * a company that deletes them all does not get them back.
+ */
+async function seedDefaultFeatures(companyId, actorId) {
+  const existing = await db.CompanyFeature.count({ where: { companyId } });
+  if (existing) return;
+
+  await db.CompanyFeature.bulkCreate(
+    DEFAULT_FEATURE_ITEMS.map((item) => ({ ...item, companyId, createdBy: actorId ?? null }))
+  );
+}
+
 const toggleStatus = asyncHandler(async (req, res) => {
   const companyId = resolveCompanyId(req);
   const { key } = req.params;
@@ -134,8 +171,12 @@ const toggleStatus = asyncHandler(async (req, res) => {
   const next = req.body?.status || (row.status === STATUS.ACTIVE ? STATUS.INACTIVE : STATUS.ACTIVE);
   await row.update({ status: next, updatedBy: req.auth?.id ?? null });
 
-  if (key === FUNCTIONALITY.ABOUT_US && next === STATUS.ACTIVE) {
+  if (key === FUNCTIONALITY.FIGURES && next === STATUS.ACTIVE) {
     await seedDefaultStats(companyId, req.auth?.id);
+  }
+
+  if (key === FUNCTIONALITY.FEATURES && next === STATUS.ACTIVE) {
+    await seedDefaultFeatures(companyId, req.auth?.id);
   }
 
   const item = await functionalityService.getFunctionality(companyId, key);

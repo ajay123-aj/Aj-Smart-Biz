@@ -7,7 +7,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { UploadService } from '../../core/services/upload.service';
 import { messageOf } from '../../core/interceptors/auth.interceptor';
-import { Branch, Functionality, TeamMember } from '../../core/models/domain.model';
+import { Branch, Functionality, SectionCopy, TeamMember } from '../../core/models/domain.model';
 import { touchAll } from '../../shared/utils';
 import { FieldErrorComponent } from '../../shared/ui/field-error.component';
 import { FeatureGateComponent } from '../../shared/ui/feature-gate.component';
@@ -40,6 +40,10 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
   styles: [
     `
       :host { display: block; }
+
+      .section-form { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
+      .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+      @media (max-width: 720px) { .form-grid { grid-template-columns: 1fr; } }
 
       .grid-cards {
         display: grid;
@@ -109,6 +113,19 @@ export class TeamManagerComponent {
   readonly modalOpen = signal(false);
   readonly editing = signal<TeamMember | null>(null);
 
+  readonly savingCopy = signal(false);
+
+  /**
+   * The words above the section on the website. Saved as a whole and separately
+   * from the cards, because they belong to the section rather than to any one
+   * of them — the same split the About and Features screens use.
+   */
+  readonly copyForm = this.fb.nonNullable.group({
+    eyebrow: [''],
+    title: [''],
+    lead: [''],
+  });
+
   readonly writable = computed(() => this.canEdit() && (this.feature()?.granted ?? false));
 
   readonly form = this.fb.nonNullable.group({
@@ -127,12 +144,58 @@ export class TeamManagerComponent {
     this.load();
   }
 
+  /**
+   * Filled from whatever the API resolved, which means these fields show the
+   * words actually on the website rather than empty boxes — the API sends its
+   * own defaults where the company has written nothing. Clearing a field and
+   * saving therefore puts the default back.
+   */
+  private patchCopyForm(): void {
+    const settings = (this.feature()?.settings ?? {}) as Partial<SectionCopy>;
+    this.copyForm.reset({
+      eyebrow: settings.eyebrow ?? '',
+      title: settings.title ?? '',
+      lead: settings.lead ?? '',
+    });
+  }
+
+  saveCopy(): void {
+    const raw = this.copyForm.getRawValue();
+    this.savingCopy.set(true);
+
+    this.companies
+      .saveFunctionalitySettings('team', {
+        // Blank is a real choice — it means "use the standard wording" — so it
+        // goes as null rather than being dropped from the payload.
+        eyebrow: raw.eyebrow || null,
+        title: raw.title || null,
+        lead: raw.lead || null,
+      })
+      .subscribe({
+        next: (updated) => {
+          this.savingCopy.set(false);
+          this.feature.set(updated);
+          this.patchCopyForm();
+          this.toast.success('Section wording saved');
+        },
+        error: (error: HttpErrorResponse) => {
+          this.savingCopy.set(false);
+          this.toast.error('Could not save the wording', messageOf(error));
+        },
+      });
+  }
+
+  resetCopy(): void {
+    this.patchCopyForm();
+  }
+
   private load(): void {
     this.loading.set(true);
     this.companies.functionalities().subscribe({
       next: (view) => {
         const item = (view.items ?? []).find((row) => row.key === 'team') ?? null;
         this.feature.set(item);
+        this.patchCopyForm();
         this.loading.set(false);
         if (item?.granted) {
           this.loadMembers();

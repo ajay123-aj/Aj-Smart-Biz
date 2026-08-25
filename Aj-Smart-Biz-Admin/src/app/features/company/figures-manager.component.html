@@ -1,0 +1,236 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:340px"></div>
+  } @else {
+    <app-feature-gate [feature]="feature()" />
+
+    @if (!canEdit()) {
+      <p class="tiny muted" style="margin-top:0">
+        Only the main admin can change what your website says. You are viewing this read only.
+      </p>
+    }
+
+    <!-- ------------------------------------------------------------------
+         The words above the band.
+
+         One heading for the whole set, so it is not branch-scoped — the same
+         decision Team and Gallery make about theirs.
+         ------------------------------------------------------------------ -->
+    <form class="section-form" [formGroup]="copyForm" (ngSubmit)="saveCopy()">
+      <h4 style="margin:0 0 4px">The words above your figures</h4>
+      <p class="tiny muted" style="margin:0 0 14px;max-width:64ch">
+        Shown above the band on your home page &mdash; where it is the first thing under your slider
+        &mdash; and again on your About page. Leave a field empty to use the standard wording.
+      </p>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="fig-eyebrow">Eyebrow</label>
+          <input id="fig-eyebrow" class="input" formControlName="eyebrow" placeholder="By the numbers" />
+          <span class="hint">The small line above the heading</span>
+        </div>
+
+        <div class="field">
+          <label for="fig-title">Heading</label>
+          <input id="fig-title" class="input" formControlName="title"
+                 placeholder="What {company} has to show for it" />
+          <span class="hint"><code>&#123;company&#125;</code> is replaced with your company name</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="fig-lead">Description</label>
+        <textarea id="fig-lead" class="textarea" rows="2" formControlName="lead"
+                  placeholder="A few figures that say more about the work than a page of prose would."></textarea>
+        <span class="hint">One or two sentences under the heading</span>
+      </div>
+
+      @if (writable()) {
+        <div class="row-end" style="gap:8px">
+          <button type="button" class="btn btn-ghost" [disabled]="savingCopy()" (click)="resetCopy()">Reset</button>
+          <button type="submit" class="btn btn-primary" [disabled]="savingCopy()">
+            {{ savingCopy() ? 'Saving…' : 'Save wording' }}
+          </button>
+        </div>
+      }
+    </form>
+
+    <!-- ------------------------------------------------------------------
+         The figures themselves.
+
+         Branch-scoped, unlike the wording above: a branch with its own numbers
+         shows those, and one with none shows the company-wide band.
+         ------------------------------------------------------------------ -->
+    @if (feature()?.granted && branches().length > 0) {
+      <div class="scope-bar">
+        <label class="scope-label" for="fig-scope">Showing figures for</label>
+        <select
+          id="fig-scope"
+          class="select"
+          style="width:auto"
+          [disabled]="!canEdit()"
+          (change)="onScope(selectValue($event))"
+        >
+          <option value="">All branches (company-wide)</option>
+          @for (branch of branches(); track branch.id) {
+            <option [value]="branch.id" [selected]="scope() === branch.id">{{ branch.name }}</option>
+          }
+        </select>
+
+        @if (scope()) {
+          <span class="scope-note">
+            These belong to {{ scopeName() }} alone &mdash; a branch with none of its own shows the
+            company-wide band.
+          </span>
+        }
+      </div>
+    }
+
+    <div class="row-between" style="align-items:flex-start;gap:12px">
+      <div>
+        <h4 style="margin:0 0 4px">Figures &mdash; {{ scopeName() }}</h4>
+        <p class="tiny muted" style="margin:0 0 14px;max-width:64ch">
+          Your own numbers, with your own wording. A figure can be fixed text, or counted from a date
+          &mdash; pick counting for anything that would otherwise go stale, like years in business.
+        </p>
+      </div>
+      @if (writable()) {
+        <button type="button" class="btn btn-sm btn-primary" (click)="openCard(null)">＋ Add figure</button>
+      }
+    </div>
+
+    @if (!feature()?.granted) {
+      <div class="stat-empty">Figures are not part of your plan.</div>
+    } @else if (cards().length === 0) {
+      <div class="stat-empty">No figures yet — the band is hidden on your website until you add one.</div>
+    } @else {
+      @for (row of cards(); track row.id; let first = $first; let last = $last) {
+        <div class="stat-row">
+          @if (writable()) {
+            <div class="seq">
+              <span class="seq-num">{{ row.sequence }}</span>
+              <button type="button" class="btn btn-sm btn-ghost" title="Move up"
+                      [disabled]="first || reordering()" (click)="move(row, -1)">↑</button>
+              <button type="button" class="btn btn-sm btn-ghost" title="Move down"
+                      [disabled]="last || reordering()" (click)="move(row, 1)">↓</button>
+            </div>
+          }
+
+          <span class="stat-figure">{{ figureOf(row) }}</span>
+
+          <span class="stat-main">
+            <span class="stat-label">{{ row.label }}</span>
+            <div class="stat-note">{{ describe(row) }}</div>
+          </span>
+
+          <app-status-badge [value]="row.status" />
+
+          @if (writable()) {
+            <span class="row-end" style="gap:4px">
+              <button type="button" class="btn btn-sm btn-ghost" (click)="toggleCard(row)">
+                {{ row.status === 'active' ? 'Deactivate' : 'Activate' }}
+              </button>
+              <button type="button" class="btn btn-sm btn-ghost" (click)="openCard(row)">Edit</button>
+              <button type="button" class="btn btn-sm btn-danger" (click)="removeCard(row)">Delete</button>
+            </span>
+          }
+        </div>
+      }
+      <p class="tiny muted" style="margin:12px 0 0">Only active figures appear on the website.</p>
+    }
+  }
+</div>
+
+@if (modalOpen()) {
+  <app-modal
+    [title]="editing() ? 'Edit figure' : 'Add figure'"
+    size="md"
+    [closeOnBackdrop]="false"
+    (closed)="modalOpen.set(false)"
+  >
+    <form [formGroup]="statForm" (ngSubmit)="saveCard()" id="fig-form">
+      <div class="field">
+        <label for="fig-label">Label <span class="req">*</span></label>
+        <input id="fig-label" class="input" formControlName="label" placeholder="Years in business" />
+        <app-field-error [control]="statForm.controls.label" label="Label" />
+        <span class="hint">The wording under the figure</span>
+      </div>
+
+      <div class="field">
+        <label>How is the figure produced?</label>
+        <div class="mode-grid">
+          <label class="mode" [class.mode-on]="modeIs('fixed')">
+            <input type="radio" [checked]="modeIs('fixed')" (change)="setMode('fixed')" />
+            <span>
+              <span class="mode-name">Fixed</span>
+              <span class="mode-hint">A number you type and maintain yourself</span>
+            </span>
+          </label>
+          <label class="mode" [class.mode-on]="modeIs('since_date')">
+            <input type="radio" [checked]="modeIs('since_date')" (change)="setMode('since_date')" />
+            <span>
+              <span class="mode-name">Counted from a date</span>
+              <span class="mode-hint">Recalculated on every visit, so it never goes stale</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      @if (modeIs('fixed')) {
+        <div class="field">
+          <label for="fig-value">Figure <span class="req">*</span></label>
+          <input id="fig-value" class="input" formControlName="value" placeholder="250" />
+        </div>
+      } @else {
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="fig-since">Counting from <span class="req">*</span></label>
+            <input id="fig-since" class="input" type="date" formControlName="sinceDate" />
+            <span class="hint">The day the business started, or whatever this counts from</span>
+          </div>
+          <div class="field">
+            <label for="fig-unit">Counted in</label>
+            <select id="fig-unit" class="select" formControlName="unit">
+              @for (unit of units; track unit.value) {
+                <option [value]="unit.value">{{ unit.label }}</option>
+              }
+            </select>
+          </div>
+        </div>
+      }
+
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="fig-prefix">Before the figure</label>
+          <input id="fig-prefix" class="input" formControlName="prefix" placeholder="₹" />
+        </div>
+        <div class="field">
+          <label for="fig-suffix">After the figure</label>
+          <input id="fig-suffix" class="input" formControlName="suffix" placeholder="+" />
+        </div>
+      </div>
+
+      <!-- Editing against what a visitor will actually see, not raw fields. -->
+      <div class="preview">
+        On your website this reads
+        <strong>{{ previewOf() }}</strong>
+        {{ statForm.controls.label.value || 'your label' }}
+      </div>
+
+      <div class="field" style="max-width:220px;margin-top:14px">
+        <label for="fig-status">Status</label>
+        <select id="fig-status" class="select" formControlName="status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+      <button type="submit" form="fig-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Add figure' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}
