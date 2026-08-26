@@ -18,6 +18,11 @@ const {
   TESTIMONIAL_SOURCE_VALUES,
   TESTIMONIAL_RATING_MAX,
   FEATURE_ICON_KEYS,
+  SERVICE_HIGHLIGHTS_MAX,
+  SERVICE_HIGHLIGHT_LENGTH,
+  SERVICE_ENQUIRY_TARGET_VALUES,
+  SERVICE_CTA_MAX,
+  LEAD_STAGE_VALUES,
   NAV_LABEL_MAX,
 } = require('../constants');
 
@@ -151,6 +156,35 @@ const SETTINGS_SCHEMA = {
     title: Joi.string().allow('', null).max(160),
     lead: Joi.string().allow('', null).max(400),
     ctaLabel: Joi.string().allow('', null).max(60),
+  }),
+  /**
+   * Services keeps the section's wording here, plus the name its page carries
+   * in the website's menu.
+   *
+   * `navLabel` is the only settings field on the platform that ends up in the
+   * nav bar. It is capped to the column's own width — a menu is a row of short
+   * words, and a forty-character entry is what wraps the bar onto two lines on
+   * a laptop. Blank asks for the platform's name back, like every other copy
+   * field here.
+   */
+  [FUNCTIONALITY.SERVICES]: Joi.object({
+    navLabel: Joi.string().trim().allow('', null).max(NAV_LABEL_MAX),
+    eyebrow: Joi.string().allow('', null).max(80),
+    title: Joi.string().allow('', null).max(160),
+    lead: Joi.string().allow('', null).max(400),
+    ctaLabel: Joi.string().allow('', null).max(60),
+    /**
+     * Where a submitted enquiry goes — WhatsApp, the console, or both.
+     *
+     * `.valid()`-constrained here as well as normalised in the service, and
+     * both are deliberate: this refuses a bad write, the service survives a bad
+     * read. The value decides whether the public internet can write rows into
+     * this tenant's database, which is the same reason the testimonial mode is
+     * checked twice.
+     */
+    enquiryTarget: Joi.string().valid(...SERVICE_ENQUIRY_TARGET_VALUES),
+    formTitle: Joi.string().allow('', null).max(120),
+    formNote: Joi.string().allow('', null).max(300),
   }),
 };
 
@@ -456,6 +490,119 @@ const featureCreate = {
 
 const featureUpdate = { params: idParam, body: Joi.object(featureFields).min(1) };
 
+/* ------------------------------------------------------------------ *
+ * Services
+ * ------------------------------------------------------------------ */
+
+/**
+ * What one service may carry.
+ *
+ * `icon` is constrained to the same closed library the benefit cards use, and
+ * for the same reason: the website draws these itself, so an unchecked name
+ * would let a tenant save something that silently renders as a spark.
+ *
+ * `highlights` is the one array a tenant sends. It is capped in both directions
+ * — how many, and how long each — because it is printed as a tick list beside
+ * the card's picture, and neither twenty lines nor a paragraph masquerading as
+ * a line survives that layout. Empty strings are stripped rather than refused:
+ * a person filling in six boxes and using four should not get a validation
+ * error for the two they left alone.
+ */
+const serviceFields = {
+  branchId,
+  icon: Joi.string().valid(...FEATURE_ICON_KEYS),
+  /** An upload path from `POST /uploads/service`. Optional — the icon covers it. */
+  image: Joi.string().trim().allow('', null).max(255),
+  title: Joi.string().trim().min(1).max(150),
+  summary: Joi.string().trim().allow('', null).max(600),
+  highlights: Joi.array()
+    .items(Joi.string().trim().max(SERVICE_HIGHLIGHT_LENGTH).allow(''))
+    .max(SERVICE_HIGHLIGHTS_MAX)
+    .allow(null)
+    .custom((value) => (value ?? []).map((line) => line.trim()).filter(Boolean)),
+  priceLabel: Joi.string().trim().allow('', null).max(60),
+  /**
+   * This service's own button label. Optional, and blank means "use the
+   * section's" — which is why it is stored as null rather than filled in.
+   */
+  ctaLabel: Joi.string().trim().allow('', null).max(SERVICE_CTA_MAX),
+  featured: Joi.boolean(),
+  sequence: Joi.number().integer().min(0).max(9999),
+  status,
+};
+
+const serviceCreate = {
+  body: Joi.object({
+    ...serviceFields,
+    title: serviceFields.title.required(),
+  }),
+};
+
+const serviceUpdate = { params: idParam, body: Joi.object(serviceFields).min(1) };
+
+/* ------------------------------------------------------------------ *
+ * Service enquiries
+ * ------------------------------------------------------------------ */
+
+/**
+ * What a visitor may send when they ask about a service.
+ *
+ * A name and a number, and nothing else. There is no `companyId` to send — the
+ * tenant comes from the host, the same rule every route in the website module
+ * follows — and no `serviceId` that is trusted: the controller checks the
+ * service belongs to this tenant and is actually published before it writes
+ * anything.
+ *
+ * `domain` is how the endpoint knows which tenant is being enquired at on a
+ * local dev server, matching `?domain=` on `/website/company-details`. In
+ * production the Host header answers it and the field is never sent.
+ */
+const serviceLeadSubmit = {
+  body: Joi.object({
+    domain: Joi.string().allow('', null).max(255),
+    serviceId: id.required(),
+    name: Joi.string().trim().min(2).max(150).required(),
+    /**
+     * Digits, spaces and the punctuation people actually type — `+`, `-`,
+     * brackets. Kept as a pattern rather than a strict phone format because
+     * this is every country's numbering plan at once, and a form that refuses
+     * a real number is worse than a row that needs reading by a person.
+     */
+    phone: Joi.string()
+      .trim()
+      .pattern(/^[0-9+()\-\s]{6,20}$/)
+      .required()
+      .messages({ 'string.pattern.base': 'Enter a valid phone number' }),
+    /** The page it was sent from. Optional, and never trusted for anything. */
+    sourceUrl: Joi.string().trim().allow('', null).max(500),
+  }),
+};
+
+/** The tenant's own enquiry list: filters, paging and search. */
+const serviceLeadList = {
+  query: listQuery({
+    stage: Joi.string().valid(...LEAD_STAGE_VALUES),
+    serviceId: id,
+    branchId: Joi.alternatives().try(id, Joi.string().valid('none', 'null')),
+  }),
+};
+
+/**
+ * What the company may change on an enquiry: where it has got to, and what
+ * they want to remember about it.
+ *
+ * Nothing the visitor wrote is editable. A name and a number are what somebody
+ * typed, and a screen that let them be rewritten would quietly turn a record of
+ * what happened into a note about what someone thinks happened.
+ */
+const serviceLeadUpdate = {
+  params: idParam,
+  body: Joi.object({
+    stage: Joi.string().valid(...LEAD_STAGE_VALUES),
+    note: Joi.string().trim().allow('', null).max(2000),
+  }).min(1),
+};
+
 /** Every card list reorders the same way: the whole order, in one call. */
 const reorder = {
   body: Joi.object({
@@ -497,6 +644,11 @@ module.exports = {
   testimonialSubmit,
   featureCreate,
   featureUpdate,
+  serviceCreate,
+  serviceUpdate,
+  serviceLeadSubmit,
+  serviceLeadList,
+  serviceLeadUpdate,
   reorder,
   cardListQuery: {
     // `none` asks for the company-wide cards, which have no branch id at all.

@@ -1,0 +1,168 @@
+<app-page-header
+  title="Service Leads"
+  subtitle="People who asked you to call them back about a service, and what you did about it."
+>
+  <button type="button" class="btn btn-ghost" (click)="reload()" [disabled]="store.loading()">↻ Refresh</button>
+</app-page-header>
+
+<!-- The counters describe the whole queue, never the open filter, and each one
+     is also the filter for it. The number waiting on somebody is the reason to
+     open this screen, so it is the first thing on it. -->
+@if (counts(); as c) {
+  <div class="counts">
+    <button type="button" class="count" [class.count-on]="activeStage() === null" (click)="filterStage(null)">
+      <span class="count-n">{{ c.total }}</span> All
+    </button>
+    @for (stage of stages(); track stage) {
+      <button type="button" class="count" [class.count-on]="activeStage() === stage" (click)="filterStage(stage)">
+        <span class="count-n">{{ c[stage] }}</span>
+        <app-lead-stage-badge [value]="stage" />
+      </button>
+    }
+  </div>
+}
+
+<section class="card">
+  <div class="card-head">
+    <div class="filters">
+      <input
+        class="input"
+        style="width:auto;min-width:220px"
+        type="search"
+        placeholder="Search a name, number or service…"
+        (input)="apply({ search: inputValue($event) })"
+      />
+
+      @if (services().length > 0) {
+        <select class="select" style="width:auto" (change)="apply({ serviceId: selectValue($event) || undefined })">
+          <option value="">All services</option>
+          @for (service of services(); track service.id) {
+            <option [value]="service.id">
+              {{ service.title }}{{ service.status === 'active' ? '' : ' (hidden)' }}
+            </option>
+          }
+        </select>
+      }
+    </div>
+  </div>
+
+  <div class="card-body tight">
+    <app-table-state
+      [loading]="store.loading()"
+      [empty]="!store.loading() && store.items().length === 0"
+      icon="📥"
+      title="No enquiries yet"
+      message="Enquiries appear here as soon as someone fills in the form on a service card. Check Company Details → Services is switched on and that enquiries are set to reach the admin."
+    />
+
+    @if (!store.loading() && store.items().length > 0) {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th class="sortable" (click)="store.toggleSort('name')">Who{{ store.sortIcon('name') }}</th>
+              <th>Asked about</th>
+              <th class="sortable" (click)="store.toggleSort('stage')">Stage{{ store.sortIcon('stage') }}</th>
+              <th>Note</th>
+              <th class="sortable" (click)="store.toggleSort('created_at')">
+                Received{{ store.sortIcon('created_at') }}
+              </th>
+              <th style="text-align:right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of store.items(); track row.id) {
+              <tr>
+                <td>
+                  <div class="who">
+                    <span class="who-name">{{ row.name }}</span>
+                    <!-- A number on a screen somebody is working through should
+                         be one tap on a phone, not something to copy out. -->
+                    <span class="phone"><a [href]="telHref(row.phone)">{{ row.phone }}</a></span>
+                  </div>
+                </td>
+
+                <td>
+                  <div class="svc">
+                    <span>{{ row.serviceTitle || '—' }}</span>
+                    @if (row.serviceTitle && !row.service) {
+                      <!-- The row keeps its own copy of the title, so a deleted
+                           service leaves the enquiry saying what it was about. -->
+                      <span class="svc-gone">service since removed</span>
+                    }
+                    @if (row.branch) {
+                      <span class="badge badge-info">{{ row.branch.name }}</span>
+                    }
+                  </div>
+                </td>
+
+                <td>
+                  <app-lead-stage-badge [value]="row.stage" />
+                  @if (row.sentToWhatsapp) {
+                    <!-- They may well have messaged already, and a screen that
+                         showed every enquiry as untouched would have somebody
+                         ringing people who wrote in ten minutes ago. -->
+                    <div class="wa">also sent on WhatsApp</div>
+                  }
+                </td>
+
+                <td><span class="note-cell" [title]="row.note || ''">{{ row.note || '—' }}</span></td>
+
+                <td>{{ row.createdAt | date: 'd MMM y, h:mm a' }}</td>
+
+                <td style="text-align:right;white-space:nowrap">
+                  <button type="button" class="btn btn-sm btn-ghost" (click)="open(row)">Update</button>
+                  <button type="button" class="btn btn-sm btn-danger" (click)="remove(row)">Delete</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pager [meta]="store.meta()" (pageChange)="store.setPage($event)" (limitChange)="store.setLimit($event)" />
+    }
+  </div>
+</section>
+
+@if (modalOpen()) {
+  <app-modal title="Update enquiry" size="sm" [closeOnBackdrop]="false" (closed)="modalOpen.set(false)">
+    @if (editing(); as row) {
+      <p class="tiny muted" style="margin-top:0">
+        <strong>{{ row.name }}</strong> · {{ row.phone }}<br />
+        Asked about {{ row.serviceTitle || 'a service' }} on {{ row.createdAt | date: 'd MMM y, h:mm a' }}.
+      </p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="save()" id="service-lead-form">
+      <div class="field">
+        <label for="sl-stage">Stage</label>
+        <select id="sl-stage" class="select" formControlName="stage">
+          @for (stage of stages(); track stage) {
+            <option [value]="stage">{{ stage }}</option>
+          }
+        </select>
+        <span class="hint">The same stages Lead Management uses.</span>
+      </div>
+
+      <div class="field">
+        <label for="sl-note">Note</label>
+        <textarea
+          id="sl-note"
+          class="textarea"
+          formControlName="note"
+          maxlength="2000"
+          placeholder="Rang at 4pm — wants a quote for two frames."
+        ></textarea>
+        <span class="hint">Yours, not theirs. What they typed is a record and cannot be edited.</span>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+      <button type="submit" form="service-lead-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : 'Save' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

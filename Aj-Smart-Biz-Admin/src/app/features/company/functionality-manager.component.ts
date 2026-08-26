@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { CompanyService } from '../../core/services/company.service';
 import { ConfirmService } from '../../core/services/confirm.service';
@@ -24,6 +25,25 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
  * Channels the share button can offer, with the label the tenant picks them by.
  * The API validates against its own list; this only names them for the UI.
  */
+/**
+ * Where the content behind a feature is written, for the features that have a
+ * screen of their own.
+ *
+ * Only used to offer a way there from a section that is switched on and empty —
+ * the moment a tenant needs telling that flipping the switch was half the job.
+ * The routes mirror the Company Details submenus; a key missing from here
+ * simply gets no link, which is the right answer for WhatsApp and the share
+ * button because their settings are on this screen already.
+ */
+const FEATURE_SCREENS: Partial<Record<FunctionalityKey, string>> = {
+  services: '/company/services',
+  team: '/company/team',
+  gallery: '/company/gallery',
+  features_benefits: '/company/features',
+  testimonials: '/company/testimonials',
+  figures: '/company/figures',
+};
+
 const SHARE_CHANNELS: { key: ShareChannel; name: string; hint: string }[] = [
   { key: 'copy', name: 'Copy link', hint: 'Copies the page address to the clipboard' },
   { key: 'whatsapp', name: 'WhatsApp', hint: 'Opens WhatsApp with the link and your message' },
@@ -50,7 +70,9 @@ const SHARE_CHANNELS: { key: ShareChannel; name: string; hint: string }[] = [
   selector: 'app-functionality-manager',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'card' },
-  imports: [ReactiveFormsModule, StatusBadgeComponent, ModalComponent, FieldErrorComponent],
+  imports: [ReactiveFormsModule, StatusBadgeComponent, ModalComponent, FieldErrorComponent,
+    RouterLink,
+  ],
   templateUrl: './functionality-manager.component.html',
   styles: [
     `
@@ -242,7 +264,16 @@ export class FunctionalityManagerComponent {
    * The pill next to the name. `active` is the only state that means "a visitor
    * can see this"; everything else says why not, in the API's own words.
    */
+  /** Where this feature's content is written, or null if it has no screen. */
+  screenOf(key: FunctionalityKey): string | null {
+    return FEATURE_SCREENS[key] ?? null;
+  }
+
   stateLabel(item: Functionality): string {
+    // Switched on but empty is not "active" — the website shows no such
+    // section — and it is not "inactive" either, which would read as switched
+    // off. It is its own state, and the API names it.
+    if (item.active && item.published === false) return 'empty';
     if (item.active) return 'active';
     if (!item.granted) return 'not in plan';
     if (!item.enabled) return 'inactive';

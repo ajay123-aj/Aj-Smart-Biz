@@ -20,6 +20,8 @@ const CompanyTeamMember = require('./companyTeamMember.model')(sequelize);
 const CompanyGalleryItem = require('./companyGalleryItem.model')(sequelize);
 const CompanyTestimonial = require('./companyTestimonial.model')(sequelize);
 const CompanyFeature = require('./companyFeature.model')(sequelize);
+const CompanyService = require('./companyService.model')(sequelize);
+const ServiceLead = require('./serviceLead.model')(sequelize);
 const CompanySubscription = require('./companySubscription.model')(sequelize);
 const SubscriptionEvent = require('./subscriptionEvent.model')(sequelize);
 const PlanRequest = require('./planRequest.model')(sequelize);
@@ -110,6 +112,31 @@ Company.hasMany(CompanyFeature, { foreignKey: 'companyId', as: 'featureCards', o
 CompanyFeature.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Branch.hasMany(CompanyFeature, { foreignKey: 'branchId', as: 'featureCards', onDelete: 'CASCADE' });
 CompanyFeature.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+
+// What the business sells, as opposed to why anyone should buy it. Same
+// ownership and the same branch fallback as the cards above; a separate table
+// because a service carries a price, a picture and a list of inclusions that
+// would be meaningless on a benefit card. See `CompanyService`.
+Company.hasMany(CompanyService, { foreignKey: 'companyId', as: 'services', onDelete: 'CASCADE' });
+CompanyService.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(CompanyService, { foreignKey: 'branchId', as: 'services', onDelete: 'CASCADE' });
+CompanyService.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+
+/**
+ * Enquiries raised against those services.
+ *
+ * Cascades from the company like every other tenant-owned table, and from the
+ * branch it was raised on. It does **not** cascade from the service: deleting a
+ * service must not delete the record of people who asked about it, so the
+ * foreign key is cleared and `serviceTitle` — copied onto the row when it was
+ * raised — goes on saying what the enquiry was about.
+ */
+Company.hasMany(ServiceLead, { foreignKey: 'companyId', as: 'serviceLeads', onDelete: 'CASCADE' });
+ServiceLead.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(ServiceLead, { foreignKey: 'branchId', as: 'serviceLeads', onDelete: 'SET NULL' });
+ServiceLead.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+CompanyService.hasMany(ServiceLead, { foreignKey: 'serviceId', as: 'enquiries', onDelete: 'SET NULL' });
+ServiceLead.belongsTo(CompanyService, { foreignKey: 'serviceId', as: 'service' });
 
 Company.hasMany(CompanyDomain, { foreignKey: 'companyId', as: 'domains', onDelete: 'CASCADE' });
 CompanyDomain.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
@@ -228,6 +255,8 @@ const db = {
   CompanyGalleryItem,
   CompanyTestimonial,
   CompanyFeature,
+  CompanyService,
+  ServiceLead,
   CompanySubscription,
   SubscriptionEvent,
   PlanRequest,

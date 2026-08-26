@@ -10,6 +10,9 @@ const domainRoutes = require('./companyDomain.routes');
 const sliderRoutes = require('./slider.routes');
 const functionalityRoutes = require('./functionality.routes');
 const leadRoutes = require('./lead.routes');
+const serviceLeadController = require('../controllers/serviceLead.controller');
+const functionalitySchema = require('../validators/functionality.validator');
+const masterSchema = require('../validators/master.validator');
 const validate = require('../middlewares/validate');
 const schema = require('../validators/company.validator');
 const { companyAdminOnly, requirePermission } = require('../middlewares/auth');
@@ -94,12 +97,50 @@ router.use('/gallery', ...websiteSettingsGuard, functionalityRoutes.gallery);
  */
 router.use('/features', ...websiteSettingsGuard, functionalityRoutes.features);
 /**
+ * The services the company sells. Same guard again — this is the list a
+ * visitor reads before deciding to call, and its prices are on it, so changing
+ * it is the main admin's rather than anyone with the menu.
+ */
+router.use('/services', ...websiteSettingsGuard, functionalityRoutes.services);
+/**
  * Testimonials. Same guard as the rest of the section — reading open to anyone
  * who can view the company, writing to the main admin — which is what puts
  * approving a stranger's review in the same hands as changing the domain it
  * would be published on.
  */
 router.use('/testimonials', ...websiteSettingsGuard, functionalityRoutes.testimonials);
+
+/**
+ * Service enquiries — the people who filled in the form on a service card.
+ *
+ * Its own menu rather than a corner of Company Details, because it is a
+ * different job: that section is the company describing itself, and this is a
+ * queue somebody works through. It is the first inbox on the platform.
+ *
+ * Reading needs `canView` on the menu and moving one along needs `canEdit`,
+ * the same split Lead Management uses — which is what lets a company give its
+ * sales staff the list without also giving them the ability to clear it.
+ */
+router.get(
+  '/service-leads',
+  requirePermission('service-leads', 'canView'),
+  validate(functionalitySchema.serviceLeadList),
+  serviceLeadController.list
+);
+/** Before `/:id`, or "summary" would be read as an enquiry id. */
+router.get('/service-leads/summary', requirePermission('service-leads', 'canView'), serviceLeadController.summary);
+router.patch(
+  '/service-leads/:id',
+  requirePermission('service-leads', 'canEdit'),
+  validate(functionalitySchema.serviceLeadUpdate),
+  serviceLeadController.update
+);
+router.delete(
+  '/service-leads/:id',
+  requirePermission('service-leads', 'canDelete'),
+  validate(masterSchema.idParam),
+  serviceLeadController.remove
+);
 
 /**
  * Website visitors, and what is known about each of them.

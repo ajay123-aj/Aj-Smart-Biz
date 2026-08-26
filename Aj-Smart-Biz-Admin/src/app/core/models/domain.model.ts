@@ -136,6 +136,7 @@ export interface Slider extends AuditFields {
 export type FunctionalityKey =
   | 'whatsapp'
   | 'share_link'
+  | 'services'
   | 'about_us'
   | 'figures'
   | 'team'
@@ -150,7 +151,21 @@ export type WhatsappType = 'inquiry' | 'contact' | 'support' | 'orders';
 export type ShareChannel = 'copy' | 'whatsapp' | 'facebook' | 'x' | 'linkedin' | 'telegram' | 'email';
 
 /** Why a functionality is not live. `null` when it is. */
-export type FunctionalityBlockReason = 'not_in_plan' | 'disabled' | 'expired' | 'suspended' | 'no_plan';
+/**
+ * Why a functionality is not on the website.
+ *
+ * `empty` is the one that is not about entitlement: the plan grants it, the
+ * switch is on, the term is running — and the section still does not appear,
+ * because nothing has been written into it. Several sections are absent rather
+ * than empty by design, so this is an ordinary state rather than a fault.
+ */
+export type FunctionalityBlockReason =
+  | 'not_in_plan'
+  | 'disabled'
+  | 'expired'
+  | 'suspended'
+  | 'no_plan'
+  | 'empty';
 
 export interface WhatsappTypeMeta {
   key: WhatsappType;
@@ -380,6 +395,122 @@ export interface FeaturesSettings {
   ctaLabel: string;
 }
 
+/* -------------------------------- services -------------------------------- */
+
+/**
+ * One service the business sells.
+ *
+ * The closest thing to a `FeatureCard`, and deliberately not the same thing: a
+ * benefit is a reason to choose the business, a service is a thing it sells,
+ * and only one of the two carries a price. What this has on top is a picture,
+ * a list of what is included, and a price line.
+ */
+export interface ServiceCard extends AuditFields {
+  companyId: number;
+  /** Branch this belongs to; null means the whole company. */
+  branchId?: number | null;
+  branch?: { id: number; name: string; code: string } | null;
+  /** A key from the same icon library the benefit cards use. */
+  icon: string;
+  /** Upload path, e.g. `/uploads/service/fitting.jpg`. Optional — the icon covers it. */
+  image?: string | null;
+  title: string;
+  summary?: string | null;
+  /** What is included, as a short list. Capped by the API; see `ServicesSettings`. */
+  highlights?: string[] | null;
+  /** Free text, never a number — `From ₹45,000`, `On request`, `£60/hour`. */
+  priceLabel?: string | null;
+  /** This card's own button label. Blank means "use the section's". */
+  ctaLabel?: string | null;
+  /** Read this one first. The website gives it the wide cell. */
+  featured?: boolean;
+  sequence: number;
+}
+
+/**
+ * The Services section's own wording, plus the name its page carries in the
+ * website's menu.
+ *
+ * Saved through the functionality's settings route rather than with the cards,
+ * because it is one block per company rather than a list. `navLabel` is here
+ * for a reason of its own: Services is a page as well as a band, and it has no
+ * settings table to keep a name in — unlike About and Contact, which do.
+ */
+export interface ServicesSettings {
+  /** Blank keeps the platform's name. Shown as the field's placeholder. */
+  navLabel: string | null;
+  eyebrow: string;
+  /** `{company}` is filled in by the website. */
+  title: string;
+  lead: string;
+  /** The label on the button each card carries, unless the card overrides it. */
+  ctaLabel: string;
+  /** Where a submitted enquiry goes. */
+  enquiryTarget: EnquiryTarget;
+  /** The heading on the dialog the button opens, and the line under it. */
+  formTitle: string;
+  formNote: string;
+}
+
+/**
+ * Where a service enquiry goes when a visitor submits it.
+ *
+ *   whatsapp  straight into WhatsApp, composed and ready to send. Nothing is
+ *             stored on the platform.
+ *   admin     recorded as a row in Service Leads. Nothing leaves the platform.
+ *   both      recorded *and* handed to WhatsApp. The default, because it is the
+ *             only one that loses nothing.
+ *
+ * `whatsapp` needs a published number to be worth offering; without one the API
+ * degrades `both` to `admin` and withholds the button entirely on `whatsapp`.
+ */
+export type EnquiryTarget = 'whatsapp' | 'admin' | 'both';
+
+/**
+ * One person who filled in the enquiry form on a service card.
+ *
+ * Not a `Lead`. That table is one row per device that opened the website —
+ * traffic, with a stage bolted on. This is somebody who typed their name and
+ * number in because they want a call about a specific service, and it is one
+ * row per asking rather than per person.
+ */
+export interface ServiceLead extends AuditFields {
+  companyId: number;
+  branchId?: number | null;
+  branch?: { id: number; name: string; code: string } | null;
+  serviceId?: number | null;
+  service?: { id: number; title: string; icon: string } | null;
+  /**
+   * What the service was called when the enquiry was raised, copied onto the
+   * row rather than joined — services get renamed and deleted, and an enquiry
+   * is a thing that happened.
+   */
+  serviceTitle?: string | null;
+  name: string;
+  phone: string;
+  /** The same five stages Lead Management uses, so there is one vocabulary. */
+  stage: LeadStage;
+  /** Whatever the company wants to remember. Theirs, not the visitor's. */
+  note?: string | null;
+  /** True when the visitor was also handed the message to send on WhatsApp. */
+  sentToWhatsapp: boolean;
+  sourceUrl?: string | null;
+}
+
+/** `GET /my-company/service-leads` — the page, the counts and the filters. */
+export interface ServiceLeadView {
+  items: ServiceLead[];
+  /**
+   * Counts for the whole scope, never the open filter: a count the browser
+   * derived from a filtered page would read zero on the very tab that needed it.
+   */
+  counts: Record<LeadStage | 'total', number>;
+  /** Every service, including switched-off ones — an enquiry against one still
+      has to be findable. */
+  services: { id: number; title: string; status: Status }[];
+  stages: LeadStage[];
+}
+
 /* ---------------------------- testimonials ---------------------------- */
 
 /** How a company runs its wall. See `TestimonialsSettings`. */
@@ -516,8 +647,24 @@ export interface Functionality {
   granted: boolean;
   /** The company's own switch is on. */
   enabled: boolean;
-  /** granted && enabled && the plan is still being served. */
+  /**
+   * granted && enabled && the plan is still being served.
+   *
+   * Entitlement only. A section can be `active` and still show nothing on the
+   * website, because several of them are absent rather than empty when the
+   * company has written nothing into them — that is `published`.
+   */
   active: boolean;
+  /**
+   * Live **and** actually carrying something.
+   *
+   * False on a switched-on section with nothing in it, which is a section the
+   * website does not render at all. `null` on the endpoints that do not count
+   * content, and on the features that have none to count.
+   */
+  published: boolean | null;
+  /** How many rows this section publishes, where it is that kind of section. */
+  contentCount: number | null;
   /** False until the company has touched this feature at all. */
   configured: boolean;
   settings: ShareLinkSettings | AboutSettings | Record<string, unknown>;

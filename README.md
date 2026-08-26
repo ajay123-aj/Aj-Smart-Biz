@@ -184,11 +184,12 @@ the company built itself are left exactly as configured.
 
 ## Data model
 
-25 tables — platform masters (states, business types, themes, plans), tenants
+31 tables — platform masters (states, business types, themes, plans), tenants
 (companies, branches, branch contacts, company domains, sliders), website
 content (company functionalities, WhatsApp numbers, About copy, About stats,
-team members, gallery items, Contact page settings), billing (subscriptions,
-subscription events, plan requests, transactions) and identity (super admins,
+services, team members, gallery items, testimonials, benefit cards, Contact page
+settings), billing (subscriptions, subscription events, plan requests,
+transactions), the enquiry queue (service leads) and identity (super admins,
 roles, menus, role permissions, admins).
 
 The full schema is in [`Aj-Smart-Biz-Backend/docs/schema.dbml`](Aj-Smart-Biz-Backend/docs/schema.dbml)
@@ -275,6 +276,7 @@ entry to `FUNCTIONALITY_CATALOGUE`, and nothing else enumerates them.
 | --- | --- |
 | `whatsapp` | WhatsApp buttons, per enquiry type |
 | `share_link` | A share button so visitors can pass the site on |
+| `services` | The services the business sells, as a band on the home page and a page of their own, each with an enquiry form behind its button |
 | `about_us` | Writing the About section yourself, and its band of figures |
 | `team` | A Team section listing the people |
 | `gallery` | A Gallery section of the company's own photographs |
@@ -294,6 +296,34 @@ entry to `FUNCTIONALITY_CATALOGUE`, and nothing else enumerates them.
 rather than working it out, the write routes guard on it, and
 `/website/company-details` embeds it — so a locked switch, a refused request and
 a missing button on the website can never tell different stories.
+
+### Switched on is not the same as published
+
+`active` is entitlement, and entitlement is not content. Several sections are
+**absent rather than empty** — Services, Team, Gallery, Features / Benefits, and
+a static wall of Testimonials — so a company can clear all three switches and
+still have nothing whatever on its website, because it has not written a card
+yet. Services feels it hardest, having no seeded content at all by design.
+
+The console used to say *On your website* the moment a switch was flipped, which
+is the exact disagreement the rest of this section exists to prevent: the badge
+claimed a section the site did not render, and a tenant meeting that reasonably
+concludes the feature is broken. So the functionality endpoints now also report
+
+```
+published: false, contentCount: 0, reason: "empty"
+```
+
+and the card reads **Nothing published yet**, with the reason under it and an
+**Add content →** button pointing at the screen where the cards are written. The
+banner on that screen agrees — *switched on, but nothing is published yet*.
+
+Two things deliberately do **not** change with it. `active` still means
+entitlement, because the write routes are guarded on it and a tenant has to be
+able to add the first card to a section that is empty by definition until they
+do. And `activeKeys` is untouched, so the website goes on deciding emptiness
+from the rows it is already loading. The counts are only asked for by the
+console routes (`withContent`), so the public path pays nothing for them.
 
 The grant is **snapshotted onto the subscription** at activation, exactly like
 the branch and admin limits and for the same reason: dropping WhatsApp from a
@@ -338,6 +368,132 @@ the company ticked — copy link, WhatsApp, Facebook, X, LinkedIn, Telegram,
 email — with the company's own headline and message. The URL is read in the
 browser rather than built from the tenant's domain, so sharing from a branch
 host or a deep link passes on the address actually being looked at.
+
+### Services
+
+What the business sells, as opposed to why anyone should buy it. It is the
+question a visitor arrives with, and until now the only answer a tenant's site
+could give was whatever they had written into a slide.
+
+It is a **band on the home page and a page of its own**, from one component and
+one list. The home band shows the first four and links to the page; `/services`
+shows all of them. Nothing about the copy differs between the two — only the
+length — so a business cannot end up describing itself one way on the home page
+and another a click later.
+
+**A service is not a benefit card**, which is why it is not the same table. A
+benefit is a reason to choose the business ("delivered when we said"); a service
+is a thing it sells ("kitchen fitting, from ₹4,50,000"), and only one of the two
+has a price. Each carries what its own argument needs:
+
+| | What it holds |
+| --- | --- |
+| A photograph | Optional. A picture of the actual work outsells any glyph — but the icon is the **fallback**, not the alternative, so a card without one is still a finished card rather than an empty frame. |
+| What's included | Up to six short lines, printed as a tick list. It is the question every visitor has after the name of the service, and answering it in a paragraph buries it. |
+| A price line | **Free text, never a number** — `From ₹4,50,000`, `₹1,200/hour`, `On request`. A decimal column would have to invent a currency and a period, and would be wrong for everyone who prices per job or does not publish prices at all. |
+| Featured | One or two services the company most wants read. The website gives a featured card the full row and lays it on its side, picture beside the words; `sequence` still decides the order. |
+
+The glyphs come from the **same library the benefit cards use** — `FEATURE_ICONS`
+— rather than a second set, so a site carrying both sections looks drawn by one
+hand. The website draws them itself, and falls back to `spark` for a name it
+does not recognise.
+
+**There are no default services.** Every other seeded list on the platform
+replaces wording the template used to invent — six benefit cards, four figures —
+and seeding gives a tenant something to edit rather than a blank screen. This one
+has no honest content to seed: a figure the platform made up is a wrong number,
+but a *service* the platform made up is a business advertising work it may not
+do, and a customer ringing up about it. So the section stays absent until the
+company writes its first card.
+
+**Empty withholds the page, not just the band.** Entitled, switched on and
+nothing written is an ordinary state for a tenant on its first afternoon, and a
+Services page with no services on it is worse than no Services page — so the
+route 404s and the menu entry disappears with it. That is `content` on the
+`NAV_PAGES` row, the first page to need it: the difference between "the plan
+pays for this page" and "there is something on it". The menu is built from the
+same payload the website renders, so a link here can never outlive the list.
+
+**The page is renamed where the services are edited**, like About and Contact —
+Company Details → Services has a *Menu name* field, so a studio can call it
+*Work* and a clinic *Treatments*. It is the first page whose label lives on the
+functionality's own `settings` blob rather than in a settings table, because the
+section has only cards and no settings row to keep one in; see `NAV_LABEL_SOURCE`.
+
+### The enquiry form, and where it goes
+
+A service card's button opens a short form — **a name and a mobile number, and
+nothing else**. No email, no address, no message box: it is a callback request
+rather than a brief, and every extra field on it is another reason to abandon
+it. What the enquiry is *about* comes from the card it was sent from, which the
+visitor has already read.
+
+**Every button is named by the tenant.** The section sets one label — *Enquire*,
+*Get a quote*, *Book a slot* — and any single service can override it, so a
+company can run "Enquire" everywhere and "Book a fitting" on the one card that
+wants it. Blank on a card means "use the section's", so changing the section's
+label still changes every card that never deliberately overrode it.
+
+**Where a submission goes is the company's choice**, set on Company Details →
+Services:
+
+| Setting | What happens |
+| --- | --- |
+| **WhatsApp and Service Leads** | Recorded here *and* the customer is offered WhatsApp with the message composed. The default, because it is the only one that loses nothing: the row is the record, the message is the notification. |
+| **Service Leads only** | Recorded here. Nothing leaves the platform. |
+| **WhatsApp only** | Handed to WhatsApp and stored nowhere — the same bargain the Contact page's form makes. |
+
+`whatsapp` needs a published Inquiry number to be worth offering. Without one the
+API degrades *both* to *Service Leads only* — the record is the half worth
+keeping — and on *WhatsApp only* it withholds the button entirely, because a
+chat with nobody is worse than no button. One function decides it
+(`serviceEnquiryTarget`) and both the website's payload and the public write
+route read it, so the form a visitor is shown and the request the API accepts
+can never disagree.
+
+**The WhatsApp link is the one this template builds itself.** Every other one
+arrives finished from the API, which can do that because it knows the whole
+message in advance. This one cannot exist until somebody has typed their name,
+so the API sends the number and the composing happens on the site. It is offered
+as a link to press rather than a window opened automatically: a popup opened
+after an `await` has lost its user gesture and gets blocked.
+
+### Service Leads
+
+The queue those enquiries land in — a **top-level menu**, not a Company Details
+submenu, for the same reason Lead Management is one: that section is the company
+describing itself, and this is a queue somebody works through on a Monday
+morning. It is the platform's first inbox.
+
+**It is not Lead Management.** That screen is one row per *device* that opened
+the website — traffic, assembled from tracking, with a stage bolted on so a
+salesperson can work it. Nobody in it ever asked to be contacted. Everybody here
+did, and said what about. One row per *asking* rather than per person: the same
+customer enquiring about framing in March and about restoration in June is two
+enquiries, and collapsing them would lose the second behind the first one's
+stage. The two share `LEAD_STAGE` deliberately — a company should not have to
+learn two vocabularies for "I have rung them".
+
+What a person does here is move an enquiry along and write down what happened,
+so those are the only two things the API accepts. **What the visitor typed
+cannot be edited**: a name and a number are a record of what happened, and
+letting them be rewritten would turn that into a note about what someone thinks
+happened. There is no create route either — the only writer is the public
+website, or the list would be a place where "somebody asked us" and "somebody
+typed this in" are indistinguishable.
+
+Two details the screen turns on. The counts come from the API and describe the
+whole queue rather than the open filter, because a count derived from a filtered
+page would read zero on the very tab that needed it. And a row records whether
+the visitor was *also* handed the message to send, because on the default
+setting the company may well have heard from them already — a screen that showed
+every enquiry as untouched would have somebody ringing people who messaged them
+ten minutes ago.
+
+The menu is dropped for a tenant whose plan does not grant Services: no form on
+the website means nothing to work through. Switching Services **off** is a
+different thing and keeps it, because they still need to reach what has already
+been sent.
 
 ### About us: the section, and its figures
 
@@ -568,6 +724,7 @@ now, nested under Company Details:
 | Domains | `/company/domains` | `company-details` | — |
 | Functionality | `/company/functionality` | `company-details` | — |
 | Slider | `/company/sliders` | `slider-management` | — |
+| Services | `/company/services` | `company-details` | `services` |
 | About us | `/company/about` | `company-details` | `about_us` |
 | Team | `/company/team` | `company-details` | `team` |
 | Gallery | `/company/gallery` | `company-details` | `gallery` |
@@ -609,6 +766,8 @@ extra request.
 
 - **Plan Management (:4200)** — a card per feature on the plan form, and a column showing what each plan grants. Unlike the free-text `features` list beside it, these are validated against the platform's own keys.
 - **Company Details → Slider (:4300)** — hero slides for the public website, company-wide or pinned to one branch. Grantable on its own, like Branches.
+- **Company Details → Services (:4300)** — a card per service with its picture, its inclusions and its price, plus the section's wording and the name its page carries in the website's menu.
+- **Service Leads (:4300)** — the queue of people who filled in the form on a service card: who, what they asked about, where it has got to and what was done. A menu of its own, dropped for a plan that does not grant Services.
 - **Company Details → Functionality (:4300)** — a card per feature with a switch, the reason it is not live when it is not, and its settings panel: the typed number list for WhatsApp, the channels and copy for the share button. The switch is locked, with the reason on it, when the plan does not grant the feature.
 - **Company Details → About us / Team / Gallery / Contact page (:4300)** — one submenu each, always present. About us and Contact page each carry the **Menu name** for their page, which is how the website's menu is renamed. A banner at the top says whether the section is live, switched off, or not in the plan, in the API's own words; where it is not granted the editor below is read only rather than hidden, so a tenant can see what it wrote and what upgrading would bring back. Each is scoped to a branch or to the company as a whole.
 - **The website** — `/about` carries About, Team and Gallery; `/contact` is its own page; the home page carries the rest.

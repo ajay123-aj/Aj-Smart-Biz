@@ -11,10 +11,13 @@ import {
   Functionality,
   FunctionalityKey,
   FunctionalityView,
+  LeadStage,
   MyPlanView,
   PlanCatalogue,
   PlanRequest,
   QuotaView,
+  ServiceLead,
+  ServiceLeadView,
   Status,
   Subscription,
   TestimonialListView,
@@ -177,12 +180,12 @@ export class CompanyService {
   /* -------------------------- website content ------------------------- */
 
   /**
-   * The About stat band, the Team section, the Gallery and the Features /
-   * Benefits cards are the same shape of thing — an ordered list of cards the
+   * The About stat band, the Team section, the Gallery, the Services list and
+   * the Features / Benefits cards are the same shape of thing — an ordered list of cards the
    * tenant adds, edits, reorders and deletes — so they share one client rather
    * than four near-identical ones.
    */
-  cards<T>(path: 'stats' | 'team' | 'gallery' | 'features' | 'testimonials'): CardClient<T> {
+  cards<T>(path: 'stats' | 'team' | 'gallery' | 'features' | 'services' | 'testimonials'): CardClient<T> {
     return new CardClient<T>(this.api, `/admin/company/${path}`);
   }
 
@@ -222,6 +225,35 @@ export class CompanyService {
       `/admin/company/testimonials/${id}/moderation`,
       { moderation }
     );
+  }
+
+  /* -------------------------- service enquiries ----------------------- */
+
+  /**
+   * The enquiry queue — one page of it, the counts, and the services to filter
+   * by.
+   *
+   * Not `cards()`, which would drop all three extras: this list is fed by the
+   * public internet and grows for as long as the website is up, so it pages,
+   * and the number waiting on somebody is the reason to open the screen at all.
+   * The counts come from the API for the same reason the testimonial ones do —
+   * a count derived here from a filtered page is a count of that filter.
+   */
+  listServiceLeads(query: ListQuery = {}): Observable<{ data: ServiceLeadView; meta: PageMeta }> {
+    return this.api.getWithMeta<ServiceLeadView>('/admin/company/service-leads', query);
+  }
+
+  /**
+   * Move an enquiry along, and write down what happened. The only two things
+   * this accepts — what the visitor typed is a record of what happened and is
+   * not the company's to rewrite.
+   */
+  updateServiceLead(id: number, payload: { stage?: LeadStage; note?: string | null }): Observable<ServiceLead> {
+    return this.api.patch<ServiceLead>(`/admin/company/service-leads/${id}`, payload);
+  }
+
+  removeServiceLead(id: number): Observable<{ id: number }> {
+    return this.api.delete<{ id: number }>(`/admin/company/service-leads/${id}`);
   }
 
   /* ---------------------------- about copy ---------------------------- */

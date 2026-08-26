@@ -1,0 +1,272 @@
+/* ------------------------------------------------------------------ *
+ * Service enquiry — the card's button, and the dialog it opens.
+ *
+ * The button keeps the underline-that-grows the section's links already use,
+ * so a card looks the same whether its button opens a dialog or goes to the
+ * Contact page. The dialog is the template's panel: frosted, generously
+ * spaced, and short enough that a phone shows the whole of it.
+ * ------------------------------------------------------------------ */
+
+/*
+ * Appearance only. Where it sits is the caller's business — a service card
+ * pins it to the bottom and a wide card lifts it, neither of which this
+ * component can see — so there is no margin or padding here to fight them.
+ */
+.trigger {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.93rem;
+  color: var(--brand-strong);
+  background-image: linear-gradient(var(--accent), var(--accent));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0% 1.5px;
+  transition: background-size 0.28s cubic-bezier(0.22, 1, 0.36, 1), color 0.18s ease;
+}
+
+.trigger:hover,
+.trigger:focus-visible {
+  background-size: 100% 1.5px;
+  color: var(--accent);
+}
+
+/* --------------------------------- dialog --------------------------------- */
+
+.dialog {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  max-width: min(30rem, calc(100vw - 32px));
+  width: 100%;
+  /* The element is centred by the top layer; this keeps a tall dialog off the
+     edges on a short screen. */
+  margin: auto;
+}
+
+.dialog::backdrop {
+  background: rgba(20, 20, 22, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.panel {
+  position: relative;
+  padding: 34px 32px 30px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 30px 80px rgb(0 0 0 / 28%);
+  animation: rise 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.close:hover {
+  background: var(--surface-sunken);
+  color: var(--text);
+}
+
+/* --------------------------------- heading -------------------------------- */
+
+/* Which service this is about, above the heading — the dialog is opened from a
+   card and has to go on saying which one once the card is behind a scrim. */
+.eyebrow {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+  padding-right: 28px;
+}
+
+.title {
+  font-size: 1.32rem;
+  letter-spacing: -0.02em;
+}
+
+.note {
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 0.94rem;
+  line-height: 1.6;
+}
+
+.error {
+  margin-top: 16px;
+  padding: 11px 14px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, #d92d20 8%, transparent);
+  border: 1px solid color-mix(in srgb, #d92d20 26%, transparent);
+  color: #91221a;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+/* ---------------------------------- form ---------------------------------- */
+
+.form {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+}
+
+.label {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.fieldError {
+  font-size: 0.82rem;
+  color: #91221a;
+}
+
+.submit {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* Aria-disabled rather than a disabled attribute: the anchor still has to be
+   focusable and announced, it just must not navigate yet. */
+.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.privacy {
+  font-size: 0.8rem;
+  color: var(--text-faint);
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* -------------------------------- confirmed ------------------------------- */
+
+.done {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 8px 0 4px;
+}
+
+.tick {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  font-size: 1.7rem;
+  color: var(--brand-contrast);
+  background: var(--accent);
+}
+
+.doneTitle {
+  font-size: 1.26rem;
+  letter-spacing: -0.02em;
+}
+
+.doneNote {
+  color: var(--text-muted);
+  font-size: 0.94rem;
+  line-height: 1.6;
+  max-width: 34ch;
+}
+
+.whatsapp {
+  margin-top: 8px;
+  width: 100%;
+  background: var(--whatsapp);
+  color: #fff;
+}
+
+.whatsapp:hover {
+  background: var(--whatsapp-dark);
+}
+
+.doneClose {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 4px 8px;
+}
+
+.doneClose:hover {
+  color: var(--text);
+}
+
+/* ------------------------------- responsive ------------------------------- */
+
+@media (max-width: 620px) {
+  .panel {
+    padding: 28px 22px 24px;
+    border-radius: var(--radius-sm);
+  }
+
+  .title {
+    font-size: 1.2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+
+  .trigger {
+    transition: none;
+  }
+}

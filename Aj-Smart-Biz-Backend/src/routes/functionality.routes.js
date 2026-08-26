@@ -41,6 +41,7 @@ functionalities.patch('/:key/status', validate(schema.toggle), controller.toggle
  *       | `team` | The words above the Team section — `eyebrow`, `title`, `lead`. See `TeamSectionCopy`. |
  *       | `gallery` | The same three for the Gallery. See `GallerySectionCopy`. |
  *       | `features_benefits` | Heading, lede and the button label. The cards are their own rows. |
+ *       | `services` | Heading, lede, the button label, and the name the Services page carries in the website's menu. The services themselves are their own rows. |
  *       | `testimonials` | The static/dynamic mode, the headings, and the wording of the review form. |
  *       | `share_link` | Headline, message and which channels to offer. |
  *       | `whatsapp`, `about_us`, `contact_page` | Nothing — their configuration lives elsewhere. A body is refused. |
@@ -59,7 +60,7 @@ functionalities.patch('/:key/status', validate(schema.toggle), controller.toggle
  *         required: true
  *         schema:
  *           type: string
- *           enum: [whatsapp, share_link, about_us, team, gallery, contact_page, testimonials, features_benefits]
+ *           enum: [whatsapp, share_link, services, about_us, figures, team, gallery, contact_page, testimonials, features_benefits]
  *     requestBody:
  *       required: true
  *       content:
@@ -159,6 +160,12 @@ const stats = cardRouter(content.stats, schema.statCreate, schema.statUpdate);
 const team = cardRouter(content.team, schema.teamCreate, schema.teamUpdate);
 const gallery = cardRouter(content.gallery, schema.galleryCreate, schema.galleryUpdate);
 const features = cardRouter(content.features, schema.featureCreate, schema.featureUpdate);
+/**
+ * The services a company sells. The same seven verbs as every other card list —
+ * what it carries on top (a picture, a price line, a list of inclusions) is the
+ * row's business, not the router's.
+ */
+const services = cardRouter(content.services, schema.serviceCreate, schema.serviceUpdate);
 
 /**
  * Exported as separate routers rather than one: the caller mounts each under
@@ -175,4 +182,5 @@ module.exports = {
   gallery,
   testimonials,
   features,
+  services,
 };

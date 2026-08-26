@@ -1,0 +1,334 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:340px"></div>
+  } @else {
+    <app-feature-gate [feature]="feature()" />
+
+    <!-- The section's own wording, plus the name the page carries in the
+         website's menu. One form, saved as a whole, because all five belong to
+         the section rather than to any service in it. -->
+    <form class="section-form" [formGroup]="copyForm" (ngSubmit)="saveCopy()">
+      <h4 style="margin:0 0 4px">How the section reads</h4>
+      <p class="tiny muted" style="margin:0 0 14px;max-width:64ch">
+        The heading above your services, on the home page and on your Services page. Leave a field
+        empty to use the standard wording &mdash; <code>&#123;company&#125;</code> is replaced with
+        your company name.
+      </p>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="svc-nav">Menu name</label>
+          <input id="svc-nav" class="input" formControlName="navLabel" placeholder="Services" maxlength="40" />
+          <span class="hint">What this page is called in your website&rsquo;s menu. Blank keeps &ldquo;Services&rdquo;.</span>
+        </div>
+
+        <div class="field">
+          <label for="svc-eyebrow">Eyebrow</label>
+          <input id="svc-eyebrow" class="input" formControlName="eyebrow" placeholder="What we do" />
+          <span class="hint">The small line above the heading.</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="svc-title">Heading</label>
+        <input id="svc-title" class="input" formControlName="title"
+               placeholder="How {{ '{company}' }} can help" />
+      </div>
+
+      <div class="field">
+        <label for="svc-lead">Introduction</label>
+        <textarea id="svc-lead" class="textarea" formControlName="lead"
+                  placeholder="What we take on, what is included, and roughly what it costs."></textarea>
+      </div>
+
+      <div class="field" style="max-width:280px">
+        <label for="svc-cta">Button label</label>
+        <input id="svc-cta" class="input" formControlName="ctaLabel" placeholder="Enquire" />
+        <span class="hint">On every service card, unless a card sets its own.</span>
+      </div>
+
+      <!-- The enquiry form the button opens. Where it goes is the one setting
+           on this screen that changes what happens to a customer's details, so
+           it says plainly what each choice does. -->
+      <h4 style="margin:22px 0 4px">When someone fills in the form</h4>
+      <p class="tiny muted" style="margin:0 0 14px;max-width:64ch">
+        The button on each card opens a short form asking for a name and a mobile number. This is where
+        those go.
+      </p>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="svc-target">Send enquiries to</label>
+          <select id="svc-target" class="select" formControlName="enquiryTarget">
+            <option value="both">WhatsApp and Service Leads</option>
+            <option value="admin">Service Leads only</option>
+            <option value="whatsapp">WhatsApp only</option>
+          </select>
+          <span class="hint">
+            <strong>Both</strong> records the enquiry here and offers the customer WhatsApp &mdash; nothing is
+            lost either way. <strong>Service Leads only</strong> keeps it on the platform.
+            <strong>WhatsApp only</strong> stores nothing, and needs an Inquiry number on the
+            Functionality screen or the button is not shown at all.
+          </span>
+        </div>
+
+        <div class="field">
+          <label for="svc-form-title">Form heading</label>
+          <input id="svc-form-title" class="input" formControlName="formTitle" placeholder="Book an enquiry" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="svc-form-note">Form introduction</label>
+        <textarea id="svc-form-note" class="textarea" formControlName="formNote"
+                  placeholder="Leave your name and number and we will call you back — usually the same day."></textarea>
+        <span class="hint">Set expectations here. It is the last thing they read before they type.</span>
+      </div>
+
+      @if (writable()) {
+        <div class="row-end" style="gap:8px">
+          <button type="button" class="btn btn-ghost" [disabled]="savingCopy()" (click)="resetCopy()">Reset</button>
+          <button type="submit" class="btn btn-primary" [disabled]="savingCopy()">
+            {{ savingCopy() ? 'Saving…' : 'Save wording' }}
+          </button>
+        </div>
+      }
+    </form>
+
+    <div class="row-between" style="align-items:flex-start;gap:12px">
+      <div>
+        <h4 style="margin:0 0 4px">What you offer</h4>
+        <p class="tiny muted" style="margin:0 0 16px;max-width:64ch">
+          One card per service, shown in the order below. A photograph of the work sells it better
+          than an icon does &mdash; the icon is what a service without one falls back to.
+        </p>
+      </div>
+      <div class="row-end" style="gap:8px">
+        <!-- Same branch fallback as the sliders: a branch site shows its own
+             services, or the company-wide ones when it has none. -->
+        @if (feature()?.granted && branches().length > 0) {
+          <select class="select" style="width:auto" (change)="onBranchFilter(selectValue($event))">
+            <option value="">All services</option>
+            <option value="none">Company-wide only</option>
+            @for (branch of branches(); track branch.id) {
+              <option [value]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+        }
+        @if (writable()) {
+          <button type="button" class="btn btn-sm btn-primary" (click)="open(null)">＋ Add service</button>
+        }
+      </div>
+    </div>
+
+    @if (!feature()?.granted) {
+      <div class="empty-note">The Services section is not part of your plan.</div>
+    } @else if (items().length === 0) {
+      <div class="empty-note">
+        No services yet &mdash; the section and the Services page stay off your website until you add one.
+      </div>
+    } @else {
+      <div class="grid-cards">
+        @for (row of items(); track row.id; let first = $first; let last = $last) {
+          <article class="svc" [class.svc-inactive]="row.status !== 'active'"
+                   [class.svc-featured]="row.featured">
+            @if (imageUrl(row.image); as photo) {
+              <img class="svc-photo" [src]="photo" [alt]="row.title" loading="lazy" />
+            }
+
+            <div class="svc-body">
+              <!-- Drawn from the library the API sent, so this tile and the
+                   website's card are the same picture. -->
+              <span class="svc-icon" [title]="labelOf(row.icon)" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  @for (d of pathsOf(row.icon); track $index) {
+                    <path [attr.d]="d" />
+                  }
+                </svg>
+              </span>
+
+              <div class="svc-main">
+                <div class="svc-title">
+                  {{ row.title }}
+                  @if (row.featured) {
+                    <span class="badge badge-warning">Featured</span>
+                  }
+                </div>
+
+                @if (row.summary) {
+                  <p class="svc-text">{{ row.summary }}</p>
+                } @else {
+                  <p class="svc-untitled">No description</p>
+                }
+
+                @if (row.highlights?.length) {
+                  <ul class="svc-points">
+                    @for (point of row.highlights; track $index) {
+                      <li><span class="tick" aria-hidden="true">✓</span>{{ point }}</li>
+                    }
+                  </ul>
+                }
+
+                @if (row.priceLabel) {
+                  <span class="svc-price">{{ row.priceLabel }}</span>
+                }
+                @if (row.ctaLabel) {
+                  <span class="svc-price" style="margin-left:4px">{{ row.ctaLabel }} →</span>
+                }
+
+                <div style="margin-top:8px">
+                  <app-status-badge [value]="row.status" />
+                  @if (row.branch) {
+                    <span class="badge badge-info" style="margin-left:4px">{{ row.branch.name }}</span>
+                  }
+                </div>
+              </div>
+            </div>
+
+            @if (writable()) {
+              <div class="svc-foot">
+                <span class="seq-num">{{ row.sequence }}</span>
+                <button type="button" class="btn btn-sm btn-ghost" title="Move up"
+                        [disabled]="first || reordering()" (click)="move(row, -1)">↑</button>
+                <button type="button" class="btn btn-sm btn-ghost" title="Move down"
+                        [disabled]="last || reordering()" (click)="move(row, 1)">↓</button>
+                <span class="spacer"></span>
+                <button type="button" class="btn btn-sm btn-ghost" (click)="toggle(row)">
+                  {{ row.status === 'active' ? 'Hide' : 'Show' }}
+                </button>
+                <button type="button" class="btn btn-sm btn-ghost" (click)="open(row)">Edit</button>
+                <button type="button" class="btn btn-sm btn-danger" (click)="remove(row)">Delete</button>
+              </div>
+            }
+          </article>
+        }
+      </div>
+      <p class="tiny muted" style="margin:14px 0 0">Only active services appear on the website.</p>
+    }
+  }
+</div>
+
+@if (modalOpen()) {
+  <app-modal
+    [title]="editing() ? 'Edit service' : 'Add service'"
+    size="md"
+    [closeOnBackdrop]="false"
+    (closed)="modalOpen.set(false)"
+  >
+    <form [formGroup]="form" (ngSubmit)="save()" id="service-form">
+      <div class="field">
+        <label for="svc-branch">Shows on</label>
+        <select id="svc-branch" class="select" formControlName="branchId">
+          <option value="">All branches (company-wide)</option>
+          @for (branch of branches(); track branch.id) {
+            <option [value]="branch.id">{{ branch.name }}</option>
+          }
+        </select>
+        <p class="tiny muted mb-0">
+          A branch site shows its own. If it has none, it falls back to the company-wide ones.
+        </p>
+      </div>
+
+      <div class="field">
+        <label for="svc-card-title">Service <span class="req">*</span></label>
+        <input id="svc-card-title" class="input" formControlName="title" placeholder="Kitchen fitting" />
+        <app-field-error [control]="form.controls.title" label="Service" />
+        <span class="hint">Name it the way a customer would ask for it.</span>
+      </div>
+
+      <div class="field">
+        <label for="svc-card-summary">Description</label>
+        <textarea id="svc-card-summary" class="textarea" formControlName="summary"
+                  placeholder="Measured, made and installed by the same team, usually inside three weeks."></textarea>
+        <span class="hint">Optional &mdash; a clear name can stand on its own.</span>
+      </div>
+
+      <!-- The inclusions. A row each, so the tenant sees the list the way the
+           website prints it rather than typing separators into one box. -->
+      <div class="field">
+        <label>What&rsquo;s included</label>
+        <div class="points-rows" formArrayName="highlights">
+          @for (control of highlights.controls; track $index) {
+            <div class="points-row">
+              <input class="input" [formControlName]="$index" placeholder="Free measure and quote"
+                     maxlength="120" />
+              <button type="button" class="btn btn-sm btn-ghost" title="Remove"
+                      (click)="removeHighlight($index)">✕</button>
+            </div>
+          }
+        </div>
+
+        @if (highlights.length < highlightsMax) {
+          <button type="button" class="btn btn-sm btn-ghost" style="margin-top:8px"
+                  (click)="addHighlight()">＋ Add a line</button>
+        }
+        <span class="hint">
+          Up to {{ highlightsMax }} short lines, printed as a tick list. Empty ones are dropped.
+        </span>
+      </div>
+
+      <div class="field">
+        <label for="svc-price">Price</label>
+        <input id="svc-price" class="input" formControlName="priceLabel" placeholder="From ₹45,000"
+               maxlength="60" />
+        <span class="hint">
+          Written however you price it &mdash; &ldquo;From ₹45,000&rdquo;, &ldquo;₹1,200/hour&rdquo;,
+          &ldquo;On request&rdquo;. Leave it empty to publish no price.
+        </span>
+      </div>
+
+      <div class="field">
+        <label for="svc-card-cta">Button label</label>
+        <input id="svc-card-cta" class="input" formControlName="ctaLabel" placeholder="Enquire" maxlength="40" />
+        <span class="hint">
+          Just for this service &mdash; &ldquo;Book a fitting&rdquo;, &ldquo;Get a quote&rdquo;. Leave it
+          empty to use the section&rsquo;s label above.
+        </span>
+      </div>
+
+      <div class="field">
+        <label>Photograph</label>
+        <app-image-upload
+          formControlName="image"
+          label="Photograph"
+          folder="service"
+          hint="Optional — landscape works best, 1200×900 or larger · PNG, JPG or WEBP"
+        />
+        <span class="hint">A picture of the work sells it better than an icon. Without one the card leads with the icon instead.</span>
+      </div>
+
+      <div class="field">
+        <label>Icon <span class="req">*</span></label>
+        <app-icon-picker formControlName="icon" [icons]="icons()" />
+        <span class="hint">Shown on the card, and in place of the photograph when there is none.</span>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="svc-featured">Feature this service</label>
+          <select id="svc-featured" class="select" formControlName="featured">
+            <option [value]="false">No</option>
+            <option [value]="true">Yes — give it the wide card</option>
+          </select>
+          <span class="hint">For the one or two you most want read.</span>
+        </div>
+
+        <div class="field">
+          <label for="svc-status">Status</label>
+          <select id="svc-status" class="select" formControlName="status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+      <button type="submit" form="service-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Add service' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

@@ -324,6 +324,105 @@ export interface BenefitsFeature {
   items: BenefitCard[];
 }
 
+/* -------------------------------- services -------------------------------- */
+
+/**
+ * One service the business sells.
+ *
+ * Next to a `BenefitCard` this looks like the same thing with more fields on
+ * it, and it is not. A benefit is a reason to choose the business; a service is
+ * a thing it sells, and only one of the two has a price. They are two different
+ * arguments and they are made in two different bands.
+ *
+ * `icon` is a plain string for the reason `BenefitCard.icon` is: the platform's
+ * library is the wider set and can grow a glyph before this template learns to
+ * draw it. `Glyph` narrows it, and falls back to `spark`.
+ */
+export interface ServiceItem {
+  id: number;
+  icon: string;
+  /**
+   * A photograph of the work. Null on most cards — the icon is what a service
+   * without one falls back to, so the card is never short of a picture.
+   */
+  image: string | null;
+  title: string;
+  summary: string | null;
+  /** What is included. Always an array — the API normalises it, never null. */
+  highlights: string[];
+  /** Free text, never a number: `From ₹45,000`, `On request`, `£60/hour`. */
+  priceLabel: string | null;
+  /**
+   * This service's own button label, or null to use the section's.
+   *
+   * Null rather than pre-filled, so a company that changes the section's label
+   * still changes every card that never deliberately overrode it.
+   */
+  ctaLabel: string | null;
+  /** Read this one first. The section gives it the wide cell. */
+  featured: boolean;
+}
+
+/** Where a submitted enquiry goes. The company's setting, decided by the API. */
+export type EnquiryTarget = 'whatsapp' | 'admin' | 'both';
+
+/**
+ * What the enquiry button on a service card does.
+ *
+ * `null` on the section when it can do nothing — the company pointed it at
+ * WhatsApp and published no number — and the card then renders no button at
+ * all rather than a dialog that goes nowhere.
+ *
+ * `records` and `opensWhatsapp` are the two questions the template actually
+ * asks, sent as answers rather than as a `target` it would have to interpret.
+ * `target` is still here because a third state would otherwise be invisible to
+ * anyone reading a payload.
+ */
+export interface ServiceEnquiry {
+  target: EnquiryTarget;
+  /** Whether a submission is recorded on the platform. */
+  records: boolean;
+  /** Whether the visitor is handed the message to send. */
+  opensWhatsapp: boolean;
+  /** The dialog's heading, and the line under it. Both the tenant's. */
+  title: string;
+  note: string;
+  /**
+   * The number to compose against, in parts. Not a finished `wa.me` link,
+   * because the message cannot exist until the visitor has typed their name —
+   * the one place this template builds a WhatsApp URL itself.
+   */
+  whatsapp: { number: string; countryCode: string } | null;
+}
+
+/**
+ * The Services section, or `null` when this tenant is not showing one.
+ *
+ * Absent unless the plan grants `services`, the tenant switched it on, the plan
+ * is still being served **and** at least one service is active — the same rule
+ * Team, Gallery and the benefit cards follow. The `/services` route and the
+ * menu entry are decided by exactly the same answer, so a link to that page
+ * never outlives the content on it.
+ *
+ * There is deliberately no fallback. The platform knows a company's name, trade
+ * and address; it knows nothing about what that company actually sells, and a
+ * list of invented services is a business advertising work it may not do.
+ */
+export interface ServicesFeature {
+  eyebrow: string;
+  /** `{company}` is filled in at render time. */
+  title: string;
+  lead: string;
+  /** The button on each card, unless the card carries a label of its own. */
+  ctaLabel: string;
+  /**
+   * What that button does, or `null` when it can do nothing. See
+   * `ServiceEnquiry` — absence is the whole check, as everywhere else.
+   */
+  enquiry: ServiceEnquiry | null;
+  items: ServiceItem[];
+}
+
 /**
  * Optional functionality this tenant is entitled to **right now**.
  *
@@ -357,6 +456,12 @@ export interface SiteFeatures {
    * site that is not carrying the section simply has no block here.
    */
   benefits: BenefitsFeature | null;
+  /**
+   * What the business sells, in its own words. Absent unless the plan grants
+   * it, the tenant switched it on and wrote at least one service — the same
+   * signal the `/services` route and its menu entry are built on.
+   */
+  services: ServicesFeature | null;
 }
 
 /**
@@ -478,6 +583,7 @@ export const FALLBACK_COMPANY: CompanyDetails = {
     gallery: null,
     testimonials: null,
     benefits: null,
+    services: null,
   },
   /** Same rule as `features`: with no answer from the API, show nothing. */
   contactPage: null,

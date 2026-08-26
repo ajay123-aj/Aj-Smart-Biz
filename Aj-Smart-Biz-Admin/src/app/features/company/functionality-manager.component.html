@@ -14,7 +14,8 @@
     </p>
 
     @for (item of items(); track item.key) {
-      <section class="feature" [class.feature-live]="item.active" [class.feature-locked]="!item.granted">
+      <section class="feature" [class.feature-live]="item.active && item.published !== false"
+               [class.feature-locked]="!item.granted">
         <div class="feature-head">
           <span class="feature-icon" aria-hidden="true">{{ item.key === 'whatsapp' ? '💬' : '🔗' }}</span>
 
@@ -22,8 +23,15 @@
             <div class="feature-title">
               <span class="feature-name">{{ item.name }}</span>
               <app-status-badge [value]="stateLabel(item)" />
-              @if (item.active) {
+              <!--
+                "On your website" only when something actually is. A section
+                that is switched on but empty is absent from the site, and the
+                badge said otherwise until the API started reporting it.
+              -->
+              @if (item.active && item.published !== false) {
                 <span class="badge badge-success">On your website</span>
+              } @else if (item.active) {
+                <span class="badge badge-warning">Nothing published yet</span>
               }
             </div>
             <p class="feature-summary">{{ item.description }}</p>
@@ -35,6 +43,14 @@
           </div>
 
           <div class="feature-actions">
+            <!--
+              Where the content for this section is written. Shown when the
+              section is on and empty, which is the one moment a tenant needs
+              telling that switching it on was only half the job.
+            -->
+            @if (item.active && item.published === false && screenOf(item.key); as route) {
+              <a class="btn btn-sm btn-primary" [routerLink]="route">Add content →</a>
+            }
             @if (item.granted) {
               <button type="button" class="btn btn-sm btn-ghost" (click)="togglePanel(item.key)">
                 {{ panelOpen(item.key) ? 'Hide settings' : 'Settings' }}

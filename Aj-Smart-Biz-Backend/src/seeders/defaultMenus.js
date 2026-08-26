@@ -30,9 +30,22 @@ const menus = [
    * team opens it daily and nobody opens Role Management twice.
    */
   { name: 'Lead Management', slug: 'lead-management', icon: 'target', route: '/leads', sequence: 4 },
-  { name: 'Role Management', slug: 'role-management', icon: 'shield', route: '/roles', sequence: 5 },
-  { name: 'Menu Permission', slug: 'menu-permission', icon: 'list-checks', route: '/menu-permissions', sequence: 6 },
-  { name: 'Admin Management', slug: 'admin-management', icon: 'users', route: '/admins', sequence: 7 },
+  /**
+   * The people who filled in the enquiry form on a service card.
+   *
+   * A top-level menu rather than a Company Details submenu, and for the same
+   * reason Lead Management is one: that section is the company describing
+   * itself, and this is a queue somebody works through. Different screen,
+   * different staff, different permission.
+   *
+   * Directly under Lead Management, because the two are read by the same
+   * person on the same morning — and this is the half of it where somebody
+   * actually asked to be called.
+   */
+  { name: 'Service Leads', slug: 'service-leads', icon: 'inbox', route: '/service-leads', sequence: 5 },
+  { name: 'Role Management', slug: 'role-management', icon: 'shield', route: '/roles', sequence: 6 },
+  { name: 'Menu Permission', slug: 'menu-permission', icon: 'list-checks', route: '/menu-permissions', sequence: 7 },
+  { name: 'Admin Management', slug: 'admin-management', icon: 'users', route: '/admins', sequence: 8 },
 
   /* ------------------------------------------------------------------ *
    * Company Details submenus
@@ -55,25 +68,31 @@ const menus = [
    * the section, and grantable on its own — same rule as Branches.
    */
   { name: 'Slider', slug: 'slider-management', icon: 'film', route: '/company/sliders', sequence: 25, parent: 'company-details' },
-  { name: 'About us', slug: 'company-about', icon: 'file-text', route: '/company/about', sequence: 26, parent: 'company-details' },
+  /**
+   * The services the business sells — its own screen because it is its own
+   * page on the website, and because a price list is edited by different people
+   * and on a different rhythm from the company's story.
+   */
+  { name: 'Services', slug: 'company-services', icon: 'briefcase', route: '/company/services', sequence: 26, parent: 'company-details' },
+  { name: 'About us', slug: 'company-about', icon: 'file-text', route: '/company/about', sequence: 27, parent: 'company-details' },
   /**
    * The band of figures, and the words above it. Its own entry rather than a
    * block on the About screen: it is its own functionality now, sold and
    * switched on separately, and a tenant whose plan carries one of the two but
    * not the other must not find it half-hidden inside the other's page.
    */
-  { name: 'Figures', slug: 'company-figures', icon: 'bar-chart-3', route: '/company/figures', sequence: 27, parent: 'company-details' },
-  { name: 'Team', slug: 'company-team', icon: 'users', route: '/company/team', sequence: 28, parent: 'company-details' },
-  { name: 'Gallery', slug: 'company-gallery', icon: 'image', route: '/company/gallery', sequence: 29, parent: 'company-details' },
-  { name: 'Contact page', slug: 'company-contact', icon: 'mail', route: '/company/contact', sequence: 30, parent: 'company-details' },
-  { name: 'Features / Benefits', slug: 'company-features', icon: 'sparkles', route: '/company/features', sequence: 31, parent: 'company-details' },
+  { name: 'Figures', slug: 'company-figures', icon: 'bar-chart-3', route: '/company/figures', sequence: 28, parent: 'company-details' },
+  { name: 'Team', slug: 'company-team', icon: 'users', route: '/company/team', sequence: 29, parent: 'company-details' },
+  { name: 'Gallery', slug: 'company-gallery', icon: 'image', route: '/company/gallery', sequence: 30, parent: 'company-details' },
+  { name: 'Contact page', slug: 'company-contact', icon: 'mail', route: '/company/contact', sequence: 31, parent: 'company-details' },
+  { name: 'Features / Benefits', slug: 'company-features', icon: 'sparkles', route: '/company/features', sequence: 32, parent: 'company-details' },
   /**
    * Customer reviews. Unlike the rest of the section this screen is a queue as
    * well as an editor — a review a stranger wrote sits here until someone
    * approves it — which is why it is worth its own entry rather than a tab.
    */
-  { name: 'Testimonials', slug: 'company-testimonials', icon: 'quote', route: '/company/testimonials', sequence: 32, parent: 'company-details' },
-  { name: 'Plan & billing', slug: 'company-subscription', icon: 'credit-card', route: '/company/subscription', sequence: 33, parent: 'company-details' },
+  { name: 'Testimonials', slug: 'company-testimonials', icon: 'quote', route: '/company/testimonials', sequence: 33, parent: 'company-details' },
+  { name: 'Plan & billing', slug: 'company-subscription', icon: 'credit-card', route: '/company/subscription', sequence: 34, parent: 'company-details' },
 ];
 
 /**
@@ -89,6 +108,7 @@ const menus = [
  */
 const MENU_INHERITS_PARENT = new Set([
   'company-profile',
+  'company-services',
   'company-domains',
   'company-functionality',
   'company-about',
@@ -114,6 +134,16 @@ const MENU_INHERITS_PARENT = new Set([
  * Domains, Functionality, Slider and Plan & billing are part of every plan.
  */
 const MENU_FUNCTIONALITY = {
+  'company-services': FUNCTIONALITY.SERVICES,
+  /**
+   * The enquiry queue exists because the Services section does. A tenant whose
+   * plan does not carry Services has no form on its website and therefore
+   * nothing to work through, so the menu is left out rather than shown leading
+   * to an empty screen. Switched **off** is a different thing and keeps it —
+   * that is the tenant's own choice, and they still need to reach whatever has
+   * already been sent to them.
+   */
+  'service-leads': FUNCTIONALITY.SERVICES,
   'company-about': FUNCTIONALITY.ABOUT_US,
   'company-figures': FUNCTIONALITY.FIGURES,
   'company-team': FUNCTIONALITY.TEAM,

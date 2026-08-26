@@ -84,15 +84,24 @@ const catalogue = asyncHandler(async (req, res) =>
  * Switches
  * ------------------------------------------------------------------ */
 
-/** GET /my-company/functionalities */
+/**
+ * GET /my-company/functionalities
+ *
+ * `withContent` because this is a console screen: it has to be able to say
+ * "switched on, but nothing published yet" rather than claiming a section is on
+ * the website when the website renders no such section. The public path asks
+ * for the same picture without the counts — see `getFunctionalities`.
+ */
 const list = asyncHandler(async (req, res) => {
-  const data = await functionalityService.getFunctionalities(resolveCompanyId(req));
+  const data = await functionalityService.getFunctionalities(resolveCompanyId(req), { withContent: true });
   return success(res, { message: 'Functionality list fetched successfully', data });
 });
 
 /** GET /my-company/functionalities/:key */
 const getByKey = asyncHandler(async (req, res) => {
-  const item = await functionalityService.getFunctionality(resolveCompanyId(req), req.params.key);
+  const item = await functionalityService.getFunctionality(resolveCompanyId(req), req.params.key, {
+    withContent: true,
+  });
   return success(res, { message: 'Functionality fetched successfully', data: item });
 });
 
@@ -179,7 +188,9 @@ const toggleStatus = asyncHandler(async (req, res) => {
     await seedDefaultFeatures(companyId, req.auth?.id);
   }
 
-  const item = await functionalityService.getFunctionality(companyId, key);
+  /* With content, so switching a section on reports at once whether anything
+     actually reached the website — see `list`. */
+  const item = await functionalityService.getFunctionality(companyId, key, { withContent: true });
   return success(res, { message: `${item.name} switched ${next === STATUS.ACTIVE ? 'on' : 'off'}`, data: item });
 });
 
@@ -199,7 +210,7 @@ const updateSettings = asyncHandler(async (req, res) => {
   const row = await switchRow(companyId, key, { createdBy: req.auth?.id ?? null });
   await row.update({ settings, updatedBy: req.auth?.id ?? null });
 
-  const item = await functionalityService.getFunctionality(companyId, key);
+  const item = await functionalityService.getFunctionality(companyId, key, { withContent: true });
   return success(res, { message: `${item.name} settings saved`, data: item });
 });
 

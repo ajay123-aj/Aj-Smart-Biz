@@ -392,6 +392,64 @@ Table company_gallery_items {
   Note: 'Images in the website Gallery section, in the order the company arranged them.'
 }
 
+Table company_services {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  branch_id int [ref: > branches.id, note: 'branch these services are for; NULL = the whole company. Branch-first with a company-wide fallback, exactly as sliders resolve — and the case for it is strongest here, since a branch offering a different list of services is ordinary rather than exceptional.']
+  icon varchar(40) [not null, default: 'spark', note: 'a key from FEATURE_ICONS, the same closed library the benefit cards draw from. Not an ENUM: the library grows, and an ENUM would make every new glyph a migration.']
+  image varchar(255) [note: 'relative upload path. Optional — a card without one falls back to the icon rather than to a hole.']
+  title varchar(150) [not null]
+  summary varchar(600)
+  highlights json [note: 'what is included, as a short list of lines. JSON rather than a child table: never queried, never ordered apart from its card, and read by exactly one component. The validator caps the count and each line.']
+  cta_label varchar(40) [note: "this service's own button label, overriding the section's. Null on most rows on purpose: falling back rather than copying the section's label into every row means changing it once still changes it everywhere it was not deliberately overridden."]
+  price_label varchar(60) [note: 'free text, never a number — "From ₹4,999", "On request", "£60/hour". A decimal column would have to invent a currency and a period, and would be wrong for anyone who prices per job or does not publish prices.']
+  featured boolean [not null, default: false, note: 'read this one first; the website gives it the wide cell. sequence still decides the order.']
+  sequence int [not null, default: 0]
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    branch_id
+    status
+    sequence
+  }
+  Note: 'The services a business sells, behind the `services` functionality. Distinct from the benefit cards: a benefit is a reason to choose the business, a service is a thing it sells, and only one of the two has a price. The section heading and the name the Services page carries in the website menu live on the functionality settings blob, not here.'
+}
+
+Table service_leads {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  branch_id int [ref: > branches.id, note: 'the branch whose domain the enquiry was sent from; NULL on a company-wide host. Stamped from the host, never from the body.']
+  service_id int [ref: > company_services.id, note: 'nullable, and deliberately not the only record of what was asked — deleting a service must not delete the record of people who asked about it, so the key is cleared and service_title goes on saying what it was about.']
+  service_title varchar(150) [note: 'what that service was CALLED AT THE TIME, copied rather than joined. Services get renamed and deleted; an enquiry is a thing that happened.']
+  name varchar(150) [not null]
+  phone varchar(20) [not null, note: 'as typed, with whatever country code the visitor included. Not split the way company_whatsapp_numbers is: that column is dialled by the platform and has to be exact, this one is dialled by a person reading it off a screen.']
+  stage enum_lead_stage [not null, default: 'new', note: 'the same five stages Lead Management uses, so a company has one vocabulary rather than two']
+  note text [note: "whatever the company wants to remember about it. Theirs, not the visitor's."]
+  sent_to_whatsapp boolean [not null, default: false, note: 'true when the visitor was also handed the message to send. It changes what the row means: the company may well have heard from this person already.']
+  source_url varchar(500)
+  submitted_ip varchar(64)
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    branch_id
+    service_id
+    stage
+    created_at
+  }
+  Note: 'The platform's first inbox: someone who filled in the enquiry form on a service card. Not the same thing as `leads`, which is one row per device that opened the website — traffic, with a stage bolted on. Nobody in that table ever asked to be contacted; everybody in this one did, and said what about. One row per asking rather than per person: the same customer enquiring about framing in March and restoration in June is two enquiries.'
+}
+
 Table company_whatsapp_numbers {
   id int [pk, increment]
   company_id int [not null, ref: > companies.id]

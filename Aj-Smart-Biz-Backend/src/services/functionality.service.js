@@ -29,6 +29,10 @@ const {
   FEATURE_DEFAULTS,
   FEATURE_ICON_KEYS,
   FEATURE_ICON_FALLBACK,
+  SERVICE_DEFAULTS,
+  SERVICE_ENQUIRY_TARGET,
+  SERVICE_ENQUIRY_TARGET_VALUES,
+  NAV_LABEL_SOURCE,
   TEAM_DEFAULTS,
   GALLERY_DEFAULTS,
 } = require('../constants');
@@ -54,13 +58,28 @@ const {
  * omits the feature entirely, which is what stops it reaching a website.
  */
 
-/** Why a functionality is not live. `null` when it is. */
+/**
+ * Why a functionality is not on the website. `null` when it is.
+ *
+ * `EMPTY` is the odd one out and the reason it exists is worth stating. The
+ * other four are about entitlement: the plan, the switch, the term. `EMPTY`
+ * means all three are satisfied and the section *still* does not appear,
+ * because the company has not written anything into it — and several sections
+ * are absent rather than empty by design, so switching one on publishes exactly
+ * nothing until a card is added.
+ *
+ * Without it the console said "On your website" the moment a switch was
+ * flipped, while the website showed no such section. That is precisely the
+ * disagreement this service exists to prevent, and a tenant meeting it
+ * reasonably concludes the feature is broken.
+ */
 const BLOCK_REASON = {
   NOT_IN_PLAN: 'not_in_plan',
   DISABLED: 'disabled',
   EXPIRED: 'expired',
   SUSPENDED: 'suspended',
   NO_PLAN: 'no_plan',
+  EMPTY: 'empty',
 };
 
 const MESSAGES = {
@@ -69,6 +88,7 @@ const MESSAGES = {
   [BLOCK_REASON.EXPIRED]: 'Your plan has expired, so this functionality is not being served. Renew it to bring it back.',
   [BLOCK_REASON.SUSPENDED]: 'Your plan is suspended, so this functionality is not being served.',
   [BLOCK_REASON.NO_PLAN]: 'No plan is active for this company, so this functionality is not being served.',
+  [BLOCK_REASON.EMPTY]: 'This is switched on, but you have not added anything to it yet — the section stays off your website until you do.',
 };
 
 /**
@@ -166,6 +186,64 @@ function featureSettings(stored) {
 }
 
 /**
+ * Normalises whatever is stored for `services` into a complete block of
+ * wording, plus the name the page carries in the menu.
+ *
+ * `navLabel` is null rather than defaulted, the same way About's and Contact's
+ * are: the console shows the platform's name as a placeholder, and has to be
+ * able to tell "they typed the standard name" from "they never opened the
+ * field". `publicNav` falls back for it.
+ */
+function serviceSettings(stored) {
+  const settings = stored && typeof stored === 'object' ? stored : {};
+
+  return {
+    navLabel: settings.navLabel || null,
+    eyebrow: settings.eyebrow || SERVICE_DEFAULTS.eyebrow,
+    title: settings.title || SERVICE_DEFAULTS.title,
+    lead: settings.lead || SERVICE_DEFAULTS.lead,
+    ctaLabel: settings.ctaLabel || SERVICE_DEFAULTS.ctaLabel,
+    /**
+     * Validated rather than trusted on the way out, the same way the
+     * testimonial mode is and for the same reason: this value decides whether
+     * the public internet can write rows into a tenant's database, so a blob
+     * that somehow holds nonsense must fail closed rather than open. An
+     * unrecognised value lands on the default.
+     */
+    enquiryTarget: SERVICE_ENQUIRY_TARGET_VALUES.includes(settings.enquiryTarget)
+      ? settings.enquiryTarget
+      : SERVICE_DEFAULTS.enquiryTarget,
+    formTitle: settings.formTitle || SERVICE_DEFAULTS.formTitle,
+    formNote: settings.formNote || SERVICE_DEFAULTS.formNote,
+  };
+}
+
+/**
+ * What the enquiry button can actually do on this tenant's site today, given
+ * where they pointed it and whether they have published a number for it.
+ *
+ * One function, called by the website's payload and by the public write route,
+ * so the button a visitor sees and the request the API accepts are decided by
+ * the same answer. Three outcomes:
+ *
+ *   `null`          no button at all. Only reachable by pointing the form at
+ *                   WhatsApp and publishing no number — a chat with nobody is
+ *                   worse than no button, exactly as the Contact page's form
+ *                   hides itself in the same position.
+ *   `admin`         the enquiry is recorded and nothing leaves the platform.
+ *   `whatsapp`      handed to WhatsApp and not recorded.
+ *   `both`          recorded and handed over. Degrades to `admin` where there
+ *                   is no number, because the record is the half worth keeping.
+ */
+function serviceEnquiryTarget(settings, whatsappNumber) {
+  const wanted = settings.enquiryTarget;
+  if (whatsappNumber) return wanted;
+
+  if (wanted === SERVICE_ENQUIRY_TARGET.WHATSAPP) return null;
+  return SERVICE_ENQUIRY_TARGET.ADMIN;
+}
+
+/**
  * The heading block a section shows above its cards, with the platform's
  * wording filling anything the tenant left blank.
  *
@@ -235,6 +313,7 @@ function settingsFor(key, stored) {
   if (key === FUNCTIONALITY.SHARE_LINK) return shareSettings(stored);
   if (key === FUNCTIONALITY.TESTIMONIALS) return testimonialSettings(stored);
   if (key === FUNCTIONALITY.FEATURES) return featureSettings(stored);
+  if (key === FUNCTIONALITY.SERVICES) return serviceSettings(stored);
   /* Team, Gallery and Figures keep only the words above their cards. */
   if (key === FUNCTIONALITY.TEAM) return sectionCopy(stored, TEAM_DEFAULTS);
   if (key === FUNCTIONALITY.GALLERY) return sectionCopy(stored, GALLERY_DEFAULTS);
@@ -243,11 +322,74 @@ function settingsFor(key, stored) {
 }
 
 /**
+ * The sections that are **absent rather than empty**: entitled, switched on and
+ * with nothing written is a section the website does not render at all.
+ *
+ * One entry per card-backed feature, naming the table its content lives in and
+ * what counts as published there. It is the same rule each `publicX` function
+ * applies on the way out — this is the console's side of it, so the switch and
+ * the site agree about whether anything is actually being shown.
+ *
+ * About, Figures, WhatsApp and the rest are deliberately absent from this list.
+ * About falls back to the company profile, Figures seeds its own cards, and
+ * WhatsApp's own emptiness is already reported by the numbers screen.
+ */
+const CONTENT_SOURCES = {
+  [FUNCTIONALITY.SERVICES]: { model: () => db.CompanyService, where: { status: STATUS.ACTIVE } },
+  [FUNCTIONALITY.TEAM]: { model: () => db.CompanyTeamMember, where: { status: STATUS.ACTIVE } },
+  [FUNCTIONALITY.GALLERY]: { model: () => db.CompanyGalleryItem, where: { status: STATUS.ACTIVE } },
+  [FUNCTIONALITY.FEATURES]: { model: () => db.CompanyFeature, where: { status: STATUS.ACTIVE } },
+  /**
+   * Only an approved review is published, so a queue of pending ones still
+   * counts as nothing on the website — which is exactly what the tenant needs
+   * telling. `skip` exempts a `dynamic` wall: it survives being empty because
+   * the review form is the point of it, and calling that "nothing published"
+   * would be wrong.
+   */
+  [FUNCTIONALITY.TESTIMONIALS]: {
+    model: () => db.CompanyTestimonial,
+    where: { status: STATUS.ACTIVE, moderation: TESTIMONIAL_MODERATION.APPROVED },
+    skip: (row) => testimonialSettings(row?.settings).mode !== TESTIMONIAL_MODE.STATIC,
+  },
+};
+
+/**
+ * How many published rows each live, card-backed feature has.
+ *
+ * Only asked for the features that are actually live — a switched-off section
+ * has nothing to report and the count would be a query for nothing — and only
+ * when the caller wants it. The public website path calls `getFunctionalities`
+ * on every request and decides emptiness for itself from the rows it is already
+ * loading, so it would be paying for five counts it never reads.
+ */
+async function contentCounts(companyId, liveKeys, rowsByKey) {
+  const wanted = liveKeys.filter((key) => {
+    const source = CONTENT_SOURCES[key];
+    return source && !(source.skip && source.skip(rowsByKey.get(key)));
+  });
+  if (!wanted.length) return new Map();
+
+  const counts = await Promise.all(
+    wanted.map((key) =>
+      CONTENT_SOURCES[key].model().count({ where: { companyId, ...CONTENT_SOURCES[key].where } })
+    )
+  );
+
+  return new Map(wanted.map((key, index) => [key, counts[index]]));
+}
+
+/**
  * The whole functionality picture for one company: every key in the catalogue,
  * whether the plan grants it, whether the tenant switched it on, whether it is
  * therefore live, and the reason when it is not.
+ *
+ * `withContent` additionally reports, for the card-backed sections, how many
+ * rows each is publishing — see `CONTENT_SOURCES`. The consoles ask for it so a
+ * switch cannot claim to be on the website while the section is empty; the
+ * public path does not, because it resolves emptiness from the rows it loads
+ * anyway.
  */
-async function getFunctionalities(companyId) {
+async function getFunctionalities(companyId, { withContent = false } = {}) {
   const subscription = await runningSubscription(companyId, {
     include: [{ model: db.Plan, as: 'plan', attributes: ['id', 'name', 'functionalities'] }],
   });
@@ -260,23 +402,58 @@ async function getFunctionalities(companyId) {
   const granted = new Set(grantedKeys(subscription));
   const byKey = new Map(rows.map((row) => [row.key, row]));
 
+  /**
+   * The features that clear all three gates. Their content is counted below;
+   * anything short of live has nothing to publish and is not asked about.
+   */
+  const liveKeys = service.active
+    ? FUNCTIONALITY_CATALOGUE.map((entry) => entry.key).filter(
+      (key) => granted.has(key) && byKey.get(key)?.status === STATUS.ACTIVE
+    )
+    : [];
+
+  const counts = withContent ? await contentCounts(companyId, liveKeys, byKey) : new Map();
+
   const items = FUNCTIONALITY_CATALOGUE.map((entry) => {
     const row = byKey.get(entry.key) ?? null;
     const isGranted = granted.has(entry.key);
     const isEnabled = row?.status === STATUS.ACTIVE;
+    const isActive = isGranted && isEnabled && service.active;
+
+    /**
+     * How many rows this section is publishing, or `null` when it is not the
+     * kind of section that has any — and when the caller did not ask.
+     */
+    const contentCount = counts.has(entry.key) ? counts.get(entry.key) : null;
 
     // Ordered so the most fundamental problem is the one reported: a feature
-    // the plan never included should not read "switched off".
+    // the plan never included should not read "switched off", and one that is
+    // simply empty should not read as anything worse than that.
     let reason = null;
     if (!isGranted) reason = BLOCK_REASON.NOT_IN_PLAN;
     else if (!isEnabled) reason = BLOCK_REASON.DISABLED;
     else if (!service.active) reason = service.reason;
+    else if (contentCount === 0) reason = BLOCK_REASON.EMPTY;
 
     return {
       ...entry,
       granted: isGranted,
       enabled: isEnabled,
-      active: isGranted && isEnabled && service.active,
+      /**
+       * Entitlement only, and deliberately unchanged by emptiness: the write
+       * guards and `activeKeys` are built on it, and a tenant must be able to
+       * add the first service to a section that is by definition empty until
+       * they do. Whether anything is actually on the website is `published`.
+       */
+      active: isActive,
+      /**
+       * Live **and** carrying something. False on a switched-on section with
+       * nothing in it — which is a section the website does not render, so a
+       * console saying otherwise would be lying. `null` when the caller did not
+       * ask for content counts.
+       */
+      published: withContent ? isActive && contentCount !== 0 : null,
+      contentCount,
       // Never configured is different from configured-and-empty for the console,
       // which shows "not set up yet" on the first, so the raw row is reported.
       configured: Boolean(row),
@@ -303,9 +480,9 @@ async function getFunctionalities(companyId) {
 }
 
 /** One entry from `getFunctionalities`, or a 404 for a key nobody defined. */
-async function getFunctionality(companyId, key) {
+async function getFunctionality(companyId, key, options) {
   if (!FUNCTIONALITY_VALUES.includes(key)) throw ApiError.notFound('Unknown functionality');
-  const { items } = await getFunctionalities(companyId);
+  const { items } = await getFunctionalities(companyId, options);
   return items.find((item) => item.key === key);
 }
 
@@ -631,6 +808,94 @@ async function publicBenefits(companyId, branchId, settings) {
   };
 }
 
+/* -------------------------------- services ------------------------------- */
+
+/**
+ * One service as the website receives it.
+ *
+ * The icon is checked rather than trusted, exactly as a benefit card's is: a
+ * name the platform no longer draws becomes `spark` on the way out, so the
+ * worst an unknown glyph can do is pick the wrong picture.
+ *
+ * `highlights` is normalised hard. It is the one field on the platform that
+ * arrives as free-form JSON, so it is coerced to an array of non-empty strings
+ * here rather than being handed to a template that would then have to guard
+ * every `.map` on it. A row written before the validator existed, or by hand,
+ * cannot break a page from this side.
+ */
+const publicService = (row) => ({
+  id: row.id,
+  icon: FEATURE_ICON_KEYS.includes(row.icon) ? row.icon : FEATURE_ICON_FALLBACK,
+  image: row.image ?? null,
+  title: row.title,
+  summary: row.summary ?? null,
+  highlights: Array.isArray(row.highlights)
+    ? row.highlights.map((line) => String(line).trim()).filter(Boolean)
+    : [],
+  priceLabel: row.priceLabel ?? null,
+  /**
+   * This service's own button label, or null to use the section's. Resolved by
+   * the website rather than filled in here so a company that changes the
+   * section's label still changes every card that never overrode it.
+   */
+  ctaLabel: row.ctaLabel ?? null,
+  featured: Boolean(row.featured),
+});
+
+/**
+ * The Services section for one host, or `null` when there is nothing to show.
+ *
+ * Empty means absent, the rule Team, Gallery and the benefit cards all follow,
+ * and it decides the Services *page* as well as the band on the home page: a
+ * route that exists but lists nothing is worse than a route that 404s. The nav
+ * entry is dropped on the same signal — see `publicNav`, which reads the same
+ * `activeKeys` — so nothing on the site links to a page that is not there.
+ *
+ * There is deliberately no fallback wording for the items themselves. The
+ * platform holds a company's name, trade and address; it holds nothing about
+ * what that company actually sells, and a service nobody offers is worse on a
+ * website than no list at all. See `SERVICE_DEFAULTS`.
+ */
+async function publicServices(companyId, branchId, settings, whatsappNumber = null) {
+  const rows = await branchScoped(db.CompanyService, companyId, branchId, { status: STATUS.ACTIVE });
+  if (!rows.length) return null;
+
+  const target = serviceEnquiryTarget(settings, whatsappNumber);
+
+  return {
+    eyebrow: settings.eyebrow,
+    title: settings.title,
+    lead: settings.lead,
+    /** The button on each card, unless the card carries one of its own. */
+    ctaLabel: settings.ctaLabel,
+    /**
+     * What the button does. `null` when it cannot do anything — the tenant
+     * pointed it at WhatsApp and published no number — and the website then
+     * renders no button at all rather than a dialog that goes nowhere.
+     *
+     * `whatsapp` carries the digits rather than a finished `wa.me` link,
+     * because the message is composed from what the visitor types and cannot
+     * exist until they have typed it. It is the one place the website builds a
+     * WhatsApp URL itself; everywhere else the API sends a finished one.
+     */
+    enquiry: target
+      ? {
+        target,
+        /** True when a submission is recorded on the platform. */
+        records: target !== SERVICE_ENQUIRY_TARGET.WHATSAPP,
+        /** True when the visitor is handed the message to send. */
+        opensWhatsapp: target !== SERVICE_ENQUIRY_TARGET.ADMIN,
+        title: settings.formTitle,
+        note: settings.formNote,
+        whatsapp: whatsappNumber
+          ? { number: whatsappNumber.number, countryCode: whatsappNumber.countryCode }
+          : null,
+      }
+      : null,
+    items: rows.map(publicService),
+  };
+}
+
 /* --------------------------- branch resolution --------------------------- */
 
 const CARD_ORDER = [['sequence', 'ASC'], ['id', 'ASC']];
@@ -708,23 +973,65 @@ async function publicContact(companyId, branchId) {
  * Adding a page in future is a row in `NAV_PAGES` and a `navLabel` on whatever
  * settings table it has. Nothing here or in the website changes.
  */
-async function publicNav(companyId, branchId, activeKeys) {
+async function publicNav(companyId, branchId, activeKeys, features = {}) {
   const needsSettings = NAV_PAGES.some((page) => page.settings);
 
-  const [aboutRow, contactRow] = needsSettings
+  /**
+   * A page is in the menu when the plan pays for it **and**, where the page
+   * says so, when there is something on it. The second half is `content`, and
+   * it is answered from the very payload the website will render — not from a
+   * second count of the same rows, which is how the two would come to disagree.
+   *
+   * Services is the page that needs it: entitled, switched on and empty is an
+   * ordinary state for a tenant on its first afternoon, and a Services link
+   * leading to a page with nothing on it is worse than no link.
+   */
+  const published = (page) => !page.content || Boolean(features[page.content]);
+
+  /**
+   * Only the pages actually in this tenant's menu are asked about. A company
+   * without the Services grant has no Services entry to name, and reading its
+   * settings row to find that out would be a query for a label nobody will see.
+   */
+  const wanted = new Set(
+    NAV_PAGES.filter(
+      (page) => page.settings && (!page.functionality || activeKeys.includes(page.functionality)) && published(page)
+    ).map((page) => page.settings)
+  );
+
+  const [aboutRow, contactRow, servicesRow] = needsSettings
     ? await Promise.all([
-        resolveAboutRow(companyId, branchId),
-        branchId
-          ? db.CompanyContact.findOne({ where: { companyId, branchId } }).then(
-              (own) => own ?? db.CompanyContact.findOne({ where: { companyId, branchId: null } })
-            )
-          : db.CompanyContact.findOne({ where: { companyId, branchId: null } }),
+        wanted.has('about') ? resolveAboutRow(companyId, branchId) : null,
+        wanted.has('contact')
+          ? branchId
+            ? db.CompanyContact.findOne({ where: { companyId, branchId } }).then(
+                (own) => own ?? db.CompanyContact.findOne({ where: { companyId, branchId: null } })
+              )
+            : db.CompanyContact.findOne({ where: { companyId, branchId: null } })
+          : null,
+        /**
+         * Services keeps its label on the switch row's settings blob rather
+         * than in a settings table, because it has no settings table — see
+         * `NAV_LABEL_SOURCE`. Company-wide, therefore, where About's and
+         * Contact's are branch-aware: a branch can offer a different list of
+         * services, but calling the page something else on one host and not
+         * another is a difference nobody asked for.
+         */
+        wanted.has('services')
+          ? db.CompanyFunctionality.findOne({ where: { companyId, key: FUNCTIONALITY.SERVICES } })
+          : null,
       ])
-    : [null, null];
+    : [null, null, null];
 
-  const labels = { about: aboutRow?.navLabel, contact: contactRow?.navLabel };
+  const labels = {
+    about: aboutRow?.navLabel,
+    contact: contactRow?.navLabel,
+    services: NAV_LABEL_SOURCE.services === 'functionality' ? servicesRow?.settings?.navLabel : null,
+  };
 
-  return NAV_PAGES.filter((page) => !page.functionality || activeKeys.includes(page.functionality)).map(
+  return NAV_PAGES.filter(
+    (page) => (!page.functionality || activeKeys.includes(page.functionality)) && published(page)
+  ).map(
     (page) => ({
       key: page.key,
       href: page.href,
@@ -745,6 +1052,7 @@ async function publicFeatures(companyId, branchId = null) {
     gallery: null,
     testimonials: null,
     benefits: null,
+    services: null,
   };
   if (!activeKeys.length) return features;
 
@@ -887,6 +1195,25 @@ async function publicFeatures(companyId, branchId = null) {
     features.benefits = await publicBenefits(companyId, branchId, featureSettings(row?.settings));
   }
 
+  if (activeKeys.includes(FUNCTIONALITY.SERVICES)) {
+    const row = await db.CompanyFunctionality.findOne({
+      where: { companyId, key: FUNCTIONALITY.SERVICES },
+    });
+    /**
+     * The enquiry number, taken from the block resolved above rather than
+     * queried again — which also means it is `null` whenever the WhatsApp
+     * feature itself is not live, and the enquiry form degrades accordingly.
+     * An enquiry is an inquiry, so it uses that type and inherits its fallback
+     * to `contact`.
+     */
+    features.services = await publicServices(
+      companyId,
+      branchId,
+      serviceSettings(row?.settings),
+      features.whatsapp?.byType?.inquiry ?? null
+    );
+  }
+
   return features;
 }
 
@@ -900,6 +1227,9 @@ module.exports = {
   publicTestimonials,
   featureSettings,
   publicBenefits,
+  serviceSettings,
+  serviceEnquiryTarget,
+  publicServices,
   aboutCopy,
   contactSettings,
   publicContact,

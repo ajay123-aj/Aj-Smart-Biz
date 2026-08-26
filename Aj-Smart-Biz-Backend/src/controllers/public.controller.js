@@ -17,6 +17,7 @@ const {
   TESTIMONIAL_REVIEW_TARGET,
   TESTIMONIAL_SOURCE,
   TESTIMONIAL_MODERATION,
+  SERVICE_ENQUIRY_TARGET,
 } = require('../constants');
 
 /** Hosts that never identify a tenant, so a bare dev server gets platform branding. */
@@ -32,10 +33,19 @@ const normaliseHost = (value) =>
 
 /**
  * The Host the browser actually used. Behind a proxy the original host arrives in
- * `X-Forwarded-Host`; `?domain=` stays available for local development, where the
+ * `X-Forwarded-Host`; `domain` stays available for local development, where the
  * dev server has no tenant subdomain of its own.
+ *
+ * Read from the **body as well as the query**. The read endpoints are called
+ * with `?domain=`, but both submit endpoints take it as a body field — it is in
+ * their validators and documented there as exactly this escape hatch — and
+ * looking only at the query meant a form on a local dev site could never
+ * identify its tenant, so every submission was refused. It grants nothing new:
+ * `?domain=` already lets any caller name the tenant, which is the accepted
+ * trade for being able to run a tenant's website on localhost at all.
  */
-const resolveHost = (req) => normaliseHost(req.query.domain || req.get('x-forwarded-host') || req.get('host'));
+const resolveHost = (req) =>
+  normaliseHost(req.query.domain || req.body?.domain || req.get('x-forwarded-host') || req.get('host'));
 
 /** First label of the host: `acme.ajsmartbiz.com` -> `acme`. */
 const subdomainOf = (host) => {
@@ -241,6 +251,7 @@ const platformDetails = (host) => ({
     gallery: null,
     testimonials: null,
     benefits: null,
+    services: null,
   },
   // The Contact page exists for every tenant, so the platform default carries
   // a usable block rather than null.
@@ -326,12 +337,20 @@ const companyDetails = asyncHandler(async (req, res) => {
 
   const functionalities = await functionalityService.getFunctionalities(company.id);
 
-  const [slides, service, features, contactPage, nav] = await Promise.all([
+  /**
+   * Ahead of the rest, because the menu depends on it: a page whose `content`
+   * key is null in here is not in the menu, so `publicNav` has to be able to
+   * read the finished payload rather than count the same rows a second time.
+   * See `NAV_PAGES`.
+   *
+   * The pinned branch goes in, so About/Team/Gallery/Services resolve
+   * branch-first the same way the slides do.
+   */
+  const features = await functionalityService.publicFeatures(company.id, branch?.id ?? null);
+
+  const [slides, service, contactPage, nav] = await Promise.all([
     resolveSlides(company.id, branch?.id ?? null),
     resolveServiceState(company.id),
-    // The pinned branch, so About/Team/Gallery resolve branch-first the same
-    // way the slides above them do.
-    functionalityService.publicFeatures(company.id, branch?.id ?? null),
     // Alongside `features` rather than inside it, because the template reaches
     // for it by name on one page. Null when the tenant is not entitled to a
     // Contact page or has it switched off — the website then drops the page and
@@ -341,7 +360,7 @@ const companyDetails = asyncHandler(async (req, res) => {
      * The menu. Built by the API so a page's name is the tenant's to set and a
      * page they are not entitled to never reaches the template at all.
      */
-    functionalityService.publicNav(company.id, branch?.id ?? null, functionalities.activeKeys),
+    functionalityService.publicNav(company.id, branch?.id ?? null, functionalities.activeKeys, features),
   ]);
 
   const mainBranch = branches.find((row) => row.isMain) ?? null;
@@ -490,6 +509,122 @@ const submitTestimonial = asyncHandler(async (req, res) => {
 });
 
 /* ------------------------------------------------------------------ *
+ * Service enquiries
+ * ------------------------------------------------------------------ */
+
+/**
+ * POST /website/service-leads
+ *
+ * Somebody asking a tenant to ring them back about one of its services. The
+ * second route on the platform that lets an unauthenticated stranger create a
+ * row, and it is narrow for the same reasons the first one is:
+ *
+ *  - **The tenant comes from the host, never from the body.** There is no
+ *    `companyId` field to send, so an enquiry cannot be aimed at a company
+ *    whose website the sender never opened.
+ *  - **Only against a service that is actually published.** The functionality
+ *    has to be live, the service has to belong to this tenant, and it has to be
+ *    active. An id pointing at another company's service, or at one that was
+ *    switched off, is refused rather than recorded against nothing.
+ *  - **Only where the form records at all.** A tenant that pointed the button
+ *    at WhatsApp has no inbox on the platform, and this endpoint is shut with
+ *    it — the same rule that closes testimonial submissions on a curated wall.
+ *  - **Branch-stamped from the domain.** An enquiry raised on the Surat site
+ *    belongs to Surat.
+ *
+ * What comes back is deliberately thin: that it was received, and — where the
+ * tenant is also handing enquiries to WhatsApp — the number to open. It never
+ * reports how many enquiries exist or what happens to one next.
+ */
+const submitServiceLead = asyncHandler(async (req, res) => {
+  const host = resolveHost(req);
+  const { company, branch } = await resolveTenantByHost(host);
+
+  /**
+   * Refused with one message however it failed, exactly as a testimonial is: a
+   * distinct "no such company" would turn a POST into a way of enumerating
+   * tenants, which is precisely what the read endpoints are careful not to be.
+   */
+  const refuse = () => {
+    throw ApiError.badRequest('This website is not accepting enquiries at the moment');
+  };
+
+  if (!company || company.status !== STATUS.ACTIVE) refuse();
+
+  const { activeKeys } = await functionalityService.getFunctionalities(company.id);
+  if (!activeKeys.includes(FUNCTIONALITY.SERVICES)) refuse();
+
+  const row = await db.CompanyFunctionality.findOne({
+    where: { companyId: company.id, key: FUNCTIONALITY.SERVICES },
+  });
+  const settings = functionalityService.serviceSettings(row?.settings);
+
+  /**
+   * The number decides what the button was allowed to do, so it is resolved
+   * here the same way the website's payload resolves it — one function, so the
+   * form a visitor was shown and the request this route accepts cannot
+   * disagree about where an enquiry is supposed to go.
+   */
+  const numbers = activeKeys.includes(FUNCTIONALITY.WHATSAPP)
+    ? await db.CompanyWhatsapp.findAll({
+      where: { companyId: company.id, status: STATUS.ACTIVE },
+      order: [['sequence', 'ASC'], ['id', 'ASC']],
+    })
+    : [];
+  const enquiryNumber =
+    numbers.find((entry) => entry.type === 'inquiry') ?? numbers.find((entry) => entry.type === 'contact') ?? numbers[0] ?? null;
+
+  const target = functionalityService.serviceEnquiryTarget(settings, enquiryNumber);
+  /* No button on the site, or a button that only opens WhatsApp — either way
+     there is nothing here to write to. */
+  if (!target || target === SERVICE_ENQUIRY_TARGET.WHATSAPP) refuse();
+
+  const { serviceId, name, phone, sourceUrl } = req.body;
+
+  /**
+   * The service is checked against this tenant rather than trusted. Without it
+   * an enquiry could be filed against another company's service id, and the
+   * title copied onto the row would be that company's wording.
+   */
+  const service = await db.CompanyService.findOne({
+    where: { id: serviceId, companyId: company.id, status: STATUS.ACTIVE },
+    attributes: ['id', 'title'],
+  });
+  if (!service) refuse();
+
+  await db.ServiceLead.create({
+    companyId: company.id,
+    branchId: branch?.id ?? null,
+    serviceId: service.id,
+    /* Copied, not joined — see the model. An enquiry is a thing that happened. */
+    serviceTitle: service.title,
+    name,
+    phone,
+    /* Not fields a body can carry. */
+    sentToWhatsapp: target === SERVICE_ENQUIRY_TARGET.BOTH,
+    sourceUrl: sourceUrl || null,
+    submittedIp: req.ip ?? null,
+    createdBy: null,
+  });
+
+  return created(res, 'Thank you — we have your details and will be in touch', {
+    received: true,
+    /**
+     * The website opens WhatsApp itself, with a message composed from what the
+     * visitor typed. Sent back rather than assumed so the page does not have to
+     * re-derive what the API just decided.
+     */
+    whatsapp:
+      target === SERVICE_ENQUIRY_TARGET.BOTH && enquiryNumber
+        ? {
+          number: functionalityService.digitsOnly(enquiryNumber.number),
+          countryCode: functionalityService.digitsOnly(enquiryNumber.countryCode),
+        }
+        : null,
+  });
+});
+
+/* ------------------------------------------------------------------ *
  * Lead tracking
  * ------------------------------------------------------------------ */
 
@@ -557,6 +692,7 @@ module.exports = {
   branding,
   companyDetails,
   submitTestimonial,
+  submitServiceLead,
   trackLead,
   resolveTenantByHost,
   normaliseHost,

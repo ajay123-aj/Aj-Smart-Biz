@@ -88,6 +88,14 @@ export const routes: Routes = [
               import('./features/sliders/slider-list.component').then((m) => m.SliderListComponent),
           },
           {
+            path: 'services',
+            title: 'Services',
+            loadComponent: () =>
+              import('./features/company/services-manager.component').then(
+                (m) => m.ServicesManagerComponent
+              ),
+          },
+          {
             path: 'about',
             title: 'About us',
             loadComponent: () =>
@@ -161,6 +169,18 @@ export const routes: Routes = [
         canActivate: [permissionGuard('lead-management')],
         title: 'Lead Management',
         loadComponent: () => import('./features/leads/lead-list.component').then((m) => m.LeadListComponent),
+      },
+      /**
+       * The enquiry queue. Its own menu and its own permission, like Lead
+       * Management above it — the two are read by the same person but one is
+       * traffic and the other is people who asked to be rung.
+       */
+      {
+        path: 'service-leads',
+        canActivate: [permissionGuard('service-leads')],
+        title: 'Service Leads',
+        loadComponent: () =>
+          import('./features/service-leads/service-lead-list.component').then((m) => m.ServiceLeadListComponent),
       },
       {
         path: 'leads/analytics',

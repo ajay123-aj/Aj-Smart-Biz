@@ -228,6 +228,69 @@ export const PLAN_NOTICE = {
 } as const;
 
 /* ------------------------------------------------------------------ *
+ * Services
+ * ------------------------------------------------------------------ */
+
+/**
+ * The Services section's wording of last resort, and the labels around it.
+ *
+ * The copy comes from the API — the tenant writes it on Company Details →
+ * Services — so `eyebrow`, `title`, `lede` and `cta` here are the same standing
+ * `FEATURES_COPY` has: the words to use if a block arrives with a field blank,
+ * so a heading is never an empty line.
+ *
+ * There are deliberately no `items`, for a stronger version of the reason
+ * `FEATURES_COPY` has none. A benefit the platform invented is a claim nobody
+ * can stand behind; a *service* the platform invented is a business advertising
+ * work it may not do, and a visitor ringing up about it. A tenant with nothing
+ * written here shows no section and has no Services page.
+ *
+ * `metaTitle`, `more` and `emptyPrice` are the template's own labels rather
+ * than fallbacks — they are chrome, not the tenant's words.
+ */
+export const SERVICES_COPY = {
+  eyebrow: 'What we do',
+  title: 'How {company} can help',
+  lede: 'What we take on, what is included, and roughly what it costs.',
+  /** The button on each card. Rendered only where there is a Contact page. */
+  cta: 'Enquire',
+
+  /** The page's browser title. The heading on it is the tenant's. */
+  metaTitle: 'Services',
+  /** The link out of the home band when it is showing only part of the list. */
+  more: 'See everything we do',
+  /** Above the tick list on a card. */
+  includesLabel: 'Includes',
+
+  /* ----------------------------- the enquiry ----------------------------- */
+  /*
+   * The dialog's own furniture. Its heading and its introduction are the
+   * tenant's — written on Company Details → Services — and everything here is
+   * the labels around them, which no company needs to rewrite.
+   */
+  enquiryName: 'Your name',
+  enquiryPhone: 'Mobile number',
+  enquiryPhoneHint: 'So we can call you back',
+  enquirySubmit: 'Send enquiry',
+  enquirySending: 'Sending…',
+  /** The button that opens the chat, on both the direct and the confirmed routes. */
+  enquiryWhatsapp: 'Continue on WhatsApp',
+  enquirySent: 'Enquiry sent',
+  enquiryClose: 'Close',
+  enquiryPrivacy: 'We use your number to reply to this enquiry and nothing else.',
+} as const;
+
+/**
+ * How many services the home page shows before it stops and links to the page.
+ *
+ * Four rather than all of them: the home band is the case for looking further,
+ * not the catalogue. A business with three services shows three and no link; one
+ * with eleven shows four and a way to the rest, instead of turning the home page
+ * into a price list.
+ */
+export const SERVICES_HOME_LIMIT = 4;
+
+/* ------------------------------------------------------------------ *
  * Features / Benefits
  * ------------------------------------------------------------------ */
 

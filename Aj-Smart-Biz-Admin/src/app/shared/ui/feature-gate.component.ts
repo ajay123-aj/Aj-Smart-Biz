@@ -10,6 +10,10 @@ import { Functionality } from '../../core/models/domain.model';
  *
  *   not granted   the plan does not include it — the editor below is read only
  *   switched off  editable, but nothing reaches the website yet
+ *   switched on,
+ *   empty         entitled and on, but the section has nothing in it, so the
+ *                 website still shows nothing — several sections are absent
+ *                 rather than empty by design
  *   live          on the website right now
  *
  * A screen that is not granted still shows its content rather than an empty
@@ -22,12 +26,21 @@ import { Functionality } from '../../core/models/domain.model';
   imports: [RouterLink],
   template: `
     @if (feature(); as item) {
-      <div class="gate" [class.gate-block]="!item.granted" [class.gate-live]="item.active">
-        <span class="gate-icon" aria-hidden="true">{{ item.active ? '✓' : item.granted ? '○' : '🔒' }}</span>
+      <div class="gate" [class.gate-block]="!item.granted" [class.gate-live]="item.active && item.published !== false">
+        <span class="gate-icon" aria-hidden="true">{{
+          item.active ? (item.published === false ? '○' : '✓') : item.granted ? '○' : '🔒'
+        }}</span>
 
         <div class="gate-body">
           <div class="gate-title">
-            @if (item.active) {
+            <!--
+              "Live" only when something is actually published. A section that
+              is switched on but empty is absent from the website, and saying it
+              is live is the one thing this banner exists to prevent.
+            -->
+            @if (item.active && item.published === false) {
+              {{ item.name }} is switched on, but nothing is published yet
+            } @else if (item.active) {
               {{ item.name }} is live on your website
             } @else if (!item.granted) {
               {{ item.name }} is not included in your plan

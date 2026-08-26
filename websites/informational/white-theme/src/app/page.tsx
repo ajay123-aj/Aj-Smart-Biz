@@ -1,11 +1,13 @@
 import PlanNotice from '@/components/PlanNotice';
 import ServiceUnavailable from '@/components/ServiceUnavailable';
 import Slider from '@/components/Slider';
+import ServicesSection from '@/components/ServicesSection';
 import FiguresSection from '@/components/FiguresSection';
 import FeaturesSection from '@/components/FeaturesSection';
 import TestimonialsSection from '@/components/TestimonialsSection';
 import CtaBand from '@/components/CtaBand';
 import { getCompanyDetails } from '@/lib/company.server';
+import { SERVICES_HOME_LIMIT } from '@/config/site';
 
 /**
  * The home page: the tenant's hero, the case for getting in touch, and the
@@ -46,6 +48,22 @@ export default async function HomePage() {
   return (
     <>
       <Slider company={company} />
+
+      {/*
+        Services: what the business actually sells.
+
+        Directly under the hero, and above the benefits band, because that is
+        the order the two are read in — what we do, then why us. A reader who
+        does not yet know what the business offers has nothing to weigh a
+        promise about turnaround against.
+
+        Shortened here and complete on `/services`: the home band is the case
+        for looking further, not the price list. The component renders nothing
+        when the tenant is not carrying the section, so there is no condition
+        here, and it drops the link to the page on the same signal that removes
+        the page from the menu.
+      */}
+      <ServicesSection company={company} limit={SERVICES_HOME_LIMIT} />
 
       {/*
         Features / Benefits: what the business can do, and what that is worth to

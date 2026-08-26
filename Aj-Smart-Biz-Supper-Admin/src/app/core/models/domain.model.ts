@@ -114,6 +114,7 @@ export interface Plan extends AuditFields {
 export type FunctionalityKey =
   | 'whatsapp'
   | 'share_link'
+  | 'services'
   | 'about_us'
   | 'figures'
   | 'team'

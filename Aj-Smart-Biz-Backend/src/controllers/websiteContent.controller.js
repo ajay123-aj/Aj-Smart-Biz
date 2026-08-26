@@ -76,6 +76,22 @@ const features = cardResource({
 });
 
 /**
+ * The services a company sells.
+ *
+ * `imageFields` is what makes this different from the benefit cards next to it:
+ * a service may carry a photograph, so a replaced picture has a file to clean
+ * up — the same bargain Team and Gallery make. The icon needs no such handling,
+ * being a name rather than an upload.
+ */
+const services = cardResource({
+  model: db.CompanyService,
+  functionality: FUNCTIONALITY.SERVICES,
+  label: 'Service',
+  searchFields: ['title', 'summary'],
+  imageFields: ['image'],
+});
+
+/**
  * Testimonials are a card list like the other three — added, edited, reordered
  * and deleted the same way — so they come from the same factory. What they have
  * on top is a moderation queue, because half the rows are written by strangers;
@@ -480,6 +496,7 @@ module.exports = {
   gallery,
   testimonials,
   features,
+  services,
   getAbout,
   saveAbout,
   clearAbout,

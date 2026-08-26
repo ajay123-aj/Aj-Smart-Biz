@@ -312,4 +312,63 @@ router.post(
   controller.submitTestimonial
 );
 
+/**
+ * @openapi
+ * /website/service-leads:
+ *   post:
+ *     tags: [Website]
+ *     summary: Ask a tenant to call you back about one of its services
+ *     description: |
+ *       The enquiry form behind a service card's button. The tenant is resolved
+ *       from the host, like everything else in this module, and the service is
+ *       checked against that tenant before anything is written.
+ *
+ *       Refused, with one message however it failed, unless the tenant is
+ *       actually collecting: the Services functionality live, the service
+ *       published, and the enquiry form pointed somewhere the platform records
+ *       — a company that sends its enquiries only to WhatsApp has no inbox
+ *       here, and this endpoint is shut with it.
+ *
+ *       Its own rate budget, sized between the review form and the tracker: a
+ *       person enquiring about three services in an afternoon is ordinary,
+ *       filling in thirty is not.
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [serviceId, name, phone]
+ *             properties:
+ *               serviceId: { type: integer }
+ *               name: { type: string, maxLength: 150 }
+ *               phone: { type: string, maxLength: 20 }
+ *               sourceUrl: { type: string, maxLength: 500 }
+ *               domain: { type: string, description: Local development only. }
+ *     responses:
+ *       201:
+ *         description: Received. Carries the WhatsApp number to open where the tenant sends enquiries to both.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiSuccess' }
+ *       400: { $ref: '#/components/responses/ValidationFailed' }
+ *       429: { $ref: '#/components/responses/TooManyRequests' }
+ */
+router.post(
+  '/service-leads',
+  rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: config.isProd ? 12 : 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      success: false,
+      message: 'You have sent several enquiries already — please try again later',
+    },
+  }),
+  validate(schema.serviceLeadSubmit),
+  controller.submitServiceLead
+);
+
 module.exports = router;

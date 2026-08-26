@@ -197,6 +197,7 @@ const PAYMENT_MODE_CATALOGUE = [
 const FUNCTIONALITY = {
   WHATSAPP: 'whatsapp',
   SHARE_LINK: 'share_link',
+  SERVICES: 'services',
   ABOUT_US: 'about_us',
   FIGURES: 'figures',
   TEAM: 'team',
@@ -232,13 +233,22 @@ const FUNCTIONALITY_CATALOGUE = [
     sequence: 2,
   },
   {
+    key: FUNCTIONALITY.SERVICES,
+    name: 'Services',
+    icon: 'briefcase',
+    summary: 'The services the business offers, written and priced by the company.',
+    description:
+      'Adds a Services section to the home page and a Services page of its own — a card per service with a picture or an icon, what is included, and an optional price line. The menu entry is renameable, so a studio can call it Work and a clinic can call it Treatments. Switched off, both the section and the page are absent from the site: the platform knows nothing about what a business actually does, so there is no wording to fall back to.',
+    sequence: 3,
+  },
+  {
     key: FUNCTIONALITY.ABOUT_US,
     name: 'About us',
     icon: 'file-text',
     summary: 'Write your own About page, in your own words.',
     description:
       'Replaces the template’s About copy with your own heading, introduction and paragraphs, written per branch where a branch needs to say something different.',
-    sequence: 3,
+    sequence: 4,
   },
   {
     key: FUNCTIONALITY.FIGURES,
@@ -247,7 +257,7 @@ const FUNCTIONALITY_CATALOGUE = [
     summary: 'A band of your own numbers, on the home page and the About page.',
     description:
       'Adds a band of figures to the website — a card per number with your own label and wording above the set. A figure can be fixed text, or counted from a date, so "Years in business" is right next year without anyone editing it. Sold separately from About us: the band is the first thing under the slider on the home page, and a company can want it without wanting a written About page.',
-    sequence: 4,
+    sequence: 5,
   },
   {
     key: FUNCTIONALITY.TEAM,
@@ -256,7 +266,7 @@ const FUNCTIONALITY_CATALOGUE = [
     summary: 'A Team section listing the people behind the business.',
     description:
       'Adds a Team section to the website with a card per person — photo, name, role and a short line about them.',
-    sequence: 5,
+    sequence: 6,
   },
   {
     key: FUNCTIONALITY.GALLERY,
@@ -265,7 +275,7 @@ const FUNCTIONALITY_CATALOGUE = [
     summary: 'A Gallery section for photographs of your work.',
     description:
       'Adds a Gallery section to the website — an ordered grid of images, each with an optional title and caption.',
-    sequence: 6,
+    sequence: 7,
   },
   {
     key: FUNCTIONALITY.CONTACT_PAGE,
@@ -274,7 +284,7 @@ const FUNCTIONALITY_CATALOGUE = [
     summary: 'A Contact page with your own wording and an enquiry form.',
     description:
       'Adds a Contact page to the website — your own heading and introduction, an enquiry form that reaches you by email or WhatsApp, and a card per branch with its address, phone and opening hours.',
-    sequence: 7,
+    sequence: 8,
   },
   {
     key: FUNCTIONALITY.TESTIMONIALS,
@@ -283,7 +293,7 @@ const FUNCTIONALITY_CATALOGUE = [
     summary: 'Customer reviews and feedback on the public website.',
     description:
       'Adds a Testimonials section to the website. Run it curated — only the reviews you enter yourself — or open it up so customers can write their own, which reach you for approval before anything is published.',
-    sequence: 8,
+    sequence: 9,
   },
   {
     key: FUNCTIONALITY.FEATURES,
@@ -292,7 +302,7 @@ const FUNCTIONALITY_CATALOGUE = [
     summary: 'Say what you offer, in your own words, with an icon each.',
     description:
       'Adds a Features / Benefits band to the website \u2014 a card per capability with your own heading, wording and an icon chosen from the platform\u2019s set. Switched off, the section is absent from the site entirely rather than shown with the template\u2019s words.',
-    sequence: 9,
+    sequence: 10,
   },
 ];
 
@@ -310,15 +320,39 @@ const FUNCTIONALITY_CATALOGUE = [
  * exist at all. A page with neither, like Home, is always there under the
  * template's own name.
  *
+ * `content` names a key in the public `features` payload that must be non-null
+ * for the page to exist at all — the difference between "the plan pays for this
+ * page" and "there is something on it". Services is the first page to need it:
+ * a company can be entitled to the section, have it switched on, and not have
+ * written a service yet, and a menu entry pointing at a page with nothing on it
+ * is the one thing the whole nav-from-the-API arrangement was meant to prevent.
+ *
  * Adding a page later means adding a row here: the API builds the menu from
  * this list, and the website renders whatever the API sends, so neither has to
  * be taught about it separately.
  */
 const NAV_PAGES = [
   { key: 'home', href: '/', label: 'Home', settings: null, functionality: null },
+  /**
+   * Services. The first page whose label lives on the functionality's own
+   * `settings` blob rather than in a table of its own — the section has no
+   * per-scope settings row, only cards, so there was nowhere else to put it.
+   * `publicNav` reads either shape; see `NAV_LABEL_SOURCE`.
+   */
+  { key: 'services', href: '/services', label: 'Services', settings: 'services', functionality: 'services', content: 'services' },
   { key: 'about', href: '/about', label: 'About us', settings: 'about', functionality: null },
   { key: 'contact', href: '/contact', label: 'Contact', settings: 'contact', functionality: 'contact_page' },
 ];
+
+/**
+ * Where each `NAV_PAGES.settings` name is actually stored.
+ *
+ * About and Contact each have a settings *table*, one row per scope, so their
+ * label is branch-aware. Services has only cards, so its label rides on the
+ * functionality's own settings blob — company-wide, like the Team and Gallery
+ * headings do. `publicNav` reads both, and this is what tells it which.
+ */
+const NAV_LABEL_SOURCE = { about: 'row', contact: 'row', services: 'functionality' };
 
 /** The longest a menu label may be, matching the column. */
 const NAV_LABEL_MAX = 40;
@@ -1015,6 +1049,83 @@ const DEFAULT_FEATURE_ITEMS = [
   },
 ];
 
+/* ------------------------------------------------------------------ *
+ * Services
+ * ------------------------------------------------------------------ */
+
+/**
+ * The Services section's own wording, before a company changes it.
+ *
+ * Kept on the functionality's `settings` blob, like Team's and Gallery's
+ * headings and Features' copy: it is one short block per tenant, not a list.
+ * The services themselves are branch-aware rows in `company_services`.
+ *
+ * `navLabel` is the odd one out and lives here for the same reason. Services is
+ * a page as well as a band, so it needs a name in the menu, and it has no
+ * settings table of its own to keep one in — see `NAV_LABEL_SOURCE`. Blank
+ * keeps the platform's name, exactly as About's and Contact's do.
+ */
+const SERVICE_DEFAULTS = {
+  eyebrow: 'What we do',
+  /** `{company}` is filled in by the website. */
+  title: 'How {company} can help',
+  lead: 'What we take on, what is included, and roughly what it costs. Ask about anything that is not here — most of our work starts as a question.',
+  /**
+   * The button on every service card, unless the service overrides it with one
+   * of its own — see `company_services.cta_label`. A repair shop's "Get a
+   * quote" and a clinic's "Book a slot" are the same button doing the same
+   * job, and neither of them is "Enquire".
+   */
+  ctaLabel: 'Enquire',
+
+  /** Where a submitted enquiry goes. See `SERVICE_ENQUIRY_TARGET`. */
+  enquiryTarget: 'both',
+  /** The heading on the dialog the button opens. */
+  formTitle: 'Book an enquiry',
+  /** The line under it, and the tenant's chance to set expectations. */
+  formNote: 'Leave your name and number and we will call you back — usually the same day.',
+};
+
+/**
+ * Where a service enquiry goes when a visitor submits it.
+ *
+ *   whatsapp  straight into the company's WhatsApp, composed and ready to
+ *             send. Nothing is stored on the platform — the same bargain the
+ *             Contact page's form makes, and for the same reason: the tenant
+ *             already has an inbox and a phone.
+ *   admin     recorded as a row the company works through in Service Leads.
+ *             Nothing leaves the platform.
+ *   both      recorded **and** handed to WhatsApp. The default, because it is
+ *             the only one that loses nothing: the row is the record, the
+ *             message is the notification.
+ *
+ * `whatsapp` needs a number to be worth offering. Where the tenant has not
+ * published one the API degrades `both` to `admin` and withholds the button
+ * entirely on `whatsapp` — see `publicServices`. A button that opens a chat
+ * with nobody is worse than no button.
+ */
+const SERVICE_ENQUIRY_TARGET = { WHATSAPP: 'whatsapp', ADMIN: 'admin', BOTH: 'both' };
+const SERVICE_ENQUIRY_TARGET_VALUES = Object.values(SERVICE_ENQUIRY_TARGET);
+
+/** The longest a service's own button label may be, matching the column. */
+const SERVICE_CTA_MAX = 40;
+
+/**
+ * There are deliberately **no default services**.
+ *
+ * Every other seeded list on the platform replaces wording the template used to
+ * invent — six benefit cards, four figures — and seeding them gives a tenant
+ * something to edit rather than a blank screen. This one has no such history
+ * and, more to the point, no honest content to seed: a figure the platform made
+ * up is a wrong number, but a *service* the platform made up is the business
+ * advertising work it may not do. So the section stays absent until the company
+ * writes its first card, and `publicServices` returns null until then.
+ */
+
+/** The most bullet points one service card may carry, and how long each may be. */
+const SERVICE_HIGHLIGHTS_MAX = 6;
+const SERVICE_HIGHLIGHT_LENGTH = 120;
+
 /** Permission actions stored per (role, menu) pair. */
 const PERMISSION_ACTIONS = ['canView', 'canCreate', 'canEdit', 'canDelete', 'canExport'];
 
@@ -1066,6 +1177,12 @@ module.exports = {
   FEATURE_ICON_FALLBACK,
   FEATURE_DEFAULTS,
   DEFAULT_FEATURE_ITEMS,
+  SERVICE_DEFAULTS,
+  SERVICE_ENQUIRY_TARGET,
+  SERVICE_ENQUIRY_TARGET_VALUES,
+  SERVICE_CTA_MAX,
+  SERVICE_HIGHLIGHTS_MAX,
+  SERVICE_HIGHLIGHT_LENGTH,
   CONTACT_FORM_TARGET,
   CONTACT_FORM_TARGET_VALUES,
   CONTACT_DEFAULTS,
@@ -1083,6 +1200,7 @@ module.exports = {
   TESTIMONIAL_RATING_MAX,
   TESTIMONIAL_DEFAULTS,
   NAV_PAGES,
+  NAV_LABEL_SOURCE,
   NAV_LABEL_MAX,
   LEAD_STAGE,
   LEAD_STAGE_VALUES,
