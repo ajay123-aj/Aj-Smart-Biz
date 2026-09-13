@@ -3,6 +3,11 @@ import { Observable, map } from 'rxjs';
 import { ListQuery, PageMeta, PagedResult } from '../models/api.model';
 import {
   Branch,
+  BookingStatus,
+  ServiceCategory,
+  BlogPost,
+  BlogSummary,
+  BlogTag,
   BranchContact,
   AboutView,
   CardList,
@@ -15,7 +20,10 @@ import {
   MyPlanView,
   PlanCatalogue,
   PlanRequest,
+  Product,
+  ProductCategory,
   QuotaView,
+  ServiceAnalytics,
   ServiceLead,
   ServiceLeadView,
   Status,
@@ -25,6 +33,17 @@ import {
   Transaction,
   WhatsappNumber,
   WhatsappNumberView,
+  CompanyOrder,
+  OrderSummary,
+  SalesAnalytics,
+  StockAnalytics,
+  StockLevel,
+  StockMovement,
+  Warehouse,
+  Customer,
+  CustomerDetail,
+  CustomerSummary,
+  ServiceRevenue,
 } from '../models/domain.model';
 import { ApiService } from './api.service';
 
@@ -189,6 +208,349 @@ export class CompanyService {
     return new CardClient<T>(this.api, `/admin/company/${path}`);
   }
 
+  /* ---------------------------- service leads --------------------------- */
+
+  /**
+   * What the services are earning — quoted, won and collected over one of the
+   * platform's windows. Three numbers rather than one; see `ServiceRevenue`.
+   */
+  serviceRevenue(query: ListQuery = {}): Observable<ServiceRevenue> {
+    return this.api.get<ServiceRevenue>('/admin/company/service-leads/revenue', query);
+  }
+
+  /* -------------------------------- orders ----------------------------- */
+
+  /**
+   * The order book.
+   *
+   * Read and moved along, never created or deleted. The only writer is the
+   * public website, and an order that could be typed in here would make the list
+   * a place where "somebody bought this" and "somebody typed this in" are
+   * indistinguishable — which is exactly what a sales report must never be.
+   * Cancelling is what "this is not happening" means, and it leaves the record
+   * and the stock it gave back both visible.
+   */
+  listOrders(query: ListQuery = {}): Observable<PagedResult<CompanyOrder>> {
+    return this.api.list<CompanyOrder>('/admin/company/orders', query);
+  }
+
+  /**
+   * The strip above the list. Its own call rather than a field on the page, so
+   * the counts do not change when somebody filters — a count of the current
+   * filter would read zero on the very tab that needed it.
+   */
+  orderSummary(): Observable<OrderSummary> {
+    return this.api.get<OrderSummary>('/admin/company/orders/summary');
+  }
+
+  getOrder(id: number): Observable<CompanyOrder> {
+    return this.api.get<CompanyOrder>(`/admin/company/orders/${id}`);
+  }
+
+  /**
+   * Moving an order along — and, where the warehouse feature is live, doing to
+   * stock whatever that step means. All of it happens in one transaction on the
+   * API, so a reservation that cannot be met leaves the order where it was.
+   */
+  setOrderStatus(id: number, status: string, reason?: string | null): Observable<CompanyOrder> {
+    return this.api.patch<CompanyOrder>(`/admin/company/orders/${id}/status`, { status, reason: reason || null });
+  }
+
+  setOrderPayment(id: number, paymentStatus: string, reference?: string | null): Observable<CompanyOrder> {
+    return this.api.patch<CompanyOrder>(`/admin/company/orders/${id}/payment`, {
+      paymentStatus,
+      reference: reference || null,
+    });
+  }
+
+  /** The few things a person may edit after the fact. Not the lines or the prices. */
+  updateOrder(id: number, payload: Record<string, unknown>): Observable<CompanyOrder> {
+    return this.api.put<CompanyOrder>(`/admin/company/orders/${id}`, payload);
+  }
+
+  salesAnalytics(query: ListQuery = {}): Observable<SalesAnalytics> {
+    return this.api.get<SalesAnalytics>('/admin/company/orders/analytics', query);
+  }
+
+  /* ------------------------------ customers ---------------------------- */
+
+  /**
+   * The customer list.
+   *
+   * Read and corrected, never created: an account is made by the person it
+   * belongs to, signing in with their own number. One a shop could manufacture
+   * would be a row nobody consented to, attached to somebody's phone number.
+   */
+  listCustomers(query: ListQuery = {}): Observable<PagedResult<Customer>> {
+    return this.api.list<Customer>('/admin/company/customers', query);
+  }
+
+  customerSummary(): Observable<CustomerSummary> {
+    return this.api.get<CustomerSummary>('/admin/company/customers/summary');
+  }
+
+  /** The customer, their addresses and their orders — one request, not three. */
+  getCustomer(id: number): Observable<CustomerDetail> {
+    return this.api.get<CustomerDetail>(`/admin/company/customers/${id}`);
+  }
+
+  /** A correction and a note. **Not the phone** — it is the identity. */
+  updateCustomer(id: number, payload: Record<string, unknown>): Observable<Customer> {
+    return this.api.put<Customer>(`/admin/company/customers/${id}`, payload);
+  }
+
+  /** Bars them, or lets them back. Their orders stay exactly where they are. */
+  toggleCustomer(id: number): Observable<{ id: number; status: Status }> {
+    return this.api.patch<{ id: number; status: Status }>(`/admin/company/customers/${id}/status`, {});
+  }
+
+  deleteCustomer(id: number): Observable<{ id: number }> {
+    return this.api.delete<{ id: number }>(`/admin/company/customers/${id}`);
+  }
+
+  /* ------------------------------ warehouse ---------------------------- */
+
+  listWarehouses(query: ListQuery = {}): Observable<PagedResult<Warehouse>> {
+    return this.api.list<Warehouse>('/admin/company/warehouses', query);
+  }
+
+  createWarehouse(payload: Record<string, unknown>): Observable<Warehouse> {
+    return this.api.post<Warehouse>('/admin/company/warehouses', payload);
+  }
+
+  updateWarehouse(id: number, payload: Record<string, unknown>): Observable<Warehouse> {
+    return this.api.put<Warehouse>(`/admin/company/warehouses/${id}`, payload);
+  }
+
+  deleteWarehouse(id: number): Observable<{ id: number }> {
+    return this.api.delete<{ id: number }>(`/admin/company/warehouses/${id}`);
+  }
+
+  /**
+   * What is on the shelves. `low` and `out` are filters the **API** resolves:
+   * a browser filtering a page would be filtering a page, and the product that
+   * ran out is on page four.
+   */
+  listStock(query: ListQuery = {}): Observable<PagedResult<StockLevel>> {
+    return this.api.list<StockLevel>('/admin/company/stock', query);
+  }
+
+  /**
+   * One movement.
+   *
+   * **There is no `type`** — the direction comes from the reason, so a receipt
+   * goes in and a breakage goes out without anybody being asked to say both.
+   * `quantity` therefore means two things: how many arrived, except on a stock
+   * count where it is how many there are now.
+   */
+  recordMovement(payload: Record<string, unknown>): Observable<StockMovement> {
+    return this.api.post<StockMovement>('/admin/company/stock/movements', payload);
+  }
+
+  /** Two movements, one call, one transaction. A half-recorded transfer is stock lost. */
+  transferStock(payload: Record<string, unknown>): Observable<unknown> {
+    return this.api.post('/admin/company/stock/transfer', payload);
+  }
+
+  /** Where it is kept and when to warn. Not a movement: neither changes the count. */
+  saveStockSettings(payload: Record<string, unknown>): Observable<StockLevel> {
+    return this.api.put<StockLevel>('/admin/company/stock/settings', payload);
+  }
+
+  listMovements(query: ListQuery = {}): Observable<PagedResult<StockMovement>> {
+    return this.api.list<StockMovement>('/admin/company/stock/movements', query);
+  }
+
+  stockAnalytics(query: ListQuery = {}): Observable<StockAnalytics> {
+    return this.api.get<StockAnalytics>('/admin/company/stock/analytics', query);
+  }
+
+  /* ------------------------------ catalogue ---------------------------- */
+
+  /**
+   * The category tree.
+   *
+   * A card client, because a category list is exactly that — short, ordered,
+   * edited as a whole. What it needs on top is the `tree` flag, which asks the
+   * API to nest the rows rather than return them flat; the management screen and
+   * the parent picker both render the nested form.
+   */
+  categories(): CardClient<ProductCategory> {
+    return new CardClient<ProductCategory>(this.api, '/admin/company/categories');
+  }
+
+  /**
+   * The categories, nested, with a product count on every node.
+   *
+   * Its own method rather than an argument on `cards().list()` because the flag
+   * changes the shape of what comes back, and a signature that returns two
+   * different shapes depending on a boolean is one every caller has to guard.
+   */
+  categoryTree(branchId?: number | string | null): Observable<ProductCategory[]> {
+    const query: Record<string, string> = { tree: 'true' };
+    if (branchId !== undefined && branchId !== null && branchId !== '') query['branchId'] = String(branchId);
+    return this.api
+      .get<CardList<ProductCategory>>('/admin/company/categories', query)
+      .pipe(map((result) => result.items ?? []));
+  }
+
+  /**
+   * The products — one page of them.
+   *
+   * Not `cards()`, which is unpaginated by design. Every other list in this
+   * section is short and edited whole; a catalogue is however many things the
+   * business sells, so this one pages, searches and filters by category.
+   */
+  listProducts(query: ListQuery = {}): Observable<PagedResult<Product>> {
+    return this.api.list<Product>('/admin/company/products', query);
+  }
+
+  getProduct(id: number): Observable<Product> {
+    return this.api.get<Product>(`/admin/company/products/${id}`);
+  }
+
+  createProduct(payload: Record<string, unknown>): Observable<Product> {
+    return this.api.post<Product>('/admin/company/products', payload);
+  }
+
+  updateProduct(id: number, payload: Record<string, unknown>): Observable<Product> {
+    return this.api.put<Product>(`/admin/company/products/${id}`, payload);
+  }
+
+  toggleProduct(id: number): Observable<{ id: number; status: Status }> {
+    return this.api.patch<{ id: number; status: Status }>(`/admin/company/products/${id}/status`, {});
+  }
+
+  /** The whole order in one call, so a shuffle cannot be left half-applied. */
+  reorderProducts(ids: number[]): Observable<{ ids: number[] }> {
+    return this.api.patch<{ ids: number[] }>('/admin/company/products/reorder', { ids });
+  }
+
+  removeProduct(id: number): Observable<{ id: number }> {
+    return this.api.delete<{ id: number }>(`/admin/company/products/${id}`);
+  }
+
+  /* -------------------------- service categories -------------------------- */
+
+  /**
+   * How a business sorts the work it sells.
+   *
+   * `cards()` rather than a client of its own, because the ordinary half is
+   * ordinary - add, rename, reorder, delete. The tree rules live in the API,
+   * which refuses a parent from another company, a cycle, or a tree pushed past
+   * its depth; this app renders the refusal rather than duplicating the rule.
+   */
+  serviceCategories(): CardClient<ServiceCategory> {
+    return new CardClient<ServiceCategory>(this.api, '/admin/company/service-categories');
+  }
+
+  /** The tree, with a count on every node - what the screen and the picker render. */
+  serviceCategoryTree(branchId?: number | string | null): Observable<ServiceCategory[]> {
+    const query: Record<string, string> = { tree: 'true' };
+    if (branchId !== undefined && branchId !== null && branchId !== '') query['branchId'] = String(branchId);
+    return this.api
+      .get<CardList<ServiceCategory>>('/admin/company/service-categories', query)
+      .pipe(map((result) => result.items ?? []));
+  }
+
+  /**
+   * What is happening on the service side, over one of the platform's windows.
+   *
+   * Beside `serviceRevenue` rather than replacing it: one is what the work
+   * earned, the other is whether the work is coming in. A screen showing both
+   * asks for both, and neither pays for the half it is not drawing.
+   */
+  serviceAnalytics(query: ListQuery = {}): Observable<ServiceAnalytics> {
+    return this.api.get<ServiceAnalytics>('/admin/company/service-leads/analytics', query);
+  }
+
+  /* ------------------------------ bookings -------------------------------- */
+
+  /**
+   * Confirm an appointment, or refuse it with a line saying why.
+   *
+   * Its own call rather than a field on `updateServiceLead`, matching the API:
+   * that one moves an enquiry through the company's own pipeline, and this
+   * changes a fact the customer is waiting on and can see on their own page.
+   */
+  decideBooking(
+    id: number,
+    payload: { status: BookingStatus; response?: string | null }
+  ): Observable<{ id: number; bookingStatus: BookingStatus; stage: LeadStage }> {
+    return this.api.patch<{ id: number; bookingStatus: BookingStatus; stage: LeadStage }>(
+      `/admin/company/service-leads/${id}/booking`,
+      payload
+    );
+  }
+
+  /** One day of appointments, in time order - what the shop is doing tomorrow. */
+  diary(date: string): Observable<{ date: string; items: ServiceLead[]; booked: number }> {
+    return this.api.get<{ date: string; items: ServiceLead[]; booked: number }>(
+      '/admin/company/service-leads/diary',
+      { date }
+    );
+  }
+
+  /* ------------------------------- blog ------------------------------- */
+
+  /**
+   * The posts — one page of them.
+   *
+   * Not `cards()`, which is unpaginated by design: a blog is as long as the
+   * business has been writing, and it is the one list in this section that only
+   * ever grows. Drafts and scheduled posts come back alongside what is live;
+   * this is the writing desk, not the website.
+   */
+  listBlogPosts(query: ListQuery = {}): Observable<PagedResult<BlogPost>> {
+    return this.api.list<BlogPost>('/admin/company/blog', query);
+  }
+
+  blogSummary(): Observable<BlogSummary> {
+    return this.api.get<BlogSummary>('/admin/company/blog/summary');
+  }
+
+  /**
+   * Every label this tenant has used, with a count.
+   *
+   * Read from the posts rather than from a table, because there is no table.
+   * It feeds the filter above the list and the suggestions under the tag field,
+   * and the second is the point: free-text tags with no list of what already
+   * exists is how a blog ends up filed under `case-study`, `case study` and
+   * `Case Studies` at once.
+   */
+  blogTags(): Observable<BlogTag[]> {
+    return this.api
+      .get<{ items: BlogTag[] }>('/admin/company/blog/tags')
+      .pipe(map((result) => result.items ?? []));
+  }
+
+  getBlogPost(id: number): Observable<BlogPost> {
+    return this.api.get<BlogPost>(`/admin/company/blog/${id}`);
+  }
+
+  createBlogPost(payload: Record<string, unknown>): Observable<BlogPost> {
+    return this.api.post<BlogPost>('/admin/company/blog', payload);
+  }
+
+  updateBlogPost(id: number, payload: Record<string, unknown>): Observable<BlogPost> {
+    return this.api.put<BlogPost>(`/admin/company/blog/${id}`, payload);
+  }
+
+  /**
+   * Takes a post off the site, or puts it back.
+   *
+   * Leaves `publishedAt` alone — hiding an article and un-publishing it are
+   * different acts, and a post hidden for a week comes back with its own date on
+   * it rather than with today's.
+   */
+  toggleBlogPost(id: number): Observable<{ id: number; status: Status }> {
+    return this.api.patch<{ id: number; status: Status }>(`/admin/company/blog/${id}/status`, {});
+  }
+
+  removeBlogPost(id: number): Observable<{ id: number }> {
+    return this.api.delete<{ id: number }>(`/admin/company/blog/${id}`);
+  }
+
   /* --------------------------- testimonials --------------------------- */
 
   /**
@@ -248,7 +610,25 @@ export class CompanyService {
    * this accepts — what the visitor typed is a record of what happened and is
    * not the company's to rewrite.
    */
-  updateServiceLead(id: number, payload: { stage?: LeadStage; note?: string | null }): Observable<ServiceLead> {
+  /**
+   * What a person may change about an enquiry.
+   *
+   * The stage and the note are how it is worked; `amount` and the payment are
+   * what make it countable. A service is priced in words on the website because
+   * it cannot be priced in advance, so the figure only exists once somebody has
+   * looked at the job — `null` clears it back to "not quoted yet", which is a
+   * real state and not the same as a quote of zero.
+   */
+  updateServiceLead(
+    id: number,
+    payload: {
+      stage?: LeadStage;
+      note?: string | null;
+      amount?: number | null;
+      paymentStatus?: string;
+      paymentReference?: string | null;
+    }
+  ): Observable<ServiceLead> {
     return this.api.patch<ServiceLead>(`/admin/company/service-leads/${id}`, payload);
   }
 

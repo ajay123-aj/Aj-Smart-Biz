@@ -71,7 +71,57 @@ const authenticate = asyncHandler(async (req, res, next) => {
     return next();
   }
 
+  /**
+   * A customer of one tenant — a member of the public, not staff.
+   *
+   * Reloaded on every request like the other two, so a customer the shop bars
+   * loses access immediately rather than at the end of their token's life. Their
+   * **company** is checked too: a tenant that is switched off has no website, so
+   * it has no customers who can be signed in to it.
+   *
+   * `companyId` is taken from the **token**, never from the request. It is what
+   * pins every `/website/me/*` route to one tenant, and it is why a customer of
+   * one shop cannot read another's orders by changing a path.
+   */
+  if (payload.scope === AUTH_SCOPE.CUSTOMER) {
+    const customer = await db.Customer.findByPk(payload.id, {
+      include: [{ model: db.Company, as: 'company', attributes: ['id', 'name', 'status'] }],
+    });
+    if (!customer) throw ApiError.unauthorized('Account no longer exists');
+    if (customer.status !== STATUS.ACTIVE) throw ApiError.forbidden('This account is no longer active');
+    if (!customer.company || customer.company.status !== STATUS.ACTIVE) {
+      throw ApiError.forbidden('This website is not available at the moment');
+    }
+
+    req.auth = {
+      scope: AUTH_SCOPE.CUSTOMER,
+      id: customer.id,
+      name: customer.name,
+      companyId: customer.companyId,
+    };
+    req.customer = customer;
+    return next();
+  }
+
   throw ApiError.unauthorized('Invalid token scope');
+});
+
+/**
+ * The same check, but a **missing token is not an error**.
+ *
+ * For the one route that genuinely works both ways: placing an order. A signed-in
+ * customer gets their order filed against their account and their saved address
+ * offered; a stranger gets exactly the checkout the site had before accounts
+ * existed. Refusing the stranger to tidy a foreign key would be turning away
+ * money.
+ *
+ * A token that is present and **bad** still fails. Somebody whose session has
+ * expired mid-checkout needs to be told, not quietly demoted to a guest and left
+ * wondering why the order is not in their history.
+ */
+const authenticateOptional = asyncHandler(async (req, res, next) => {
+  if (!extractToken(req)) return next();
+  return authenticate(req, res, next);
 });
 
 /** Restricts a route to one of the two portals. */
@@ -83,6 +133,15 @@ const requireScope = (...scopes) => (req, res, next) => {
 
 const superAdminOnly = requireScope(AUTH_SCOPE.SUPER_ADMIN);
 const adminOnly = requireScope(AUTH_SCOPE.ADMIN);
+/**
+ * Customer routes, and **only** customer routes.
+ *
+ * Stated rather than assumed: `/website/me/*` is mounted outside the admin
+ * prefixes, but a staff token reaching a customer route would resolve
+ * `req.auth.id` to an admin's id and read somebody else's addresses. The scope
+ * check is what makes that impossible rather than merely unlikely.
+ */
+const customerOnly = requireScope(AUTH_SCOPE.CUSTOMER);
 
 /** Company-admin-only routes (role management, admin management, company profile). */
 const companyAdminOnly = (req, res, next) => {
@@ -114,7 +173,9 @@ const requirePermission = (menuSlug, action = 'canView') =>
 
 module.exports = {
   authenticate,
+  authenticateOptional,
   requireScope,
+  customerOnly,
   superAdminOnly,
   adminOnly,
   companyAdminOnly,

@@ -170,11 +170,17 @@ const me = asyncHandler(async (req, res) => {
   const byId = new Map(menus.map((menu) => [menu.id, menu]));
   const canSee = (menu) => {
     /**
-     * A screen the plan does not pay for is left out entirely, whatever the
-     * role may view: there is nothing behind it for this tenant yet.
+    /**
+     * A screen the plan does not pay for is left out entirely, whatever the role
+     * may view: there is nothing behind it for this tenant yet.
+     *
+     * A **list** means any one of them will do. Service Leads is the case: an
+     * enquiry and a booking are both rows on that screen, and a shop that bought
+     * only the diary still has a queue to work through.
      */
     const needs = MENU_FUNCTIONALITY[menu.slug];
-    if (needs && !granted.has(needs)) return false;
+    const keys = Array.isArray(needs) ? needs : needs ? [needs] : [];
+    if (keys.length && !keys.some((key) => granted.has(key))) return false;
 
     if (MENU_INHERITS_PARENT.has(menu.slug) && menu.parentId) {
       const parent = byId.get(menu.parentId);

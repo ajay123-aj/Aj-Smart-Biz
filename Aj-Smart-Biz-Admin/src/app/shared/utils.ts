@@ -40,6 +40,51 @@ export function cleanPayload<T extends Record<string, unknown>>(value: T): Parti
 }
 
 /** Two initials for the avatar circle. */
+/**
+ * What a **number input** actually holds, as a number or nothing.
+ *
+ * `<input type="number">` is bound by Angular's `NumberValueAccessor`, not the
+ * default one, and it writes three different things into a control over its
+ * life: the initial value the form was built with (often `''`), a real `number`
+ * once somebody types, and `null` the moment the box is cleared.
+ *
+ * Every one of those has bitten this console at least once:
+ *
+ *   `''.trim()` on a number   threw inside a save handler, after the spinner was
+ *                             already on - so the request was never sent and the
+ *                             button stayed on "Saving…" forever
+ *   `null === ''`             is false, so a cleared price went to the API as
+ *                             `Number(null)` - zero - and published "₹0" instead
+ *                             of clearing the figure
+ *
+ * So: one place that answers "what number is in this box, if any", and `null`
+ * for every kind of empty. A cleared box is not a zero, and this is the
+ * distinction the whole platform is careful about - a service with no price is
+ * priced in words, and one priced at nothing is free.
+ */
+export function numberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * A pipeline word as a person reads it: `contacted` -> `Contacted`.
+ *
+ * One rule, because the same five words appear in three places on the enquiries
+ * screen - the stage badge in the table, the counters above it, and the Stage
+ * box in the editor - and the box was the odd one out, offering raw lowercase
+ * keys beside columns that said "Contacted". Two vocabularies for one field
+ * reads as two different fields.
+ */
+export function stageLabel(value: string | null | undefined): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
 export function initials(name: string | null | undefined): string {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/);

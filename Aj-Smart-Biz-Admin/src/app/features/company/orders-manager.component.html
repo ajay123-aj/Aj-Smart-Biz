@@ -1,0 +1,279 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:420px"></div>
+  } @else {
+    <app-feature-gate [feature]="feature()" />
+
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <!-- ------------------------------------------------------------------
+           Where orders go. The one setting on this screen that changes what a
+           stranger can do, so it is first and it is cards rather than a
+           dropdown — a line in a <select> has no room to say what each route
+           actually means.
+           ------------------------------------------------------------------ -->
+      <section class="block">
+        <h4 style="margin:0 0 4px">Where your orders go</h4>
+        <p class="tiny muted" style="margin:0 0 14px;max-width:68ch">
+          Your website shows an <strong>Add to cart</strong> button on every product you allow, and one
+          button that sends the whole order. This is where that order goes.
+        </p>
+
+        <div class="modes">
+          @for (option of modes(); track option.key) {
+            <label class="mode" [class.mode-on]="mode() === option.key">
+              <span class="mode-name">
+                <input type="radio" formControlName="mode" [value]="option.key"
+                       (change)="pickMode(option.key)" />
+                {{ option.name }}
+              </span>
+              <p class="mode-text">{{ option.summary }}</p>
+              @if (option.requires) {
+                <span class="mode-needs">Needs: {{ option.requires }}</span>
+              }
+            </label>
+          }
+        </div>
+
+        <!-- Said before it costs anybody a cart: the exact condition the API
+             applies on the way out. -->
+        @if (blocked(); as problem) {
+          <p class="warn"><strong>Not working yet.</strong> {{ problem }}</p>
+        }
+      </section>
+
+      @if (mode() !== 'none') {
+        <!-- ----------------------------------------------------------------
+             The basket itself.
+             ---------------------------------------------------------------- -->
+        <section class="block">
+          <h4 style="margin:0 0 4px">The basket</h4>
+
+          <div class="switch-row">
+            <input id="ord-cart" type="checkbox" formControlName="cart" />
+            <label for="ord-cart" class="switch-text">
+              Let people add several products to one order
+              <span class="hint">
+                Switched off, each product is ordered on its own: the button says
+                <strong>{{ form.controls.buyNowLabel.value || placeholder('buyNowLabel') }}</strong> and sends
+                that one line straight away. A counter selling one large thing at a time wants that;
+                a shop selling six small ones wants the basket.
+              </span>
+            </label>
+          </div>
+
+          <div class="form-grid">
+            <div class="field">
+              <label for="ord-add">Add button</label>
+              <input id="ord-add" class="input" formControlName="addToCartLabel"
+                     [placeholder]="placeholder('addToCartLabel')" maxlength="40" />
+              <span class="hint">On every product card and product page.</span>
+            </div>
+
+            <div class="field">
+              <label for="ord-buy">One-product button</label>
+              <input id="ord-buy" class="input" formControlName="buyNowLabel"
+                     [placeholder]="placeholder('buyNowLabel')" maxlength="40" />
+              <span class="hint">Used when the basket above is switched off.</span>
+            </div>
+
+            <div class="field">
+              <label for="ord-title">Basket heading</label>
+              <input id="ord-title" class="input" formControlName="cartTitle"
+                     [placeholder]="placeholder('cartTitle')" maxlength="120" />
+            </div>
+
+            <div class="field">
+              <label for="ord-submit">Send button</label>
+              <input id="ord-submit" class="input" formControlName="submitLabel"
+                     [placeholder]="placeholder('submitLabel')" maxlength="40" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="ord-note">What you promise</label>
+            <textarea id="ord-note" class="textarea" formControlName="cartNote"
+                      [placeholder]="placeholder('cartNote')" maxlength="400"></textarea>
+            <span class="hint">
+              Printed above the send button. It is the last thing somebody reads before they order,
+              so it is the place to say what happens next about stock, delivery and the final total.
+            </span>
+          </div>
+        </section>
+
+        <!-- ----------------------------------------------------------------
+             What the customer is asked for. Only what the company wants: a
+             shop that collects nothing gets a one-press order.
+             ---------------------------------------------------------------- -->
+        <section class="block">
+          <h4 style="margin:0 0 4px">What you ask the customer for</h4>
+          <p class="tiny muted" style="margin:0 0 8px;max-width:68ch">
+            Anything you do not tick is not asked for. Whatever they type is added to the bottom of
+            the order.
+          </p>
+
+          <div class="switch-row">
+            <input id="ord-name" type="checkbox" formControlName="requireName" />
+            <label for="ord-name" class="switch-text">Their name</label>
+          </div>
+          <div class="switch-row">
+            <input id="ord-phone" type="checkbox" formControlName="requirePhone" />
+            <label for="ord-phone" class="switch-text">
+              A phone number
+              <span class="hint">The one thing an order cannot be confirmed without.</span>
+            </label>
+          </div>
+          <div class="switch-row">
+            <input id="ord-address" type="checkbox" formControlName="requireAddress" />
+            <label for="ord-address" class="switch-text">
+              A delivery address
+              <span class="hint">Only worth asking for if you deliver.</span>
+            </label>
+          </div>
+
+          <div class="field" style="max-width:280px;margin-top:10px">
+            <label for="ord-min">Minimum order value</label>
+            <input id="ord-min" class="input" type="number" min="0" step="0.01"
+                   formControlName="minOrderAmount" placeholder="No minimum" />
+            <span class="hint">
+              Below this the order cannot be sent. Leave it empty for no minimum &mdash; and note that
+              products priced in words carry no number, so they are not counted towards it.
+            </span>
+          </div>
+        </section>
+
+        <!-- ----------------------------------------------------------------
+             WhatsApp. Shown in payment mode too: a payment with no idea what
+             was bought is not an order.
+             ---------------------------------------------------------------- -->
+        <section class="block">
+          <h4 style="margin:0 0 4px">
+            @if (mode() === 'payment') { The order message } @else { Where the message arrives }
+          </h4>
+          <p class="tiny muted" style="margin:0 0 14px;max-width:68ch">
+            @if (mode() === 'payment') {
+              After they pay, your website offers to send you the order on WhatsApp as well. Leave this
+              set up and you know what was bought; without a published number that step is simply not
+              shown.
+            } @else {
+              The basket is written out as a message and opened in WhatsApp, ready to send. Nothing is
+              stored here &mdash; the message is the order.
+            }
+          </p>
+
+          <div class="form-grid">
+            <div class="field">
+              <label for="ord-wa-type">Send orders to your</label>
+              <select id="ord-wa-type" class="select" formControlName="whatsappType">
+                @for (type of whatsappTypes(); track type.key) {
+                  <option [value]="type.key">{{ type.name }} number</option>
+                }
+              </select>
+              <span class="hint">
+                @if (routedTo(); as target) {
+                  Orders will reach <strong>{{ target }}</strong>. A type you have not published falls
+                  back to your Contact number.
+                } @else {
+                  You have published no WhatsApp numbers yet &mdash; add one on the Functionality screen.
+                }
+              </span>
+            </div>
+
+            <div class="field">
+              <label for="ord-intro">First line of the message</label>
+              <input id="ord-intro" class="input" formControlName="messageIntro"
+                     [placeholder]="placeholder('messageIntro')" maxlength="300" />
+            </div>
+          </div>
+
+          <!-- What a real order will look like in the shop's own inbox. Built
+               from the fields above rather than described, because the thing
+               being configured here is a message and nobody can picture one
+               from a form. -->
+          <p class="preview">{{ form.controls.messageIntro.value || placeholder('messageIntro') }}
+
+2 x Solid oak dining table — ₹24,999 each — ₹49,998
+1 x Matching bench — ₹7,500 each
+@if (form.controls.requireName.value) {
+Name: Priya Shah}@if (form.controls.requirePhone.value) {
+Phone: 98250 11223}@if (form.controls.requireAddress.value) {
+Address: 14 Nehru Road, Ahmedabad}</p>
+        </section>
+
+        <!-- ----------------------------------------------------------------
+             Payment, only where it is the chosen route.
+             ---------------------------------------------------------------- -->
+        @if (mode() === 'payment') {
+          <section class="block">
+            <h4 style="margin:0 0 4px">Taking the payment</h4>
+            <p class="tiny muted" style="margin:0 0 14px;max-width:68ch">
+              A UPI id opens the customer&rsquo;s own payment app with your name and the total already
+              filled in, so there is nothing for them to mistype. A payment link is the answer if you
+              take cards instead. Fill in either, or both &mdash; your website offers what you have.
+            </p>
+
+            <div class="form-grid">
+              <div class="field">
+                <label for="ord-upi">UPI id</label>
+                <input id="ord-upi" class="input" formControlName="upiId" placeholder="yourshop@okaxis"
+                       maxlength="80" autocapitalize="off" spellcheck="false" />
+                <app-field-error [control]="form.controls.upiId" label="UPI id" />
+                <span class="hint">
+                  Exactly as it appears in your own app &mdash; <code>name&#64;bank</code>. A wrong one fails
+                  silently in the customer&rsquo;s app, where you never see it.
+                </span>
+              </div>
+
+              <div class="field">
+                <label for="ord-payee">Name on the payment</label>
+                <input id="ord-payee" class="input" formControlName="payeeName"
+                       placeholder="Your company name" maxlength="80" />
+                <span class="hint">What the customer sees they are paying. Blank uses your company name.</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="ord-url">Payment link</label>
+              <input id="ord-url" class="input" formControlName="paymentUrl"
+                     placeholder="https://..." maxlength="500" />
+              <app-field-error [control]="form.controls.paymentUrl" label="Payment link" />
+              <span class="hint">Your own hosted payment page. Must start with <code>https://</code>.</span>
+            </div>
+
+            <div class="form-grid">
+              <div class="field">
+                <label for="ord-pay-label">Payment button</label>
+                <input id="ord-pay-label" class="input" formControlName="paymentLabel"
+                       [placeholder]="placeholder('paymentLabel')" maxlength="40" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="ord-pay-note">What happens after they pay</label>
+              <textarea id="ord-pay-note" class="textarea" formControlName="paymentNote"
+                        [placeholder]="placeholder('paymentNote')" maxlength="400"></textarea>
+            </div>
+          </section>
+        }
+      } @else {
+        <!-- Off. Everything above is kept, which is the whole point of `none`
+             being a setting rather than switching the feature off. -->
+        <section class="block">
+          <p class="tiny muted" style="margin:0;max-width:68ch">
+            Orders are switched off, so your website shows no cart and no order button &mdash; your
+            catalogue reads as a brochure with prices on it. Everything you have set up here is kept,
+            so turning orders back on later sets none of it up again.
+          </p>
+        </section>
+      }
+
+      @if (writable()) {
+        <div class="row-end" style="gap:8px;padding-top:6px">
+          <button type="button" class="btn btn-ghost" [disabled]="saving()" (click)="reset()">Reset</button>
+          <button type="submit" class="btn btn-primary" [disabled]="saving()">
+            {{ saving() ? 'Saving…' : 'Save order settings' }}
+          </button>
+        </div>
+      }
+    </form>
+  }
+</div>

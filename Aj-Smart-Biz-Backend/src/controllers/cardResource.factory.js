@@ -7,6 +7,7 @@ const { success, created } = require('../utils/response');
 const { mergeWhere } = require('../utils/query');
 const { removeUploadedFile } = require('../middlewares/upload');
 const functionalityService = require('../services/functionality.service');
+const { uniqueSlug } = require('../utils/slug');
 const { AUTH_SCOPE, STATUS } = require('../constants');
 
 /**
@@ -33,8 +34,31 @@ const { AUTH_SCOPE, STATUS } = require('../constants');
  * @param {string} options.label          Singular, lower case — used in messages.
  * @param {string[]} [options.searchFields]
  * @param {string[]} [options.imageFields] Upload paths to discard when replaced.
+ * @param {string} [options.slugFrom]      Field to build a unique slug from, for
+ *   a card that has a page of its own. Generated on create; on update it is
+ *   rewritten **only** when a slug is sent explicitly, because a card's address
+ *   is what other people have linked to.
+ * @param {{field: string, model: () => import('sequelize').ModelStatic, label: string}[]} [options.owned]
+ *   References that must belong to the same tenant - a service's category, say.
+ *   Checked rather than trusted: without it a card could be filed against
+ *   another company's row.
+ * @param {object[]} [options.include]     Extra associations the console's list
+ *   needs alongside the branch.
+ * @param {(patch: object, row: object|null) => void} [options.check]
+ *   A rule that needs the stored row to judge - a price against an offer price,
+ *   say. Run before the write, so a refusal leaves nothing half-applied.
  */
-module.exports = ({ model, functionality, label, searchFields = [], imageFields = [] }) => {
+module.exports = ({
+  model,
+  functionality,
+  label,
+  searchFields = [],
+  imageFields = [],
+  slugFrom = null,
+  owned = [],
+  include = [],
+  check = null,
+}) => {
   const resolveCompanyId = (req) => {
     if (req.auth?.scope === AUTH_SCOPE.ADMIN) return req.auth.companyId;
     const companyId = Number(req.params.companyId);
@@ -78,6 +102,30 @@ module.exports = ({ model, functionality, label, searchFields = [], imageFields 
   };
 
   /**
+   * A reference on the card has to belong to the same tenant.
+   *
+   * The same guard `assertBranchBelongsToCompany` is, generalised: a body that
+   * could name another company's category would file this card under a heading
+   * its owner never wrote, and the website would print that heading.
+   */
+  const assertOwned = async (patch, companyId) => {
+    for (const rule of owned) {
+      if (!(rule.field in patch)) continue;
+
+      const value = patch[rule.field];
+      if (value === null || value === undefined || value === '') {
+        patch[rule.field] = null;
+        continue;
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      const found = await rule.model().findOne({ where: { id: value, companyId }, attributes: ['id'] });
+      if (!found) throw ApiError.badRequest(`That ${rule.label} does not belong to this company`);
+      patch[rule.field] = found.id;
+    }
+  };
+
+  /**
    * Unpaginated on purpose: these are short, ordered lists a tenant edits as a
    * whole and reorders by hand, not tables anyone pages through.
    */
@@ -92,7 +140,7 @@ module.exports = ({ model, functionality, label, searchFields = [], imageFields 
           ? require('../utils/query').buildSearch(req.query.search, searchFields)
           : null
       ),
-      include: [BRANCH_INCLUDE],
+      include: [BRANCH_INCLUDE, ...include],
       order: ORDER,
     });
     return success(res, { message: `${label} list fetched successfully`, data: { items: rows } });
@@ -112,10 +160,15 @@ module.exports = ({ model, functionality, label, searchFields = [], imageFields 
       req.body.sequence ??
       ((await model.max('sequence', { where: { companyId, branchId: branchId ?? null } })) || 0) + 1;
 
+    const body = { ...req.body };
+    await assertOwned(body, companyId);
+    if (check) check(body, null);
+
     const row = await model.create({
-      ...req.body,
+      ...body,
       companyId,
       branchId: branchId ?? null,
+      ...(slugFrom ? { slug: await uniqueSlug(model, companyId, body.slug || body[slugFrom]) } : {}),
       sequence,
       createdBy: req.auth?.id ?? null,
     });
@@ -135,6 +188,22 @@ module.exports = ({ model, functionality, label, searchFields = [], imageFields 
     if ('branchId' in req.body) {
       patch.branchId = await assertBranchBelongsToCompany(req.body.branchId, companyId);
     }
+
+    await assertOwned(patch, companyId);
+
+    /**
+     * The slug is rewritten **only** when one was sent, never when the title
+     * changes. A card with a page of its own is linked to from other people's
+     * sites and indexed by search engines, and regenerating its address on a
+     * typo fix breaks both silently.
+     */
+    if (slugFrom && req.body.slug) {
+      patch.slug = await uniqueSlug(model, companyId, req.body.slug, row.id);
+    }
+
+    /* Rules that need the stored row to judge. On a PATCH carrying only an offer
+       price, the price it has to be below is the one already saved. */
+    if (check) check(patch, row);
 
     // A replaced image leaves its file behind otherwise.
     const previous = {};

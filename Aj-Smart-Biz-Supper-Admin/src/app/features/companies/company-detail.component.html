@@ -46,6 +46,11 @@
   <div class="card">
     <div class="tabs">
       <button type="button" [class.active]="tab() === 'overview'" (click)="tab.set('overview')">Overview</button>
+      <!-- Opening the tab is what fetches it: this screen is mostly used to check
+           an address or a plan, and paying for five aggregate queries on every
+           visit would be a slow page for everybody. -->
+      <button type="button" [class.active]="tab() === 'business'" (click)="openTab('business')">Business</button>
+      <button type="button" [class.active]="tab() === 'customers'" (click)="openTab('customers')">Customers</button>
       <button type="button" [class.active]="tab() === 'branches'" (click)="tab.set('branches')">
         Branches ({{ c.branches?.length ?? 0 }})
       </button>
@@ -57,6 +62,247 @@
         Admins ({{ c.admins?.length ?? 0 }})
       </button>
     </div>
+
+    <!-- ------------------------------ BUSINESS ------------------------------ -->
+    <!--                                                                        -->
+    <!-- How this tenant is actually doing. Every block is absent unless the      -->
+    <!-- functionality is live for them: a company that never bought the          -->
+    <!-- warehouse showing a row of noughts reads as a company with no stock      -->
+    <!-- rather than one that never bought stock control, and those are very      -->
+    <!-- different things to somebody deciding what to sell them next.            -->
+    @if (tab() === 'business') {
+      <div class="card-body">
+        <div class="tabs" style="margin-bottom:16px">
+          @for (range of [7, 30, 90, 365]; track range) {
+            <button type="button" [class.active]="insightDays() === range" (click)="setInsightDays(range)">
+              {{ range === 365 ? 'Last year' : 'Last ' + range + ' days' }}
+            </button>
+          }
+        </div>
+
+        @if (loadingInsights()) {
+          <div class="skeleton" style="height:320px"></div>
+        } @else if (insights(); as ins) {
+          @if (ins.orders; as o) {
+            <h4 class="sect">Orders</h4>
+            <div class="ins-grid">
+              <div class="ins">
+                <span class="ins-label">Revenue</span>
+                <span class="ins-value">{{ money(o.window.revenue) }}</span>
+                <!-- Cancellations are never counted as sales, here or anywhere. -->
+                <span class="ins-note">{{ o.window.orders }} orders, cancellations excluded</span>
+              </div>
+              <div class="ins">
+                <span class="ins-label">Average order</span>
+                <span class="ins-value">{{ money(o.window.averageOrderValue) }}</span>
+                <span class="ins-note">{{ o.window.units }} items</span>
+              </div>
+              <div class="ins" [class.ins-warn]="o.open > 0">
+                <span class="ins-label">Open orders</span>
+                <span class="ins-value">{{ o.open }}</span>
+                <span class="ins-note">still owed to somebody</span>
+              </div>
+              <div class="ins" [class.ins-warn]="o.unpaidAmount > 0">
+                <span class="ins-label">Unpaid</span>
+                <span class="ins-value">{{ money(o.unpaidAmount) }}</span>
+                <span class="ins-note">all time</span>
+              </div>
+              <div class="ins">
+                <span class="ins-label">Lifetime</span>
+                <span class="ins-value">{{ money(o.lifetime.revenue) }}</span>
+                <span class="ins-note">{{ o.lifetime.orders }} orders since day one</span>
+              </div>
+            </div>
+
+            @if (o.window.unpricedItems > 0) {
+              <p class="tiny muted" style="margin:8px 0 0">
+                {{ o.window.unpricedItems }} line(s) are priced in words, so they are counted in the
+                orders above but not in the revenue.
+              </p>
+            }
+
+            @if (o.topProducts.length) {
+              <h4 class="sect">Best sellers</h4>
+              <ul class="rank">
+                @for (product of o.topProducts; track product.name) {
+                  <li>
+                    <span class="rank-name">{{ product.name }}</span>
+                    <span class="rank-num">{{ product.units }}</span>
+                    <span class="rank-sub">{{ money(product.revenue) }}</span>
+                  </li>
+                }
+              </ul>
+            }
+          } @else {
+            <p class="tiny muted">This company does not have Cart &amp; orders on their plan.</p>
+          }
+
+          @if (ins.services; as sv) {
+            <h4 class="sect">Services</h4>
+            <div class="ins-grid">
+              <div class="ins">
+                <span class="ins-label">Quoted</span>
+                <span class="ins-value">{{ money(sv.quoted) }}</span>
+                <span class="ins-note">{{ sv.enquiries }} enquiries</span>
+              </div>
+              <div class="ins">
+                <span class="ins-label">Collected</span>
+                <span class="ins-value">{{ money(sv.collected) }}</span>
+                <span class="ins-note">money in</span>
+              </div>
+              <div class="ins" [class.ins-warn]="sv.outstanding > 0">
+                <span class="ins-label">Owed</span>
+                <span class="ins-value">{{ money(sv.outstanding) }}</span>
+                <span class="ins-note">quoted, not yet paid</span>
+              </div>
+              <div class="ins">
+                <span class="ins-label">Published</span>
+                <span class="ins-value">{{ sv.published }}</span>
+                <span class="ins-note">services on their site</span>
+              </div>
+            </div>
+          }
+
+          @if (ins.warehouse; as w) {
+            <h4 class="sect">Warehouse</h4>
+            <div class="ins-grid">
+              <div class="ins">
+                <span class="ins-label">On the shelves</span>
+                <span class="ins-value">{{ w.onHand }}</span>
+                <span class="ins-note">{{ w.available }} available</span>
+              </div>
+              <div class="ins" [class.ins-bad]="w.out > 0">
+                <span class="ins-label">Out of stock</span>
+                <span class="ins-value">{{ w.out }}</span>
+                <span class="ins-note">{{ w.low }} running low</span>
+              </div>
+              <div class="ins">
+                <span class="ins-label">Stock value</span>
+                <span class="ins-value">{{ money(w.retailValue) }}</span>
+                <span class="ins-note">at their own prices</span>
+              </div>
+              <div class="ins">
+                <span class="ins-label">Warehouses</span>
+                <span class="ins-value">{{ w.units }}</span>
+              </div>
+            </div>
+          }
+
+          @if (ins.catalogue; as cat) {
+            <h4 class="sect">Catalogue</h4>
+            <div class="ins-grid">
+              <div class="ins">
+                <span class="ins-label">Published</span>
+                <span class="ins-value">{{ cat.live }}</span>
+                <span class="ins-note">of {{ cat.products }} products</span>
+              </div>
+              <div class="ins">
+                <span class="ins-label">Categories</span>
+                <span class="ins-value">{{ cat.categories }}</span>
+              </div>
+            </div>
+          }
+
+          @if (ins.customers; as cu) {
+            <h4 class="sect">Customer accounts</h4>
+            <div class="ins-grid">
+              <div class="ins">
+                <span class="ins-label">Accounts</span>
+                <span class="ins-value">{{ cu.total }}</span>
+                <span class="ins-note">{{ cu.active }} can sign in</span>
+              </div>
+              <div class="ins">
+                <span class="ins-label">Have ordered</span>
+                <span class="ins-value">{{ cu.withOrders }}</span>
+                <!-- The gap is the number worth watching: accounts that signed up
+                     and never bought are a checkout somebody abandoned. -->
+                <span class="ins-note">{{ cu.total - cu.withOrders }} signed up but never bought</span>
+              </div>
+              <div class="ins">
+                <span class="ins-label">Joined this month</span>
+                <span class="ins-value">{{ cu.joinedLast30 }}</span>
+              </div>
+            </div>
+          }
+
+          @if (ins.blog; as bl) {
+            <h4 class="sect">Blog</h4>
+            <div class="ins-grid">
+              <div class="ins">
+                <span class="ins-label">Published</span>
+                <span class="ins-value">{{ bl.live }}</span>
+                <span class="ins-note">of {{ bl.posts }} written</span>
+              </div>
+              <!-- The card this block exists for. A tenant who bought a blog and
+                   stopped writing in March is a different conversation from one
+                   who posts weekly, and a post count cannot tell them apart. -->
+              <div class="ins" [class.ins-warn]="staleBlog(bl.lastPostedAt)">
+                <span class="ins-label">Last posted</span>
+                <span class="ins-value">
+                  @if (bl.lastPostedAt) {
+                    {{ bl.lastPostedAt | date: 'd MMM y' }}
+                  } @else {
+                    &mdash;
+                  }
+                </span>
+                <span class="ins-note">
+                  @if (bl.lastPostedAt) { on their website } @else { nothing published yet }
+                </span>
+              </div>
+            </div>
+          }
+        }
+      </div>
+    }
+
+    <!-- ----------------------------- CUSTOMERS ------------------------------ -->
+    @if (tab() === 'customers') {
+      <div class="card-body">
+        <p class="tiny muted" style="margin:0 0 14px;max-width:70ch">
+          The people with accounts on this company&rsquo;s website. Read only from here &mdash; their
+          addresses and the lines of their orders stay with the tenant, which is the company&rsquo;s own
+          business with its customers.
+        </p>
+
+        @if (loadingCustomers()) {
+          <div class="skeleton" style="height:240px"></div>
+        } @else if (!customers().length) {
+          <p class="tiny muted">Nobody has signed in to this company&rsquo;s website yet.</p>
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Mobile</th>
+                  <th style="text-align:right">Orders</th>
+                  <th style="text-align:right">Spent</th>
+                  <th>Joined</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of customers(); track row.id) {
+                  <tr>
+                    <td>
+                      <span class="strong">{{ row.name }}</span>
+                      @if (row.email) {
+                        <div class="tiny muted">{{ row.email }}</div>
+                      }
+                    </td>
+                    <td class="mono">{{ row.phone }}</td>
+                    <td style="text-align:right">{{ row.orders }}</td>
+                    <td style="text-align:right">{{ money(row.spent) }}</td>
+                    <td class="tiny muted">{{ row.createdAt | date: 'd MMM y' }}</td>
+                    <td>{{ row.status }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
 
     <!-- ------------------------------ OVERVIEW ------------------------------ -->
     @if (tab() === 'overview') {

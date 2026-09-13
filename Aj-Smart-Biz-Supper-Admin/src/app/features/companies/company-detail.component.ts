@@ -6,11 +6,16 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { CompanyService } from '../../core/services/company.service';
 import { CrudFactory, MASTER_PATHS } from '../../core/services/crud.service';
+import { EMPTY_META, PageMeta } from '../../core/models/api.model';
+import { PlatformService } from '../../core/services/platform.service';
 import { ConfirmService } from '../../core/services/confirm.service';
 import { SubscriptionService } from '../../core/services/subscription.service';
 import { ToastService } from '../../core/services/toast.service';
 import { messageOf } from '../../core/interceptors/auth.interceptor';
-import { Branch, Company, Option, Plan, QuotaView, Subscription } from '../../core/models/domain.model';
+import { Branch, Company, Option, Plan, QuotaView, Subscription,
+  CompanyInsights,
+  PlatformCustomer,
+} from '../../core/models/domain.model';
 import { cleanPayload, formatMoney, initials, touchAll } from '../../shared/utils';
 import { DomainManagerComponent } from '../../shared/domain-manager.component';
 import { FieldErrorComponent } from '../../shared/ui/field-error.component';
@@ -20,7 +25,7 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { PlanTimerComponent } from '../../shared/ui/plan-timer.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 
-type Tab = 'overview' | 'branches' | 'domains' | 'billing' | 'admins';
+type Tab = 'overview' | 'business' | 'customers' | 'branches' | 'domains' | 'billing' | 'admins';
 
 @Component({
   selector: 'app-company-detail',
@@ -40,6 +45,26 @@ type Tab = 'overview' | 'branches' | 'domains' | 'billing' | 'admins';
   templateUrl: './company-detail.component.html',
   styles: [
     `
+      /* The Business tab. Numbers a person reads before deciding what to say to
+         this tenant, so they are large and plain. */
+      .sect { margin: 22px 0 10px; font-size: 13px; font-weight: 600; }
+      .sect:first-child { margin-top: 0; }
+      .ins-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+      .ins { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); }
+      .ins-label { display: block; font-size: 11.5px; font-weight: 600; color: var(--text-3); }
+      .ins-value { display: block; margin-top: 3px; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .ins-note { display: block; margin-top: 2px; font-size: 11.5px; color: var(--text-3); }
+      .ins-warn .ins-value { color: var(--warn, var(--danger)); }
+      .ins-bad .ins-value { color: var(--danger); }
+
+      .rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+      .rank li { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; }
+      .rank-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .rank-num { font-weight: 600; font-variant-numeric: tabular-nums; }
+      .rank-sub { color: var(--text-3); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+
+      .mono { font-family: var(--font-mono, monospace); font-variant-numeric: tabular-nums; }
+
       .swatch { width: 16px; height: 16px; border-radius: 5px; border: 1px solid var(--border); display: inline-block; }
 
       .plan-panel {
@@ -70,6 +95,7 @@ export class CompanyDetailComponent {
   private readonly companies = inject(CompanyService);
   private readonly subscriptions = inject(SubscriptionService);
   private readonly crud = inject(CrudFactory);
+  private readonly platform = inject(PlatformService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
   private readonly router = inject(Router);
@@ -77,6 +103,22 @@ export class CompanyDetailComponent {
   readonly company = signal<Company | null>(null);
   readonly loading = signal(true);
   readonly tab = signal<Tab>('overview');
+
+  /**
+   * How this tenant is actually doing, and who buys from them.
+   *
+   * Loaded **only when the tab is opened**. This screen is mostly used to check
+   * an address or a plan, and paying for five aggregate queries on every visit to
+   * answer a question nobody asked would be a slow page for everybody.
+   */
+  readonly insights = signal<CompanyInsights | null>(null);
+  readonly insightDays = signal(30);
+  readonly loadingInsights = signal(false);
+
+  readonly customers = signal<PlatformCustomer[]>([]);
+  readonly customerMeta = signal<PageMeta>(EMPTY_META);
+  readonly loadingCustomers = signal(false);
+  readonly customerPage = signal(1);
   /** Live domain count from the panel; the company payload only has the initial one. */
   readonly domainCount = signal<number | null>(null);
   readonly states = signal<Option[]>([]);
@@ -455,4 +497,78 @@ export class CompanyDetailComponent {
         },
       });
   }
+
+  /**
+   * Opening a tab is what fetches it.
+   *
+   * Kept once loaded: flicking between Business and Branches should not re-run
+   * five aggregate queries, and nothing on this screen changes underneath
+   * somebody in the seconds they spend looking at it.
+   */
+  openTab(tab: Tab): void {
+    this.tab.set(tab);
+
+    if (tab === 'business' && !this.insights()) this.loadInsights();
+    if (tab === 'customers' && !this.customers().length) this.loadCustomers();
+  }
+
+  private loadInsights(): void {
+    const id = this.company()?.id;
+    if (!id) return;
+
+    this.loadingInsights.set(true);
+    this.platform.companyInsights(id, this.insightDays()).subscribe({
+      next: (data) => {
+        this.loadingInsights.set(false);
+        this.insights.set(data);
+      },
+      error: (error: HttpErrorResponse) => {
+        this.loadingInsights.set(false);
+        this.toast.error('Could not load this company’s figures', messageOf(error));
+      },
+    });
+  }
+
+  setInsightDays(days: number): void {
+    this.insightDays.set(days);
+    this.loadInsights();
+  }
+
+  private loadCustomers(): void {
+    const id = this.company()?.id;
+    if (!id) return;
+
+    this.loadingCustomers.set(true);
+    this.platform.customers({ companyId: id, page: this.customerPage(), limit: 25 }).subscribe({
+      next: (result) => {
+        this.loadingCustomers.set(false);
+        this.customers.set(result.items);
+        this.customerMeta.set(result.meta);
+      },
+      error: (error: HttpErrorResponse) => {
+        this.loadingCustomers.set(false);
+        this.toast.error('Could not load this company’s customers', messageOf(error));
+      },
+    });
+  }
+
+  onCustomerPage(page: number): void {
+    this.customerPage.set(page);
+    this.loadCustomers();
+  }
+
+  /**
+   * Whether a tenant's blog has gone quiet - nothing published for a season.
+   *
+   * A quarter rather than a month: a small business posting every six weeks is
+   * running a blog, and colouring that amber would make the signal meaningless
+   * on the tenants it is meant to find.
+   */
+  staleBlog(lastPostedAt: string | null): boolean {
+    if (!lastPostedAt) return true;
+    return Date.now() - new Date(lastPostedAt).getTime() > 90 * 86400000;
+  }
+
+  /* Money is already formatted by `money()` above, which every other tab uses.
+     A second one here would be two places for the currency to drift. */
 }

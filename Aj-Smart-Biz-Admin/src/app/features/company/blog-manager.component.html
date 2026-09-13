@@ -1,0 +1,413 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:340px"></div>
+  } @else {
+    <app-feature-gate [feature]="feature()" />
+
+    <!-- The section's own wording, plus the name the archive carries in the
+         website's menu. One form, saved whole, because all of it belongs to the
+         blog rather than to any post in it. -->
+    <form class="section-form" [formGroup]="copyForm" (ngSubmit)="saveCopy()">
+      <h4 style="margin:0 0 4px">How the blog reads</h4>
+      <p class="tiny muted" style="margin:0 0 14px;max-width:64ch">
+        The heading above your posts, on the home page and on the blog itself. Leave a field empty to
+        use the standard wording &mdash; <code>&#123;company&#125;</code> is replaced with your
+        company name.
+      </p>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="blg-nav">Menu name</label>
+          <input id="blg-nav" class="input" formControlName="navLabel" placeholder="Blog" maxlength="40" />
+          <span class="hint">What this is called in your website&rsquo;s menu. Blank keeps &ldquo;Blog&rdquo;.</span>
+        </div>
+
+        <div class="field">
+          <label for="blg-eyebrow">Eyebrow</label>
+          <input id="blg-eyebrow" class="input" formControlName="eyebrow" placeholder="Latest" />
+          <span class="hint">The small line above the heading.</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="blg-title">Heading</label>
+        <input id="blg-title" class="input" formControlName="title"
+               placeholder="News from {{ '{company}' }}" />
+      </div>
+
+      <div class="field">
+        <label for="blg-lead">Introduction</label>
+        <textarea id="blg-lead" class="textarea" formControlName="lead"
+                  placeholder="What we have been working on, and anything worth knowing before you get in touch."></textarea>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="blg-cta">Button label</label>
+          <input id="blg-cta" class="input" formControlName="ctaLabel" placeholder="Read more" />
+          <span class="hint">Under every post card.</span>
+        </div>
+
+        <div class="field">
+          <label class="check" style="margin-top:26px">
+            <input type="checkbox" formControlName="showAuthor" />
+            <span>Show who wrote each post</span>
+          </label>
+          <span class="hint">
+            A name under an article is most of what makes it read like a person wrote it. Turn this
+            off if the company writes as itself &mdash; the names you have typed are kept either way.
+          </span>
+        </div>
+      </div>
+
+      @if (writable()) {
+        <div class="row-end" style="gap:8px">
+          <button type="button" class="btn btn-ghost" [disabled]="savingCopy()" (click)="resetCopy()">Reset</button>
+          <button type="submit" class="btn btn-primary" [disabled]="savingCopy()">
+            {{ savingCopy() ? 'Saving…' : 'Save wording' }}
+          </button>
+        </div>
+      }
+    </form>
+
+    <div class="row-between" style="align-items:flex-start;gap:12px">
+      <div>
+        <h4 style="margin:0 0 4px">Your posts</h4>
+        <p class="tiny muted" style="margin:0 0 14px;max-width:70ch">
+          Articles, news and updates. Each one gets a page of its own on your website. Write one now
+          and give it next week&rsquo;s date to have it appear then &mdash; nothing is shown before
+          the date on it.
+        </p>
+      </div>
+      @if (writable()) {
+        <button type="button" class="btn btn-sm btn-primary" (click)="open(null)">＋ Write a post</button>
+      }
+    </div>
+
+    @if (!feature()?.granted) {
+      <div class="empty-note">A blog is not part of your plan.</div>
+    } @else {
+      @if (summary(); as s) {
+        <div class="kpis">
+          <div class="kpi">
+            <div class="kpi-label">On the site</div>
+            <div class="kpi-value">{{ s.live }}</div>
+            <div class="kpi-note">readable now</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Scheduled</div>
+            <div class="kpi-value">{{ s.scheduled }}</div>
+            <div class="kpi-note">waiting for their date</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Drafts</div>
+            <div class="kpi-value">{{ s.drafts }}</div>
+            <div class="kpi-note">no date yet</div>
+          </div>
+          <!-- The card this strip exists for. A blog's problem is going quiet,
+               and a post count cannot tell you whether it has. -->
+          <div class="kpi" [class.kpi-stale]="goneQuiet()">
+            <div class="kpi-label">Last posted</div>
+            <div class="kpi-value">{{ sinceLastPost() ?? '—' }}</div>
+            <div class="kpi-note">
+              @if (s.latest) {
+                {{ s.latest.publishedAt | date: 'd MMM y' }}
+              } @else {
+                nothing published yet
+              }
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Tabs are filters on one endpoint, not separate lists: each is the
+           `state` the API works out from the status and the date together. -->
+      <div class="tabs">
+        <button type="button" class="tab" [class.tab-on]="tab() === 'all'" (click)="setTab('all')">All</button>
+        <button type="button" class="tab" [class.tab-on]="tab() === 'live'" (click)="setTab('live')">On the site</button>
+        <button type="button" class="tab" [class.tab-on]="tab() === 'scheduled'" (click)="setTab('scheduled')">Scheduled</button>
+        <button type="button" class="tab" [class.tab-on]="tab() === 'draft'" (click)="setTab('draft')">Drafts</button>
+        <button type="button" class="tab" [class.tab-on]="tab() === 'hidden'" (click)="setTab('hidden')">Hidden</button>
+      </div>
+
+      <div class="filters">
+        <input class="input grow" type="search" placeholder="Search by title, standfirst or author…"
+               [value]="search()" (change)="onSearch(inputValue($event))" />
+
+        @if (branches().length > 0) {
+          <select class="select" style="width:auto" (change)="onBranchFilter(selectValue($event))">
+            <option value="">All branches</option>
+            <option value="none">Company-wide only</option>
+            @for (branch of branches(); track branch.id) {
+              <option [value]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+        }
+      </div>
+
+      @if (knownTags().length) {
+        <div class="tag-chips" style="margin:0 0 14px">
+          @for (entry of knownTags(); track entry.tag) {
+            <button type="button" class="chip" [class.chip-on]="tagFilter() === entry.tag"
+                    (click)="onTag(entry.tag)">
+              {{ entry.tag }} · {{ entry.count }}
+            </button>
+          }
+        </div>
+      }
+
+      @if (listing()) {
+        <div class="skeleton" style="height:220px"></div>
+      } @else if (items().length === 0) {
+        <div class="empty-note">
+          @if (tab() === 'scheduled') {
+            Nothing is waiting. Give a post a date in the future and it appears on your site that day.
+          } @else if (tab() === 'draft') {
+            No drafts. A post with no date is a draft &mdash; written, saved and shown to nobody.
+          } @else if (search() || tagFilter() || branchFilter()) {
+            No posts match that.
+          } @else {
+            Nothing written yet &mdash; your blog, its pages and its menu entry stay off your website
+            until you publish a post.
+          }
+        </div>
+      } @else {
+        <div class="posts">
+          @for (row of items(); track row.id) {
+            <article class="post" [class.post-hidden]="row.state === 'hidden'" [class.post-featured]="row.featured">
+              <div class="post-photo">
+                @if (coverOf(row); as photo) {
+                  <img [src]="photo" [alt]="row.title" loading="lazy" />
+                } @else {
+                  <div class="none">No cover</div>
+                }
+              </div>
+
+              <div class="post-main">
+                <div class="post-title">
+                  {{ row.title }}
+                  <span class="state" [class]="'state state-' + row.state">{{ stateLabel(row.state) }}</span>
+                  @if (row.featured) {
+                    <span class="badge badge-warning">Pinned</span>
+                  }
+                </div>
+
+                @if (row.excerpt) {
+                  <p class="post-text">{{ row.excerpt }}</p>
+                } @else {
+                  <p class="post-text">{{ row.body }}</p>
+                }
+
+                <div class="post-meta">
+                  <!-- The date is the whole point of the row, so it leads. A
+                       scheduled post says when, not whether. -->
+                  @if (row.publishedAt) {
+                    <span>
+                      @if (row.state === 'scheduled') { Appears {{ row.publishedAt | date: 'd MMM y, HH:mm' }} }
+                      @else { {{ row.publishedAt | date: 'd MMM y' }} }
+                    </span>
+                  } @else {
+                    <span>Not dated</span>
+                  }
+                  <span>{{ row.readMinutes }} min read</span>
+                  @if (row.author) {
+                    <span>{{ row.author }}</span>
+                  }
+                  @if (row.branch) {
+                    <span>{{ row.branch.name }}</span>
+                  }
+                  <span class="post-slug">/blog/{{ row.slug }}</span>
+                </div>
+
+                @if (row.tags?.length) {
+                  <div class="tag-chips">
+                    @for (tag of row.tags; track tag) {
+                      <button type="button" class="chip" [class.chip-on]="tagFilter() === tag" (click)="onTag(tag)">
+                        {{ tag }}
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+
+              @if (writable()) {
+                <div class="post-actions">
+                  <button type="button" class="btn btn-sm btn-ghost" (click)="open(row)">Edit</button>
+                  <button type="button" class="btn btn-sm btn-ghost" (click)="toggle(row)">
+                    {{ row.status === 'active' ? 'Hide' : 'Show' }}
+                  </button>
+                  <button type="button" class="btn btn-sm btn-danger-ghost" (click)="remove(row)">Delete</button>
+                </div>
+              }
+            </article>
+          }
+        </div>
+
+        <app-pager [meta]="meta()" (pageChange)="onPage($event)" (limitChange)="onLimit($event)" />
+
+        <p class="tiny muted" style="margin:14px 0 0">
+          A post is on your website once it is active and its date has passed. Hiding one keeps its
+          date, so it comes back where it was rather than at the top.
+        </p>
+      }
+    }
+  }
+</div>
+
+@if (modalOpen()) {
+  <app-modal
+    [title]="editing() ? 'Edit post' : 'Write a post'"
+    size="lg"
+    [closeOnBackdrop]="false"
+    (closed)="modalOpen.set(false)"
+  >
+    <form [formGroup]="form" (ngSubmit)="save()" id="blog-form">
+      <div class="field">
+        <label for="blg-title-field">Title</label>
+        <input id="blg-title-field" class="input" formControlName="title" maxlength="200"
+               placeholder="How we fit a kitchen in four days" />
+        <app-field-error [control]="form.controls.title" label="A title" />
+      </div>
+
+      <div class="field">
+        <label for="blg-excerpt">Standfirst</label>
+        <textarea id="blg-excerpt" class="textarea" formControlName="excerpt" maxlength="400"
+                  placeholder="One or two sentences under the title, and the line on the card."></textarea>
+        <span class="hint">
+          Optional &mdash; leave it and your website uses the opening of the article instead.
+        </span>
+      </div>
+
+      <div class="field body-field">
+        <label for="blg-body">The article</label>
+        <textarea id="blg-body" class="textarea" formControlName="body"
+                  placeholder="Write it here. Leave a blank line between paragraphs."></textarea>
+        <app-field-error [control]="form.controls.body" label="The article" />
+        <span class="hint">
+          Plain text with a blank line between paragraphs &mdash; your website lays it out.
+          <span class="count">About {{ readingTime() }} min to read.</span>
+        </span>
+      </div>
+
+      <div class="field">
+        <app-image-upload
+          formControlName="coverImage"
+          label="Cover picture"
+          folder="blog"
+          hint="Optional — landscape works best, 1600×900 or larger · PNG, JPG or WEBP"
+        />
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="blg-author">Written by</label>
+          <input id="blg-author" class="input" formControlName="author" maxlength="80" placeholder="Priya Shah" />
+          <span class="hint">Blank means the company itself wrote it.</span>
+        </div>
+
+        <div class="field">
+          <label for="blg-branch">Shows on</label>
+          <select id="blg-branch" class="select" formControlName="branchId">
+            <option value="">All branches (company-wide)</option>
+            @for (branch of branches(); track branch.id) {
+              <option [value]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+          <span class="hint">A branch site shows its own posts, or the company-wide ones when it has none.</span>
+        </div>
+      </div>
+
+      <!-- Publishing. The date is the scheduling feature and the whole of it. -->
+      <h4 style="margin:20px 0 4px">When it goes up</h4>
+      <div class="form-grid">
+        <div class="field">
+          <label for="blg-date">Publish date</label>
+          <input id="blg-date" class="input" type="datetime-local" formControlName="publishedAt" />
+          <span class="hint">
+            @if (scheduledFor(); as when) {
+              Waits until {{ when | date: 'd MMM y, HH:mm' }} &mdash; saved, finished and shown to nobody
+              until then.
+            } @else if (form.controls.publishedAt.value) {
+              On your website as soon as you save, unless you hide it.
+            } @else {
+              Empty means a draft &mdash; nobody sees it.
+            }
+          </span>
+          <div class="row-end" style="gap:8px;margin-top:8px;justify-content:flex-start">
+            <button type="button" class="btn btn-sm btn-ghost" (click)="publishNow()">Publish now</button>
+            @if (form.controls.publishedAt.value) {
+              <button type="button" class="btn btn-sm btn-ghost" (click)="unpublish()">Back to draft</button>
+            }
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="check" style="margin-top:26px">
+            <input type="checkbox" formControlName="featured" />
+            <span>Pin to the top</span>
+          </label>
+          <span class="hint">
+            Keeps this one above the dates without changing its date &mdash; for the article you most
+            want read.
+          </span>
+        </div>
+      </div>
+
+      <!-- Tags. Free text, with what is already in use offered underneath so a
+           blog does not end up filed under three spellings of one word. -->
+      <h4 style="margin:20px 0 4px">Tags</h4>
+      <p class="tiny muted" style="margin:0 0 10px">
+        What this is about. A reader can follow a tag to everything filed under it. At most
+        {{ tagsMax }}.
+      </p>
+
+      <div class="tag-rows" formArrayName="tags">
+        @for (control of tags.controls; track $index) {
+          <div class="tag-row">
+            <input class="input" [formControlName]="$index" maxlength="30" placeholder="kitchens" />
+            <button type="button" class="btn btn-sm btn-ghost" (click)="removeTag($index)">Remove</button>
+          </div>
+        }
+      </div>
+
+      @if (tags.length < tagsMax) {
+        <button type="button" class="btn btn-sm btn-ghost" style="margin-top:8px" (click)="addTag()">
+          ＋ Add a tag
+        </button>
+      }
+
+      @if (knownTags().length) {
+        <div class="tag-chips" style="margin-top:10px">
+          @for (entry of knownTags(); track entry.tag) {
+            <button type="button" class="chip" (click)="suggestTag(entry.tag)">{{ entry.tag }}</button>
+          }
+        </div>
+        <span class="hint">Tags you have used before. Click one to add it.</span>
+      }
+
+      <!-- The address. Shown rather than hidden, and warned about rather than
+           made read-only: it is a real decision, taken rarely. -->
+      <h4 style="margin:20px 0 4px">Address</h4>
+      <div class="field">
+        <label for="blg-slug">Page address</label>
+        <input id="blg-slug" class="input" formControlName="slug" maxlength="160"
+               [placeholder]="editing() ? '' : 'Made from the title'" />
+        <span class="hint">
+          @if (editing()) {
+            <strong>Changing this breaks every link anyone has already shared</strong> to the post, and
+            the search results pointing at it. It stays as it is when you rename the post.
+          } @else {
+            Leave it blank and we make one from the title.
+          }
+        </span>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+      <button type="submit" form="blog-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Save post' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

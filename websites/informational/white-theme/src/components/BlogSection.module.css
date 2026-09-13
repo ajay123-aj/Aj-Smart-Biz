@@ -1,0 +1,270 @@
+/* ------------------------------------------------------------------ *
+ * The blog.
+ *
+ * A three-column grid of the template's frosted card, so the band on the home
+ * page and the archive read as one thing. Three rather than the two Services
+ * uses, because a post card is narrower work: a title, a date and two lines,
+ * where a service carries a price and a tick list.
+ *
+ * The whole card is one link. That is a decision with a look attached — the
+ * hover has to move the entire panel rather than underlining four words, or a
+ * reader cannot tell what they are aiming at.
+ * ------------------------------------------------------------------ */
+
+.section {
+  padding-block: 92px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  /* Each card ends where its content ends. A post with a cover is much taller
+     than one without, and stretching the shorter one leaves a band of nothing
+     inside a bordered panel — which reads as a card that failed to load. */
+  align-items: start;
+}
+
+@media (max-width: 980px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 620px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --------------------------------- the card ------------------------------- */
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.link {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  text-decoration: none;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease,
+    background-color 0.22s ease;
+}
+
+.link:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-hover);
+}
+
+/* The hairline that fills across the top on hover — the same acknowledgement
+   the service and benefit cards give, so the three read as one family. */
+.link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  height: 2px;
+  width: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.link:hover::after {
+  transform: scaleX(1);
+}
+
+/* --------------------------------- header --------------------------------- */
+
+.header {
+  position: relative;
+  overflow: hidden;
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+}
+
+.hasPhoto {
+  aspect-ratio: 16 / 9;
+  background: var(--surface-sunken);
+}
+
+/*
+ * No cover. A short tinted band rather than a picture-sized frame: an
+ * image-shaped hole reads as a photograph that failed to arrive, and most posts
+ * on most sites will never have one. The wash is the accent at low strength from
+ * the top right — the same light source the muted sections use.
+ *
+ * It carries no text. The date belongs on the metadata line with the reading
+ * time, and printing it twice on the same card is not a design.
+ */
+.hasNoPhoto {
+  height: 84px;
+  padding-inline: 24px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(22rem 12rem at 88% -40%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 72%),
+    var(--surface-sunken);
+}
+
+.photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.link:hover .photo {
+  transform: scale(1.04);
+}
+
+/* The pin, only on a post the tenant lifted above the dates. */
+.pin {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--brand-contrast);
+  background: var(--brand);
+}
+
+/* ---------------------------------- body ---------------------------------- */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 20px 22px 22px;
+}
+
+/*
+ * The date and the reading time, above the title rather than under it.
+ *
+ * On a blog the date is not decoration: it is how a reader decides whether the
+ * article is still true, and burying it at the foot of the card makes them read
+ * the whole thing to find out it is from 2019.
+ */
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+.dot {
+  opacity: 0.5;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.12rem;
+  line-height: 1.35;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.excerpt {
+  margin: 0.6rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  /* Three lines, then it stops. The card is an invitation, not the article. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Pushed to the bottom, so a row of cards of different lengths still has its
+   read-more line on one level. */
+.foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 1rem;
+}
+
+.author {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.cta {
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--brand);
+  margin-left: auto;
+}
+
+/* ---------------------------------- tags ---------------------------------- */
+
+/*
+ * Outside the card's own link — a link inside a link is invalid HTML and the
+ * browser drops one of them. Which is also the right behaviour: a reader
+ * clicking a tag wants everything filed under it, not this article.
+ */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.6rem 0 0;
+  padding: 0 0.4rem;
+  list-style: none;
+}
+
+.tag {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: border-color 0.18s ease, color 0.18s ease;
+}
+
+.tag:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  margin-top: 34px;
+}

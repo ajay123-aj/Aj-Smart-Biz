@@ -235,6 +235,165 @@ counts. An unknown *or inactive* tenant gets the platform defaults with
 `resolved: false` rather than an error, so the endpoint cannot be used to probe
 which hosts or tenants exist. It has its own rate limit.
 
+### Services, categories and appointments
+
+A tenant's services are a price list with a page each, sorted into a tree, and -
+where the company opts in - a diary somebody can take a time in.
+
+**Prices are read in one order, everywhere**: `priceLabel` (free text) wins, then
+the offer pair, then the plain `price`. A surveyor quoting per job keeps its
+words; a salon charging ₹300 gets a number it can discount and report on. The
+`showPrice` switch withholds both — the words and the figures — so the
+switch cannot hide the prose and publish the number.
+
+`company_service_categories` is a tree of its own rather than a corner of the
+product one: they are sold separately, and `/products/bridal` and
+`/services/bridal` are different pages that would otherwise fight over one slug.
+The depth, cycle and nesting *logic* is shared — imported from
+`catalogue.controller`, so a tree is a tree in one place.
+
+- `GET|POST /admin/company/service-categories`, `PUT|PATCH|DELETE .../:id` —
+  the taxonomy. Deleting one promotes its subcategories and unfiles its services;
+  the response says how many of each.
+- `features.services` now carries `categories`, `offers`, `home` and `counts`
+  beside `items`, so the home page's three bands and the services page's filter
+  are answered from the one payload.
+
+#### Which buttons a card carries
+
+Two **functionalities**, sold on top of `services` and switched on independently:
+
+| `service_enquiry` | `service_booking` | What a card shows |
+| --- | --- | --- |
+| live | live | **Book a time** where the service allows it, an enquiry button elsewhere |
+| — | live | **Book a time** only. Nothing else has a button |
+| live | — | An enquiry button on every card |
+| — | — | **No buttons at all** — the section is a price list |
+
+The last row is a real product, not a broken state: a business that publishes
+what it does and takes its calls on the number in the header. It is also the
+cheapest thing a platform can sell, which is the reason these are grants rather
+than settings — `services` on its own is a price list, and each button is
+something a tenant buys.
+
+Both are enforced twice. The template paints nothing, and the API **refuses an
+enquiry or a booking sent anyway**: a website that only hides a form is a
+suggestion.
+
+`service_enquiry` is separate from `enquiryTarget`: one says whether an enquiry
+can be made at all, the other where it goes. Switching the button off never takes
+the diary with it — a booking is recorded through the enquiry's own route, so the
+*route* must work, but the *button* is a separate question.
+
+**Service Leads appears when either is granted.** An enquiry and a booking are
+both rows on that screen, and a shop that bought only the diary still has a queue
+to work through; gating the menu on `services` alone would show an empty inbox to
+somebody selling a price list. `MENU_FUNCTIONALITY` therefore takes a list, and
+any one of the keys will do.
+
+Existing tenants are carried across by `ensureServiceGrants` on boot: every plan
+that sells Services gains the enquiry, and a plan somebody was actually running a
+diary on gains Appointments. Switch rows are created in the state the tenant was
+already in — a button they had turned off stays off.
+
+#### The diary
+
+Booking is **off until a tenant switches it on**, because it is the only thing in
+this section that makes a promise on the company's behalf: a slot a stranger
+picks at 7pm on a Sunday is one somebody has to turn up for.
+
+A slot is not a table. It is arithmetic over three facts the company already has
+— the hours it works, the grid it cuts them into, and what is already booked
+— and `services/booking.service.js` is the **one place** that does it. The
+website asks it to paint a day and the write route asks it again inside the
+booking transaction, so a time a visitor is shown is a time the API will accept,
+and two people racing for the last chair cannot both be told yes.
+
+- `GET /website/services/:slug/slots` — one day, every slot, with a `reason` on
+  anything unavailable (`closed`, `past`, `full`, `overrun`), plus the next
+  fortnight that has anything free. With no date it opens on the **next free
+  day**, not today: a salon closing at one spends every afternoon otherwise
+  showing an empty grid.
+- `POST /website/service-leads` takes `bookingDate` + `bookingTime` and becomes a
+  booking. **Signing in is required** when the tenant runs customer accounts —
+  enforced in the API, not just hidden in the page — and a signed-in customer
+  is never asked for their name: it comes off the account.
+- `PATCH /admin/company/service-leads/:id/booking` confirms it, or declines it
+  with a line the customer reads. Declining or cancelling hands the time straight
+  back to the website.
+- `GET /admin/company/service-leads/diary?date=` — the same rows in *time*
+  order, which is the only order that answers "what does Thursday look like".
+
+#### How many fit in one slot
+
+The company sets one number — *bookings per slot* — on its booking settings, and
+every service inherits it. That is the shop's own capacity said once: three
+chairs, two vans, one treatment room. A service overrides it only where the
+constraint is the **work** rather than the business (one colourist, one van), and
+an override wins even when it is smaller.
+
+The diary reports `booked`, `capacity` and `left` on every slot, so a website can
+print *"2 of 3 left"* and grey out a time at the limit rather than refusing it
+after somebody has typed their name. The count is the **worst slot across the
+appointment's span**, not just its start: a 90-minute treatment on a 30-minute
+grid occupies three, and a full one in the middle stops the booking however empty
+its start looks.
+
+Times are the **company's own**, stored as `HH:mm` and never converted. A visitor
+in another time zone booking a haircut is booking it at the time printed on the
+salon's door.
+
+A booking's `bookingStatus` is deliberately not the enquiry's `stage`: one is a
+fact the customer is waiting on, the other is a sales pipeline the company keeps
+to itself. They move independently and are counted separately.
+
+### Blog
+
+A tenant's own articles, with a page each. Gated on the `blog` functionality like
+every other section — absent from the website, from the menu and from the
+console's sidebar unless the plan grants it.
+
+What makes it unlike the other content sections is **time**. A post carries
+`published_at`, which is both the date printed on it and the moment it becomes
+visible, so a post is live when it is *active and its date has passed*. That pair
+gives four states, and the API decides which rather than leaving the consoles to
+work it out:
+
+| state | means |
+| --- | --- |
+| `live` | active, date passed — on the website |
+| `scheduled` | active, dated in the future. Saved, finished, invisible until then |
+| `draft` | active, no date at all |
+| `hidden` | taken off the site, keeping its date |
+
+Scheduling therefore needs no scheduler and nothing to run: the same `WHERE`
+that hides a draft hides next Monday's post until Monday.
+
+- `GET|POST /admin/company/blog`, `PUT|DELETE /admin/company/blog/:id`,
+  `PATCH /admin/company/blog/:id/status` — the writing desk. Paged, with
+  `state`, `tag`, `branchId` and `search` filters, plus `/summary` and `/tags`.
+- `GET /website/blog` — **the one paged public list on the platform**, and the
+  one place the website fetches anything beyond `/website/company-details`.
+  Services and products ride whole in the payload because they are as long as the
+  business is wide; a blog accumulates, so the payload carries the latest six as
+  cards and the archive asks for the rest a page at a time.
+- `GET /website/blog/:slug` — one article with its body, plus the posts either
+  side of it by date, so a reader who has finished one is offered the next
+  without a second request.
+
+Two rules worth knowing:
+
+- **The slug never moves on its own.** Renaming a post does not regenerate it;
+  changing the address is a deliberate act, because every link anyone has shared
+  points at the old one.
+- **The body is plain text, stored and rendered as plain text.** The website
+  splits it into paragraphs and prints them, so nothing a tenant pastes in can
+  become live HTML on a page a stranger is reading.
+
+A post that exists but is not published yet answers **404**, not 403 — the
+truthful answer, and the alternative would let anybody with the URL confirm that
+a tenant has an article scheduled.
+
 ### Company domains — `company_domain`
 A company can own several hosts, each optionally pinned to one of its branches
 (`sub_company_id`).

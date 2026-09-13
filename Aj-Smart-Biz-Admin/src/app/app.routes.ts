@@ -95,6 +95,66 @@ export const routes: Routes = [
                 (m) => m.ServicesManagerComponent
               ),
           },
+          /**
+           * How those services are sorted. Its own screen for the reason
+           * Categories is one next to Products: the taxonomy is set up once and
+           * touched when the business takes on a new line, and the services
+           * themselves change every month.
+           */
+          {
+            path: 'service-categories',
+            title: 'Service categories',
+            loadComponent: () =>
+              import('./features/company/service-categories-manager.component').then(
+                (m) => m.ServiceCategoriesManagerComponent
+              ),
+          },
+          /**
+           * The catalogue, as two screens. Categories first, because a product
+           * needs one to be filed in and that is the order a tenant setting up
+           * will do them in.
+           */
+          {
+            path: 'categories',
+            title: 'Categories',
+            loadComponent: () =>
+              import('./features/company/categories-manager.component').then(
+                (m) => m.CategoriesManagerComponent
+              ),
+          },
+          {
+            path: 'products',
+            title: 'Products',
+            loadComponent: () =>
+              import('./features/company/products-manager.component').then(
+                (m) => m.ProductsManagerComponent
+              ),
+          },
+          /**
+           * The counter, under the shop window. Its own screen rather than a
+           * block on Products, because it is sold separately and answers a
+           * different question: not what the company sells, but whether a
+           * stranger may buy any of it unattended and where the money goes.
+           */
+          {
+            path: 'orders',
+            title: 'Cart & orders',
+            loadComponent: () =>
+              import('./features/company/orders-manager.component').then(
+                (m) => m.OrdersManagerComponent
+              ),
+          },
+          /**
+           * The blog. Its own screen rather than a block on About us: that page
+           * is written once, and this is the one thing in the section a tenant
+           * is expected to come back and add to.
+           */
+          {
+            path: 'blog',
+            title: 'Blog',
+            loadComponent: () =>
+              import('./features/company/blog-manager.component').then((m) => m.BlogManagerComponent),
+          },
           {
             path: 'about',
             title: 'About us',
@@ -181,6 +241,46 @@ export const routes: Routes = [
         title: 'Service Leads',
         loadComponent: () =>
           import('./features/service-leads/service-lead-list.component').then((m) => m.ServiceLeadListComponent),
+      },
+      /**
+       * The order book, and what it adds up to.
+       *
+       * One route rather than two, unlike Lead Management and its analysis
+       * screen: the queue and the figures are the same subject at two distances,
+       * and "how are we doing" is a question asked *while* working through the
+       * morning's orders. A second menu entry for it is one nobody clicks.
+       */
+      {
+        path: 'orders',
+        canActivate: [permissionGuard('orders')],
+        title: 'Orders',
+        loadComponent: () =>
+          import('./features/orders/orders-manager.component').then((m) => m.OrdersManagerComponent),
+      },
+      /**
+       * The stockroom. Its own permission, because it is its own job — one
+       * screen is a queue of customers and the other is a count of boxes, and a
+       * shop with a stockroom staffed separately has to be able to grant one
+       * without the other.
+       */
+      {
+        path: 'warehouse',
+        canActivate: [permissionGuard('warehouse')],
+        title: 'Warehouse',
+        loadComponent: () =>
+          import('./features/warehouse/warehouse-manager.component').then((m) => m.WarehouseManagerComponent),
+      },
+      /**
+       * The people who buy. Its own permission, because a shop can reasonably let
+       * staff work the order queue without handing them the whole customer list
+       * and everyone's phone number.
+       */
+      {
+        path: 'customers',
+        canActivate: [permissionGuard('customers')],
+        title: 'Customers',
+        loadComponent: () =>
+          import('./features/customers/customer-list.component').then((m) => m.CustomerListComponent),
       },
       {
         path: 'leads/analytics',

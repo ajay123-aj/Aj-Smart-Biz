@@ -1,9 +1,27 @@
 'use strict';
 
+/**
+ * The only require in this file, and it earns its place: `config/env` is what
+ * calls `dotenv.config()`, so a constant that reads the environment has to come
+ * through it or be at the mercy of module load order. Nothing else here depends
+ * on anything.
+ */
+const config = require('../config/env');
+
 const STATUS = { ACTIVE: 'active', INACTIVE: 'inactive' };
 const STATUS_VALUES = Object.values(STATUS);
 
-const AUTH_SCOPE = { SUPER_ADMIN: 'super_admin', ADMIN: 'admin' };
+/**
+ * Who a token belongs to.
+ *
+ * Three now, and the third is unlike the other two. A super admin runs the
+ * platform and an admin runs one tenant; a **customer** belongs to one tenant
+ * and is a member of the public who bought something. Their tokens are issued by
+ * a different route, carry a different shape, and can reach nothing under
+ * `/admin` or `/super-admin` — which is enforced by `requireScope`, not by
+ * hoping the paths never overlap.
+ */
+const AUTH_SCOPE = { SUPER_ADMIN: 'super_admin', ADMIN: 'admin', CUSTOMER: 'customer' };
 
 const SUPER_ADMIN_ROLE = { SUPER_ADMIN: 'super_admin', STAFF: 'staff' };
 
@@ -205,6 +223,13 @@ const FUNCTIONALITY = {
   CONTACT_PAGE: 'contact_page',
   TESTIMONIALS: 'testimonials',
   FEATURES: 'features_benefits',
+  PRODUCTS: 'products',
+  ORDERS: 'orders',
+  WAREHOUSE: 'warehouse',
+  CUSTOMERS: 'customers',
+  BLOG: 'blog',
+  SERVICE_ENQUIRY: 'service_enquiry',
+  SERVICE_BOOKING: 'service_booking',
 };
 const FUNCTIONALITY_VALUES = Object.values(FUNCTIONALITY);
 
@@ -301,8 +326,155 @@ const FUNCTIONALITY_CATALOGUE = [
     icon: 'sparkles',
     summary: 'Say what you offer, in your own words, with an icon each.',
     description:
-      'Adds a Features / Benefits band to the website \u2014 a card per capability with your own heading, wording and an icon chosen from the platform\u2019s set. Switched off, the section is absent from the site entirely rather than shown with the template\u2019s words.',
+      'Adds a Features / Benefits band to the website — a card per capability with your own heading, wording and an icon chosen from the platform’s set. Switched off, the section is absent from the site entirely rather than shown with the template’s words.',
     sequence: 10,
+  },
+  {
+    key: FUNCTIONALITY.PRODUCTS,
+    name: 'Products',
+    icon: 'package',
+    summary: 'A catalogue of what the business sells, in categories, with offers.',
+    description:
+      'Adds a product catalogue to the website — categories that nest as deeply as the business needs, a card per product with several photographs, a price and an optional offer price, and pages of their own for every product, every category and everything currently on offer. The home page picks up a band of categories and a band of offers. Switched off, all of it is absent from the site: the platform knows nothing about what a business stocks, so there is nothing to fall back to.',
+    sequence: 11,
+  },
+  /**
+   * Sold on top of Products, never instead of it.
+   *
+   * The catalogue is a shop window; this is the counter. A tenant can very
+   * reasonably want the first without the second — a showroom that prices
+   * everything but takes its orders on the phone — which is why the cart is a
+   * grant of its own rather than a setting inside Products. The reverse is not
+   * reasonable: a cart with no catalogue has nothing to put in it, so the
+   * public payload withholds this block whenever the catalogue is absent, and
+   * its console screen is left out of the sidebar on the same signal.
+   */
+  {
+    key: FUNCTIONALITY.ORDERS,
+    name: 'Cart & orders',
+    icon: 'shopping-cart',
+    summary: 'An add-to-cart button on every product, and an order that reaches you.',
+    description:
+      'Adds a cart to the website — an Add to cart button on every product card and product page, a basket the visitor can change, and one button that sends the whole order. Where it goes is the company’s own setting: a composed WhatsApp message to the number it nominates, or straight to payment through its own UPI id or payment link. Set to Off, there is no cart and no order button anywhere on the site and the catalogue reads as a brochure again, which is the right answer for a business that does not sell online.',
+    sequence: 12,
+  },
+  /**
+   * The stockroom behind the counter.
+   *
+   * Sold on top of `orders` for the same reason `orders` sits on top of
+   * `products`: a shop can take orders all day and count its stock on a
+   * clipboard, and plenty do. What this buys is the counting — somewhere for
+   * the stock to live, a ledger of every movement in and out, and the arithmetic
+   * that turns those into "you have four left and you sell three a week".
+   *
+   * It is also the only thing that can make a website's availability *true*.
+   * Without it `stockStatus` is a flag somebody remembered to set; with it, a
+   * product marked `trackInventory` is out of stock on the site the moment the
+   * last one leaves the building, with nobody having to remember anything.
+   */
+  {
+    key: FUNCTIONALITY.WAREHOUSE,
+    name: 'Warehouse & stock',
+    icon: 'warehouse',
+    summary: 'Where the stock is, how much of it there is, and everything that moved.',
+    description:
+      'Adds stock control to the platform — one or more warehouses, a running quantity per product in each, and a ledger of every receipt, issue, adjustment and transfer with who did it and why. Orders reserve stock when they are confirmed and take it off when they are dispatched, so what the website says is available is what is actually on the shelf. Brings its own analytics: what is low, what is out, what is worth the most and what is moving fastest.',
+    sequence: 13,
+  },
+  /**
+   * Accounts for the people who buy.
+   *
+   * The first functionality that gives **the public** something to sign in to,
+   * which is why it is sold separately from the cart rather than folded into it:
+   * plenty of shops want an order button and have no wish to run a membership
+   * list, and every account is a name and a phone number the tenant is then
+   * responsible for.
+   *
+   * What it buys is memory. Without it every order is a stranger typing their
+   * details in again; with it a returning customer signs in with their phone,
+   * keeps their addresses, and can see what they ordered last time — and the
+   * shop gets a customer list rather than a pile of orders it has to group by
+   * phone number itself.
+   */
+  {
+    key: FUNCTIONALITY.CUSTOMERS,
+    name: 'Customer accounts',
+    icon: 'user-round',
+    summary: 'Let customers sign in, keep their addresses, and see their orders.',
+    description:
+      'Adds sign-in to the website — a name, a mobile number and an email, verified by a one-time code, with no password to forget. A signed-in customer keeps several delivery addresses and picks one at checkout instead of typing it again, and gets a page showing every order they have placed with you and what happened to it. You get a Customers screen listing them all, what they have spent and what they last ordered. Switched off, the website has no sign-in at all and orders are taken exactly as they were before — from strangers, one form at a time.',
+    sequence: 14,
+  },
+  /**
+   * The part of the website that changes.
+   *
+   * Every other section here is a business describing what it *is* - its
+   * services, its range, its people. Those are written once and touched when
+   * something changes. This is a business saying what it has been **doing**, and
+   * it is the only thing on the platform a tenant is expected to come back and
+   * add to.
+   *
+   * Sold separately rather than folded into About us for that reason. A company
+   * that will never write a second post should not be given an empty archive,
+   * and one that writes weekly needs a screen built for a list rather than a
+   * paragraph box on somebody else's page.
+   *
+   * It grants no ability to *reach* anybody: there is no subscription list, no
+   * mailing and no comments. What it publishes is pages on the tenant's own
+   * website, which is what makes it a website functionality rather than a
+   * marketing one.
+   */
+  {
+    key: FUNCTIONALITY.BLOG,
+    name: 'Blog',
+    icon: 'newspaper',
+    summary: 'Articles, news and updates, with a page of their own for each.',
+    description:
+      'Adds a blog to the website — a band of the latest posts on the home page, an archive page that pages through the rest, and a page of its own for every article with its own address, cover picture, author and date. Posts can be tagged, and a reader can follow a tag to everything filed under it. Write one now and publish it later: a post carries the date it goes live, and nothing appears on the site before then. Switched off, the blog, the archive and every article are absent from the site — the platform knows nothing about what a business has been doing, so there is nothing to fall back to.',
+    sequence: 15,
+  },
+  /**
+   * The enquiry button, sold on top of Services rather than inside it.
+   *
+   * Services is a **price list**: what the business does, what it includes, what
+   * it costs. Plenty of trades want exactly that and nothing else - the number is
+   * in the header, and the phone is how work arrives. This is the other half: a
+   * form on every card, an inbox to work through, and a record of who asked about
+   * what.
+   *
+   * Separating them is what lets a platform sell the cheap version honestly. A
+   * tenant without this grant still gets its services on its website; it simply
+   * gets no button, and the API refuses an enquiry posted anyway.
+   */
+  {
+    key: FUNCTIONALITY.SERVICE_ENQUIRY,
+    name: 'Service enquiries',
+    icon: 'inbox',
+    summary: 'An enquiry button on every service, and an inbox to work through.',
+    description:
+      'Adds a short form to every service card — a name and a mobile number — and a Service Leads screen where those arrive. Each enquiry keeps what the service was called and what it was priced at on the day somebody asked, so a call back months later is answered with what they were actually shown. Where it goes is the company’s own setting: recorded here, handed to WhatsApp, or both. Switched off, service cards carry no enquiry button at all and the section reads as a price list.',
+    sequence: 16,
+  },
+  /**
+   * The diary, sold on top of Services and apart from the enquiry.
+   *
+   * A salon takes appointments; a surveyor takes questions; plenty of businesses
+   * take both, and a few take neither. Three of those four are only expressible
+   * because this is its own grant rather than a setting inside the enquiry.
+   *
+   * It needs somewhere for a booking to **land**, which today is the enquiry's own
+   * table - so the rows are recorded whether or not the enquiry button is sold.
+   * What a tenant buys here is the diary: working hours, a slot grid, a limit per
+   * slot, and the confirm-or-decline that a customer can see on their own page.
+   */
+  {
+    key: FUNCTIONALITY.SERVICE_BOOKING,
+    name: 'Appointments',
+    icon: 'calendar',
+    summary: 'Let customers pick a time, and confirm it before it is an appointment.',
+    description:
+      'Adds a diary to the website — your working days and hours cut into slots, with a limit on how many bookings one slot holds. A visitor picks a time on the service’s own page and it arrives as a request; nothing is an appointment until somebody at the company confirms it, and declining hands the time straight back. The website shows how many places are left in each slot and stops offering one at the limit. Only the services you mark as bookable offer a time, so a shop can take appointments for a haircut and enquiries about a wedding.',
+    sequence: 17,
   },
 ];
 
@@ -340,6 +512,30 @@ const NAV_PAGES = [
    * `publicNav` reads either shape; see `NAV_LABEL_SOURCE`.
    */
   { key: 'services', href: '/services', label: 'Services', settings: 'services', functionality: 'services', content: 'services' },
+  /**
+   * The catalogue. Renameable the same way Services is, and for the same reason
+   * it keeps its label on the functionality's settings blob rather than in a
+   * table — the section has categories and products, and no settings row.
+   *
+   * `/categories` and `/offers` are deliberately **not** here. They are real
+   * pages, but they are reached from the *View all* links on the home page and
+   * from the catalogue itself; putting all three in the header would give a
+   * five-product shop a menu longer than its stock list. They live or 404 on the
+   * same `features.products` payload this entry does.
+   */
+  { key: 'products', href: '/products', label: 'Products', settings: 'products', functionality: 'products', content: 'products' },
+  /**
+   * The blog. Renameable the way Services and Products are, and gated on
+   * `content` the same way: entitled, switched on and with nothing published
+   * yet is an ordinary state for a tenant on its first afternoon, and a Blog
+   * link leading to an empty archive is worse than no link.
+   *
+   * `/blog/<slug>` is deliberately not a second entry, for the reason
+   * `/categories` and `/offers` are not: an article is reached from the archive
+   * and from the band on the home page, and a menu that grew an entry per post
+   * would stop being a menu.
+   */
+  { key: 'blog', href: '/blog', label: 'Blog', settings: 'blog', functionality: 'blog', content: 'blog' },
   { key: 'about', href: '/about', label: 'About us', settings: 'about', functionality: null },
   { key: 'contact', href: '/contact', label: 'Contact', settings: 'contact', functionality: 'contact_page' },
 ];
@@ -352,7 +548,13 @@ const NAV_PAGES = [
  * functionality's own settings blob — company-wide, like the Team and Gallery
  * headings do. `publicNav` reads both, and this is what tells it which.
  */
-const NAV_LABEL_SOURCE = { about: 'row', contact: 'row', services: 'functionality' };
+const NAV_LABEL_SOURCE = {
+  about: 'row',
+  contact: 'row',
+  services: 'functionality',
+  products: 'functionality',
+  blog: 'functionality',
+};
 
 /** The longest a menu label may be, matching the column. */
 const NAV_LABEL_MAX = 40;
@@ -1084,6 +1286,37 @@ const SERVICE_DEFAULTS = {
   formTitle: 'Book an enquiry',
   /** The line under it, and the tenant's chance to set expectations. */
   formNote: 'Leave your name and number and we will call you back — usually the same day.',
+
+  /**
+   * The categories band, for a business with enough services to need sorting.
+   *
+   * A salon with forty treatments is unreadable as one list; a builder with five
+   * has no use for a taxonomy at all. The band appears only where the tenant has
+   * actually filed services under categories, so the second kind never sees it.
+   */
+  categoriesEyebrow: 'What we do',
+  categoriesTitle: 'Find what you came for',
+  categoriesLead: 'The kinds of work we take on. Pick one to see everything in it.',
+
+  /**
+   * The offers band — the services a company is promoting this month.
+   *
+   * Its own wording rather than the section's, because it makes its own
+   * argument: the services band says *here is what we do*, and this one says
+   * *here is why to book now*.
+   */
+  offersEyebrow: 'This month',
+  offersTitle: 'On offer right now',
+  offersLead: 'Reduced for a while. Prices go back up when the offer ends.',
+
+  /**
+   * The button on a service somebody can actually take a time for.
+   *
+   * Separate from `ctaLabel` because they are different promises: "Enquire"
+   * starts a conversation and "Book" takes a slot in the diary, and a card that
+   * offers the second must not be labelled with the first.
+   */
+  bookLabel: 'Book a time',
 };
 
 /**
@@ -1107,6 +1340,130 @@ const SERVICE_DEFAULTS = {
 const SERVICE_ENQUIRY_TARGET = { WHATSAPP: 'whatsapp', ADMIN: 'admin', BOTH: 'both' };
 const SERVICE_ENQUIRY_TARGET_VALUES = Object.values(SERVICE_ENQUIRY_TARGET);
 
+/**
+ * How many of each the home page carries before its *View all* link takes over.
+ *
+ * The same arrangement the catalogue uses, and the same reason: the home page is
+ * an invitation, not the price list. Three rather than the catalogue's eight,
+ * because a service card is a much larger object than a product card - it
+ * carries a price, a duration and a list of what is included - and four of them
+ * is already a screen.
+ */
+const SERVICE_HOME_LIMITS = { services: 3, offers: 3, categories: 6 };
+
+/** The most a service may take, in minutes. Eight hours: a day's work. */
+const SERVICE_DURATION_MAX = 480;
+
+/**
+ * How many people can be booked into one slot for one service.
+ *
+ * A salon with three chairs takes three haircuts at ten o'clock; a surveyor with
+ * one van takes one. Per service rather than per company, because the constraint
+ * is the thing doing the work, not the business.
+ */
+const SERVICE_SLOT_CAPACITY_MAX = 20;
+
+/* ------------------------------------------------------------------ *
+ * Bookings
+ * ------------------------------------------------------------------ */
+
+/**
+ * Where a booking has got to, as the **customer** reads it.
+ *
+ *   requested   they asked for that slot. Nobody has agreed to it yet.
+ *   accepted    the company confirmed it. This is the appointment.
+ *   declined    the company cannot do it, with a line saying why.
+ *   completed   the work happened.
+ *   cancelled   called off - by either side.
+ *
+ * Deliberately **not** `LEAD_STAGE`. Those five words are a sales pipeline a
+ * company works through in private ("qualified", "lost"), and none of them is
+ * something to show a customer who is waiting to hear whether they have an
+ * appointment on Thursday. An enquiry keeps its stage; a booking has this beside
+ * it, and the two move independently.
+ *
+ * `null` means the row is not a booking at all - somebody asked a question
+ * rather than asking for a slot, which is most of this table.
+ */
+const BOOKING_STATUS = {
+  REQUESTED: 'requested',
+  ACCEPTED: 'accepted',
+  DECLINED: 'declined',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+};
+const BOOKING_STATUS_VALUES = Object.values(BOOKING_STATUS);
+
+/**
+ * What may follow what.
+ *
+ * `declined` and `completed` are ends: a company that declined a slot and then
+ * changed its mind takes the booking again rather than reviving a refusal the
+ * customer has already been told about. `cancelled` is reachable from both live
+ * states because plans change on both sides.
+ */
+const BOOKING_TRANSITIONS = {
+  [BOOKING_STATUS.REQUESTED]: [BOOKING_STATUS.ACCEPTED, BOOKING_STATUS.DECLINED, BOOKING_STATUS.CANCELLED],
+  [BOOKING_STATUS.ACCEPTED]: [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED],
+  [BOOKING_STATUS.DECLINED]: [],
+  [BOOKING_STATUS.COMPLETED]: [],
+  [BOOKING_STATUS.CANCELLED]: [],
+};
+
+/** The states that still hold a slot. Anything else has given it back. */
+const BOOKING_HOLDS_SLOT = [BOOKING_STATUS.REQUESTED, BOOKING_STATUS.ACCEPTED];
+
+/** What each state is called on both consoles and on the customer's own page. */
+const BOOKING_STATUS_CATALOGUE = [
+  { key: BOOKING_STATUS.REQUESTED, label: 'Requested', customerLabel: 'Waiting for confirmation' },
+  { key: BOOKING_STATUS.ACCEPTED, label: 'Confirmed', customerLabel: 'Confirmed' },
+  { key: BOOKING_STATUS.DECLINED, label: 'Declined', customerLabel: 'Not available' },
+  { key: BOOKING_STATUS.COMPLETED, label: 'Completed', customerLabel: 'Completed' },
+  { key: BOOKING_STATUS.CANCELLED, label: 'Cancelled', customerLabel: 'Cancelled' },
+];
+
+/**
+ * When a company takes appointments, before it says otherwise.
+ *
+ * Off by default, and that is the important one: booking is the only feature in
+ * the Services section that makes a promise on the company's behalf - a slot a
+ * stranger picked at 7pm on a Sunday is one somebody has to turn up for. A
+ * tenant opts into that deliberately.
+ *
+ * `days` is 0-6 with Sunday at 0, matching `Date.getDay()` on both sides, so
+ * nothing has to translate a weekday between the API and a browser.
+ */
+const BOOKING_DEFAULTS = {
+  enabled: false,
+  days: [1, 2, 3, 4, 5, 6],
+  openTime: '09:30',
+  closeTime: '18:30',
+  /** The grid a day is cut into. A service longer than one slot takes several. */
+  slotMinutes: 30,
+  /**
+   * How many bookings one slot may hold, for the whole company.
+   *
+   * The shop's own capacity - three chairs, two vans, one room - said once
+   * rather than on every service. A service may override it where the
+   * constraint is the thing doing the work rather than the business: one
+   * colourist in a salon with three chairs takes one booking at ten, whatever
+   * the shop as a whole can manage.
+   */
+  slotCapacity: 1,
+  /** The least notice the company will take. Two hours, so nobody books lunch at noon. */
+  leadHours: 2,
+  /** How far ahead the diary is open. */
+  horizonDays: 30,
+  note: 'Pick a time that suits you. We will confirm it, and call if anything changes.',
+};
+
+/** The caps the booking settings are checked against. */
+const BOOKING_SLOT_MINUTES = [10, 15, 20, 30, 45, 60, 90, 120];
+const BOOKING_LEAD_HOURS_MAX = 168;
+const BOOKING_HORIZON_MAX = 180;
+/** The most slots one day may be cut into - a guard on the generator, not a rule. */
+const BOOKING_SLOTS_PER_DAY_MAX = 96;
+
 /** The longest a service's own button label may be, matching the column. */
 const SERVICE_CTA_MAX = 40;
 
@@ -1125,6 +1482,586 @@ const SERVICE_CTA_MAX = 40;
 /** The most bullet points one service card may carry, and how long each may be. */
 const SERVICE_HIGHLIGHTS_MAX = 6;
 const SERVICE_HIGHLIGHT_LENGTH = 120;
+
+/* ------------------------------------------------------------------ *
+ * Products and categories
+ * ------------------------------------------------------------------ */
+
+/**
+ * The wording above each of the three bands the catalogue puts on a site, plus
+ * the name its page carries in the menu.
+ *
+ * One blob rather than three, on the `products` functionality's own `settings` —
+ * the same place Services keeps its copy, for the same reason: they are one
+ * short block per tenant, not a list, and the products themselves are
+ * branch-aware rows of their own.
+ *
+ * The three bands are separate blocks of copy because they make three different
+ * arguments. Categories answer *what kind of thing do you sell*, the product
+ * band answers *show me some*, and offers answer *why buy today*. A single
+ * heading over all three would be wrong above at least two of them.
+ */
+const PRODUCT_DEFAULTS = {
+  /** `null` until the tenant types one — see `serviceSettings` for why. */
+  navLabel: null,
+
+  /* The catalogue itself: the band on the home page, and the /products page. */
+  eyebrow: 'What we sell',
+  /** `{company}` is filled in by the website. */
+  title: 'The {company} range',
+  lead: 'Everything we stock, with what it costs. Ask about anything you cannot see here — most of it we can get.',
+
+  /* The band of categories, on the home page and at /categories. */
+  categoriesEyebrow: 'Browse',
+  categoriesTitle: 'Shop by category',
+  categoriesLead: 'Start with the kind of thing you are after.',
+
+  /* The offers band, on the home page and at /offers. */
+  offersEyebrow: 'On offer',
+  offersTitle: 'Reduced right now',
+  offersLead: 'Current reductions. Prices go back up when the offer ends.',
+
+  /** The button on every product card, unless the product overrides it. */
+  ctaLabel: 'View details',
+};
+
+/**
+ * How deep categories may nest.
+ *
+ * `parent_id` would happily accept a chain of forty, and nothing in the database
+ * would object — but the website renders a category's ancestry as a breadcrumb
+ * and its children as a menu, and neither survives that. Three is a main
+ * category, a subcategory and one below it, which is as far as a catalogue this
+ * size has ever needed to go.
+ *
+ * Enforced on the way in, on create **and** on re-parenting: moving a branch of
+ * the tree under a deeper node is the move that would otherwise slip past a
+ * check that only ran on create.
+ */
+const CATEGORY_DEPTH_MAX = 3;
+
+/**
+ * What a product's photographs are capped at.
+ *
+ * The detail page shows one large image and a strip of thumbnails under it; past
+ * eight the strip wraps into something nobody scrolls. The first image is the
+ * one every card in the catalogue uses, which is why order matters here and the
+ * tenant sets it.
+ */
+const PRODUCT_IMAGES_MAX = 8;
+
+/** The most bullet points one product may carry, and how long each may be. */
+const PRODUCT_HIGHLIGHTS_MAX = 6;
+const PRODUCT_HIGHLIGHT_LENGTH = 120;
+
+/**
+ * Specifications, as label/value pairs — `Material: Solid oak`, `Warranty: 2
+ * years`. A table rather than a paragraph, because it is the part of a product
+ * page people compare between two products rather than read.
+ */
+const PRODUCT_SPECS_MAX = 20;
+const PRODUCT_SPEC_LABEL_LENGTH = 60;
+const PRODUCT_SPEC_VALUE_LENGTH = 200;
+
+/**
+ * Whether a product can actually be had today.
+ *
+ * Not a stock *count*: the platform is not a warehouse system and a number it
+ * cannot keep true is worse on a website than no number. What a visitor needs to
+ * know is whether to ring up, and these three say it.
+ */
+const PRODUCT_STOCK = {
+  IN_STOCK: 'in_stock',
+  OUT_OF_STOCK: 'out_of_stock',
+  MADE_TO_ORDER: 'made_to_order',
+};
+const PRODUCT_STOCK_VALUES = Object.values(PRODUCT_STOCK);
+
+/**
+ * The most a price may be, matching `DECIMAL(12, 2)`. A ceiling rather than a
+ * validation of taste — it exists so a typo cannot overflow the column.
+ */
+const PRODUCT_PRICE_MAX = 9999999999.99;
+
+/**
+ * How many of each the home page carries before its *View all* link takes over.
+ *
+ * The home page is an invitation, not the catalogue. These are the counts the
+ * API sends in the home payload; the pages behind the links get everything.
+ */
+const CATALOGUE_HOME_LIMITS = { categories: 8, products: 8, offers: 6 };
+
+/**
+ * The longest a slug may be, matching the column.
+ *
+ * Products and categories are addressed by slug rather than id on the public
+ * site — `/products/solid-oak-dining-table` outlives a database migration in a
+ * way `/products/417` does not, and it is the half of the URL a search engine
+ * reads. Generated from the name and made unique per tenant.
+ */
+const SLUG_MAX = 160;
+
+/* ------------------------------------------------------------------ *
+ * Blog
+ * ------------------------------------------------------------------ */
+
+/**
+ * The blog's own wording, before a company changes it.
+ *
+ * Words only. Unlike Services and Products there is deliberately no fallback
+ * *content* anywhere near this feature: the platform knows nothing a business
+ * has been doing, and an invented article is not a weak section but a company
+ * publishing something it never wrote.
+ */
+const BLOG_DEFAULTS = {
+  eyebrow: 'Latest',
+  title: 'News from {company}',
+  lead: 'What we have been working on, and anything worth knowing before you get in touch.',
+  /** The label under a post card, and on the archive's own link. */
+  ctaLabel: 'Read more',
+  /**
+   * Whether the site prints who wrote each post.
+   *
+   * On by default: a name under an article is most of what makes it read like a
+   * person wrote it rather than a brochure. A company writing as itself turns it
+   * off once here instead of clearing the field on every post.
+   */
+  showAuthor: true,
+};
+
+/**
+ * How many posts the home page's band carries before its link takes over, and
+ * how many the public payload ships with every page render.
+ *
+ * They are the same number on purpose. Unlike the catalogue, a blog is
+ * **unbounded**: a tenant that writes weekly has two hundred articles in four
+ * years, and every one of them would otherwise ride along in the payload of
+ * every page of the site, forever. So the payload carries the latest handful -
+ * enough for the band and enough to decide the menu entry - and the archive is
+ * a paged endpoint of its own. See `publicBlog`.
+ */
+const BLOG_HOME_LIMIT = 6;
+
+/** The archive's page size, and the most one request may ask for. */
+const BLOG_PAGE_SIZE = 9;
+const BLOG_PAGE_SIZE_MAX = 30;
+
+/**
+ * The most tags one post may carry, and how long each may be.
+ *
+ * A cap rather than a taxonomy. Tags are free text on the post itself, not a
+ * table: they are never ordered, never edited independently of the article, and
+ * the only thing that reads them is a filter on the archive. A tenant needing
+ * more structure than this has categories on the catalogue and should be using
+ * those.
+ */
+const BLOG_TAGS_MAX = 6;
+const BLOG_TAG_LENGTH = 30;
+
+/** The longest an article may be, matching the column. */
+const BLOG_BODY_MAX = 60000;
+/** The longest the standfirst under the title may be. */
+const BLOG_EXCERPT_MAX = 400;
+
+/**
+ * Words a minute, for the "4 min read" line.
+ *
+ * 200 is the ordinary figure for adult reading of non-technical prose. It is an
+ * estimate presented as an estimate, which is the only honest way to show it -
+ * the alternative is a word count, which tells a reader nothing about whether
+ * they have time for it now.
+ */
+const BLOG_READ_WPM = 200;
+
+/* ------------------------------------------------------------------ *
+ * Cart and orders
+ * ------------------------------------------------------------------ */
+
+/**
+ * What pressing the order button actually does.
+ *
+ *   whatsapp  the basket is composed into a message and handed to the
+ *             company's WhatsApp, ready to send. Nothing is stored on the
+ *             platform — the same bargain the service enquiry form makes, and
+ *             for the same reason: the tenant already has a phone, and an order
+ *             sitting in a console nobody has open is an order nobody packed.
+ *   payment   the visitor is sent to pay, through the tenant's own UPI id or
+ *             payment link, with the basket total already on it. The order
+ *             still reaches WhatsApp alongside where a number exists, because a
+ *             payment with no idea what was bought is not an order.
+ *   none      there is no cart and no order button anywhere on the site. The
+ *             catalogue is a brochure, which is the honest rendering for a
+ *             business that takes its orders in the shop.
+ *
+ * `none` is a real setting rather than "switch the feature off": a tenant
+ * pausing orders for a fortnight keeps its labels, its numbers and its payment
+ * details, and turns them back on without setting any of it up again.
+ */
+const ORDER_MODE = { WHATSAPP: 'whatsapp', PAYMENT: 'payment', NONE: 'none' };
+const ORDER_MODE_VALUES = Object.values(ORDER_MODE);
+
+/** What the two order modes are called and what each needs to work. */
+const ORDER_MODE_CATALOGUE = [
+  {
+    key: ORDER_MODE.WHATSAPP,
+    name: 'Send the order on WhatsApp',
+    summary: 'The basket arrives as a message you can reply to.',
+    /** What the tenant must have published for the mode to be offered at all. */
+    requires: 'A published WhatsApp number.',
+    sequence: 1,
+  },
+  {
+    key: ORDER_MODE.PAYMENT,
+    name: 'Take payment directly',
+    summary: 'The visitor pays first, through your own UPI id or payment link.',
+    requires: 'A UPI id or a payment link.',
+    sequence: 2,
+  },
+  {
+    key: ORDER_MODE.NONE,
+    name: 'Off — no cart, no orders',
+    summary: 'The catalogue shows prices and nothing is orderable.',
+    requires: null,
+    sequence: 3,
+  },
+];
+
+/**
+ * The cart's wording and terms, kept on the `orders` functionality's own
+ * `settings` blob — the same place Services and Products keep theirs.
+ *
+ * `cart` is the one that is not wording. Switched off, a product is ordered one
+ * at a time: the button on a card says *Order now* and sends that single line
+ * straight away. A trade counter selling one large thing at a time wants that;
+ * a shop selling six small ones wants the basket. Both are orders, so both live
+ * under this one setting rather than becoming two features.
+ */
+const ORDER_DEFAULTS = {
+  mode: ORDER_MODE.WHATSAPP,
+
+  /** Off means one product per order — see the note above. */
+  cart: true,
+
+  /** The button on every product card and product page. */
+  addToCartLabel: 'Add to cart',
+  /** The button that skips the basket, and the only button when `cart` is off. */
+  buyNowLabel: 'Order now',
+  /** The heading on the basket panel. */
+  cartTitle: 'Your order',
+  /** The tenant's chance to set expectations before anything is sent. */
+  cartNote: 'Send your order and we will confirm availability, delivery and the final total before anything is charged.',
+  /** The button that sends it. */
+  submitLabel: 'Send order',
+
+  /**
+   * Which published number an order reaches. `orders` by default, and it falls
+   * back to `contact` the way every other typed number does — so a tenant with
+   * one number published still gets a working cart.
+   */
+  whatsappType: 'orders',
+  /** The first line of the composed message, above the basket. */
+  messageIntro: 'Hello, I would like to place this order:',
+
+  /* What the visitor is asked for before the order can be sent. A name and a
+     number are the two an order cannot be fulfilled without, so both are on by
+     default; an address is only wanted by a business that delivers. */
+  requireName: true,
+  requirePhone: true,
+  requireAddress: false,
+
+  /** Below this the order cannot be sent. Null means no minimum. */
+  minOrderAmount: null,
+
+  /* --------------------------- direct payment --------------------------- */
+
+  /** `name@bank`, turned into a `upi://pay` link with the total already on it. */
+  upiId: null,
+  /** Who the payment is to, as it should appear in the payer's app. */
+  payeeName: null,
+  /** A hosted payment page, for a tenant that takes cards rather than UPI. */
+  paymentUrl: null,
+  /** The button that opens either of them. */
+  paymentLabel: 'Pay now',
+  /** Printed beside it — what happens after they have paid. */
+  paymentNote: 'Pay to confirm your order. Send us the reference and we will pack it straight away.',
+};
+
+/** Caps matching the columns the blob is stored in, and the sizes a page can print. */
+const ORDER_LABEL_MAX = 40;
+const ORDER_NOTE_MAX = 400;
+
+/**
+ * The most of one product a visitor may put in a basket, and the most lines the
+ * basket may carry.
+ *
+ * Not inventory control — the platform holds no stock counts and says so (see
+ * `PRODUCT_STOCK`). These are the ceilings that keep a composed WhatsApp message
+ * inside what the app will actually open: a `wa.me` URL past roughly 4,000
+ * characters is silently truncated by WhatsApp itself, and a basket of eighty
+ * lines with notes on them gets there.
+ */
+const ORDER_QTY_MAX = 99;
+const ORDER_LINES_MAX = 40;
+
+/* ------------------------------------------------------------------ *
+ * Orders, as records
+ * ------------------------------------------------------------------ */
+
+/**
+ * Where an order has got to.
+ *
+ * A queue a person works down, not a state machine a system drives — which is
+ * why every step is something somebody *did* rather than something that
+ * happened. `packed` earns its place between confirmed and dispatched because it
+ * is the step that takes the time and the one a customer rings up about.
+ *
+ *   pending     it arrived. Nobody has looked at it yet.
+ *   confirmed   accepted: the shop has the stock and the customer is real.
+ *               This is where stock is reserved, if it is being tracked.
+ *   packed      picked and boxed, waiting to go.
+ *   dispatched  it left. This is where reserved stock actually comes off.
+ *   delivered   it arrived at the other end. Terminal.
+ *   cancelled   it is not happening. Terminal, and it puts stock back.
+ */
+const ORDER_STATUS = {
+  PENDING: 'pending',
+  CONFIRMED: 'confirmed',
+  PACKED: 'packed',
+  DISPATCHED: 'dispatched',
+  DELIVERED: 'delivered',
+  CANCELLED: 'cancelled',
+};
+const ORDER_STATUS_VALUES = Object.values(ORDER_STATUS);
+
+/** Orders nothing can move out of. The only way on is a new order. */
+const TERMINAL_ORDER_STATUSES = [ORDER_STATUS.DELIVERED, ORDER_STATUS.CANCELLED];
+
+/** Orders still owed to somebody: what the console counts as open. */
+const OPEN_ORDER_STATUSES = [
+  ORDER_STATUS.PENDING,
+  ORDER_STATUS.CONFIRMED,
+  ORDER_STATUS.PACKED,
+  ORDER_STATUS.DISPATCHED,
+];
+
+/**
+ * The moves the API accepts, keyed by where the order is now.
+ *
+ * Forward or cancelled, never backward. An order that has been dispatched has
+ * left the building, and a console that let somebody put it back to `packed`
+ * would be a console where the stock ledger and the order list tell different
+ * stories about the same box. A mistake is fixed by cancelling and re-entering,
+ * which leaves both of them saying what actually happened.
+ */
+const ORDER_TRANSITIONS = {
+  [ORDER_STATUS.PENDING]: [ORDER_STATUS.CONFIRMED, ORDER_STATUS.CANCELLED],
+  [ORDER_STATUS.CONFIRMED]: [ORDER_STATUS.PACKED, ORDER_STATUS.CANCELLED],
+  [ORDER_STATUS.PACKED]: [ORDER_STATUS.DISPATCHED, ORDER_STATUS.CANCELLED],
+  [ORDER_STATUS.DISPATCHED]: [ORDER_STATUS.DELIVERED, ORDER_STATUS.CANCELLED],
+  [ORDER_STATUS.DELIVERED]: [],
+  [ORDER_STATUS.CANCELLED]: [],
+};
+
+/** What each step is called, and what it means, for both consoles. */
+const ORDER_STATUS_CATALOGUE = [
+  { key: ORDER_STATUS.PENDING, name: 'New', summary: 'Just arrived. Nobody has looked at it yet.', tone: 'info', sequence: 1 },
+  { key: ORDER_STATUS.CONFIRMED, name: 'Confirmed', summary: 'Accepted. Stock is reserved where it is tracked.', tone: 'brand', sequence: 2 },
+  { key: ORDER_STATUS.PACKED, name: 'Packed', summary: 'Picked and boxed, waiting to go.', tone: 'brand', sequence: 3 },
+  { key: ORDER_STATUS.DISPATCHED, name: 'Dispatched', summary: 'It has left. Stock comes off here.', tone: 'brand', sequence: 4 },
+  { key: ORDER_STATUS.DELIVERED, name: 'Delivered', summary: 'It arrived. Nothing more to do.', tone: 'success', sequence: 5 },
+  { key: ORDER_STATUS.CANCELLED, name: 'Cancelled', summary: 'Not happening. Any reserved stock goes back.', tone: 'danger', sequence: 6 },
+];
+
+/**
+ * Whether the money has arrived, tracked apart from where the order is.
+ *
+ * Two axes rather than one set of statuses, because they genuinely move
+ * independently: a shop taking cash on delivery dispatches an unpaid order every
+ * day of the week, and a shop taking UPI up front has money for an order nobody
+ * has packed. Folding them into one list would force every business into one of
+ * those two shapes.
+ */
+const ORDER_PAYMENT_STATUS = { UNPAID: 'unpaid', PAID: 'paid', REFUNDED: 'refunded' };
+const ORDER_PAYMENT_STATUS_VALUES = Object.values(ORDER_PAYMENT_STATUS);
+
+/**
+ * Refunding something nobody paid for is not a state. `paid` can go back to
+ * `unpaid` because marking it paid is a human action and humans mis-click; it
+ * cannot go back from `refunded`, which is money that has actually moved.
+ */
+const ORDER_PAYMENT_TRANSITIONS = {
+  [ORDER_PAYMENT_STATUS.UNPAID]: [ORDER_PAYMENT_STATUS.PAID],
+  [ORDER_PAYMENT_STATUS.PAID]: [ORDER_PAYMENT_STATUS.REFUNDED, ORDER_PAYMENT_STATUS.UNPAID],
+  [ORDER_PAYMENT_STATUS.REFUNDED]: [],
+};
+
+const ORDER_PAYMENT_STATUS_CATALOGUE = [
+  { key: ORDER_PAYMENT_STATUS.UNPAID, name: 'Unpaid', tone: 'warn', sequence: 1 },
+  { key: ORDER_PAYMENT_STATUS.PAID, name: 'Paid', tone: 'success', sequence: 2 },
+  { key: ORDER_PAYMENT_STATUS.REFUNDED, name: 'Refunded', tone: 'danger', sequence: 3 },
+];
+
+/**
+ * `ORD-00001`, and a number that never repeats within a tenant.
+ *
+ * Human-facing, because it is what a customer reads back down the phone and what
+ * goes in the WhatsApp message. Sequential per company rather than global: a
+ * shop’s third order should be 3, not 40,118, and one tenant must not be able to
+ * infer another’s volume from it.
+ */
+const ORDER_NO_PREFIX = 'ORD';
+const ORDER_NO_PAD = 5;
+
+/** The most lines one order may carry, matching what the cart will send. */
+const ORDER_ITEMS_MAX = 40;
+
+/* ------------------------------------------------------------------ *
+ * Warehouse and stock
+ * ------------------------------------------------------------------ */
+
+/**
+ * Which way stock moved.
+ *
+ * Three, not six. A purchase and a customer return are both stock arriving, and
+ * a sale and a breakage are both stock leaving — what tells them apart is
+ * `STOCK_REASON`, which is a separate question from the arithmetic. Keeping the
+ * direction and the reason apart is what lets a report answer "everything that
+ * came in this month" without enumerating every reason it might have.
+ *
+ * `adjust` is the odd one and has to exist: it is a count that disagreed with the
+ * ledger, and the honest way to record that is a movement saying so rather than
+ * an edit that hides it.
+ */
+const STOCK_MOVEMENT_TYPE = { IN: 'in', OUT: 'out', ADJUST: 'adjust' };
+const STOCK_MOVEMENT_TYPE_VALUES = Object.values(STOCK_MOVEMENT_TYPE);
+
+/** Why it moved. Free text would make every report useless, so it is a list. */
+const STOCK_REASON = {
+  OPENING: 'opening',
+  PURCHASE: 'purchase',
+  SALE: 'sale',
+  RETURN: 'return',
+  DAMAGE: 'damage',
+  CORRECTION: 'correction',
+  TRANSFER: 'transfer',
+};
+const STOCK_REASON_VALUES = Object.values(STOCK_REASON);
+
+/** What each reason is for, and which way it is allowed to move stock. */
+const STOCK_REASON_CATALOGUE = [
+  { key: STOCK_REASON.OPENING, name: 'Opening balance', direction: STOCK_MOVEMENT_TYPE.IN, summary: 'What was already on the shelf when you started counting.', sequence: 1 },
+  { key: STOCK_REASON.PURCHASE, name: 'Received', direction: STOCK_MOVEMENT_TYPE.IN, summary: 'A delivery from a supplier.', sequence: 2 },
+  { key: STOCK_REASON.RETURN, name: 'Customer return', direction: STOCK_MOVEMENT_TYPE.IN, summary: 'Something came back and is fit to sell again.', sequence: 3 },
+  { key: STOCK_REASON.SALE, name: 'Sold', direction: STOCK_MOVEMENT_TYPE.OUT, summary: 'Went out against an order. Written by the platform, never by hand.', sequence: 4 },
+  { key: STOCK_REASON.DAMAGE, name: 'Damaged or lost', direction: STOCK_MOVEMENT_TYPE.OUT, summary: 'Gone, and not sold.', sequence: 5 },
+  { key: STOCK_REASON.TRANSFER, name: 'Transfer', direction: null, summary: 'Moved between two of your own warehouses.', sequence: 6 },
+  { key: STOCK_REASON.CORRECTION, name: 'Stock count', direction: null, summary: 'A physical count that disagreed with the ledger.', sequence: 7 },
+];
+
+/**
+ * Reasons a person may write by hand.
+ *
+ * `sale` and `transfer` are absent on purpose: a sale is what dispatching an
+ * order does, and a transfer is what the transfer endpoint does. Both write their
+ * movements in pairs, inside a transaction, alongside something else that has to
+ * be true at the same time. Letting either be typed in on its own is how a ledger
+ * ends up holding a sale against no order, and a warehouse that shipped to
+ * nowhere.
+ */
+const STOCK_MANUAL_REASONS = [
+  STOCK_REASON.OPENING,
+  STOCK_REASON.PURCHASE,
+  STOCK_REASON.RETURN,
+  STOCK_REASON.DAMAGE,
+  STOCK_REASON.CORRECTION,
+];
+
+/**
+ * The most one movement may carry, and therefore the most a stock level can
+ * reach. A ceiling rather than a judgement: it is here so a finger slipping on
+ * the keyboard cannot set a quantity no physical count will ever reconcile.
+ */
+const STOCK_QUANTITY_MAX = 9999999;
+
+/** Below this a product is reported as low. Zero means do not warn me. */
+const STOCK_REORDER_DEFAULT = 0;
+
+/* ------------------------------------------------------------------ *
+ * Analytics
+ * ------------------------------------------------------------------ */
+
+/**
+ * The windows every analytics endpoint offers, in days.
+ *
+ * A closed list rather than a free number, because each one is a query the
+ * database has to answer quickly, and because "the last 3,650 days" is a report
+ * nobody reads and every tenant would eventually ask for.
+ */
+const ANALYTICS_RANGES = [7, 30, 90, 365];
+const ANALYTICS_RANGE_DEFAULT = 30;
+
+/** How many rows a top-sellers or worst-stocked list actually returns. */
+const ANALYTICS_TOP_LIMIT = 10;
+
+/* ------------------------------------------------------------------ *
+ * Customers
+ * ------------------------------------------------------------------ */
+
+/**
+ * How a customer proves who they are.
+ *
+ * **A one-time code to their mobile, and no password.** Not a shortcut: a
+ * password is a thing to forget, to reset over email, to store safely and to be
+ * blamed for when it leaks, and the entire value of an account here is
+ * remembering an address and an order history. A phone number is the one
+ * identifier this kind of shop already has for every customer, already prints on
+ * every order, and already rings when something goes wrong.
+ *
+ * Which makes the phone number the **identity**, unique per tenant. The same
+ * person buying from two shops on this platform is two customers, and that is
+ * correct: they are two shops, and one of them has no business knowing what the
+ * other sold.
+ */
+const CUSTOMER_OTP_LENGTH = 6;
+
+/**
+ * How long a code is good for, and how many times it may be got wrong.
+ *
+ * Ten minutes is long enough to switch to the messages app and back on a slow
+ * phone, and short enough that a code left on a lock screen is worthless by the
+ * time anybody else reads it. Five attempts is generous for somebody typing six
+ * digits and far too few to guess a million of them.
+ */
+const CUSTOMER_OTP_TTL_MINUTES = 10;
+const CUSTOMER_OTP_MAX_ATTEMPTS = 5;
+
+/**
+ * The code every customer gets while no SMS gateway is connected.
+ *
+ * **This is a development default and it is deliberately obvious.** There is no
+ * SMS provider wired into the platform yet, so a real random code would be one
+ * nobody could ever read — sign-in would be impossible rather than insecure,
+ * which is worse for a feature nobody can then test.
+ *
+ * It is read from `CUSTOMER_OTP_DEV_CODE` so a deployment can change it without
+ * a release, and `sendOtp` in the customer service is the **one** place that
+ * decides whether to use it. When a gateway is added, that function starts
+ * generating and sending a real code and this constant stops being reachable in
+ * production — nothing else has to change.
+ *
+ * Taken from `config/env` rather than from `process.env` directly, because that
+ * is the module that loads the `.env` file. Reading the environment here would
+ * work or not depending on which module loaded first: through the server it
+ * happened to work, and through a script that required the constants on their
+ * own it silently ignored the setting and used the default.
+ */
+const CUSTOMER_OTP_DEV_CODE = config.customerOtpDevCode;
+
+/** How many addresses one customer may keep. A list, not a database. */
+const CUSTOMER_ADDRESSES_MAX = 10;
+
+/** What an address is *for*, so a picker can show it in one word. */
+const ADDRESS_LABELS = ['Home', 'Work', 'Other'];
 
 /** Permission actions stored per (role, menu) pair. */
 const PERMISSION_ACTIONS = ['canView', 'canCreate', 'canEdit', 'canDelete', 'canExport'];
@@ -1181,8 +2118,81 @@ module.exports = {
   SERVICE_ENQUIRY_TARGET,
   SERVICE_ENQUIRY_TARGET_VALUES,
   SERVICE_CTA_MAX,
+  SERVICE_HOME_LIMITS,
+  SERVICE_DURATION_MAX,
+  SERVICE_SLOT_CAPACITY_MAX,
+  BOOKING_STATUS,
+  BOOKING_STATUS_VALUES,
+  BOOKING_TRANSITIONS,
+  BOOKING_HOLDS_SLOT,
+  BOOKING_STATUS_CATALOGUE,
+  BOOKING_DEFAULTS,
+  BOOKING_SLOT_MINUTES,
+  BOOKING_LEAD_HOURS_MAX,
+  BOOKING_HORIZON_MAX,
+  BOOKING_SLOTS_PER_DAY_MAX,
   SERVICE_HIGHLIGHTS_MAX,
   SERVICE_HIGHLIGHT_LENGTH,
+  PRODUCT_DEFAULTS,
+  CATEGORY_DEPTH_MAX,
+  PRODUCT_IMAGES_MAX,
+  PRODUCT_HIGHLIGHTS_MAX,
+  PRODUCT_HIGHLIGHT_LENGTH,
+  PRODUCT_SPECS_MAX,
+  PRODUCT_SPEC_LABEL_LENGTH,
+  PRODUCT_SPEC_VALUE_LENGTH,
+  PRODUCT_STOCK,
+  PRODUCT_STOCK_VALUES,
+  PRODUCT_PRICE_MAX,
+  CATALOGUE_HOME_LIMITS,
+  ORDER_MODE,
+  ORDER_MODE_VALUES,
+  ORDER_MODE_CATALOGUE,
+  ORDER_DEFAULTS,
+  ORDER_LABEL_MAX,
+  ORDER_NOTE_MAX,
+  ORDER_QTY_MAX,
+  ORDER_LINES_MAX,
+  ORDER_STATUS,
+  ORDER_STATUS_VALUES,
+  ORDER_STATUS_CATALOGUE,
+  ORDER_TRANSITIONS,
+  TERMINAL_ORDER_STATUSES,
+  OPEN_ORDER_STATUSES,
+  ORDER_PAYMENT_STATUS,
+  ORDER_PAYMENT_STATUS_VALUES,
+  ORDER_PAYMENT_STATUS_CATALOGUE,
+  ORDER_PAYMENT_TRANSITIONS,
+  ORDER_NO_PREFIX,
+  ORDER_NO_PAD,
+  ORDER_ITEMS_MAX,
+  STOCK_MOVEMENT_TYPE,
+  STOCK_MOVEMENT_TYPE_VALUES,
+  STOCK_REASON,
+  STOCK_REASON_VALUES,
+  STOCK_REASON_CATALOGUE,
+  STOCK_MANUAL_REASONS,
+  STOCK_QUANTITY_MAX,
+  STOCK_REORDER_DEFAULT,
+  ANALYTICS_RANGES,
+  ANALYTICS_RANGE_DEFAULT,
+  ANALYTICS_TOP_LIMIT,
+  CUSTOMER_OTP_LENGTH,
+  CUSTOMER_OTP_TTL_MINUTES,
+  CUSTOMER_OTP_MAX_ATTEMPTS,
+  CUSTOMER_OTP_DEV_CODE,
+  CUSTOMER_ADDRESSES_MAX,
+  ADDRESS_LABELS,
+  SLUG_MAX,
+  BLOG_DEFAULTS,
+  BLOG_HOME_LIMIT,
+  BLOG_PAGE_SIZE,
+  BLOG_PAGE_SIZE_MAX,
+  BLOG_TAGS_MAX,
+  BLOG_TAG_LENGTH,
+  BLOG_BODY_MAX,
+  BLOG_EXCERPT_MAX,
+  BLOG_READ_WPM,
   CONTACT_FORM_TARGET,
   CONTACT_FORM_TARGET_VALUES,
   CONTACT_DEFAULTS,

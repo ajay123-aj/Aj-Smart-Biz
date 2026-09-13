@@ -1,0 +1,282 @@
+/* ------------------------------------------------------------------ *
+ * Picking a time.
+ *
+ * The one interactive surface on a service's page, so it is framed as a panel
+ * rather than folded into the prose: a visitor scanning the page should be able
+ * to find the thing that takes a booking without reading the description first.
+ *
+ * Two rows of choices — the day, then the time — because that is the order a
+ * person decides in. Both are real buttons with pressed state rather than a
+ * select, so the whole diary is visible at a glance and a closed Sunday is not
+ * something you discover by clicking.
+ * ------------------------------------------------------------------ */
+
+.panel {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.heading {
+  margin: 0 0 6px;
+  font-size: 1.2rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.note {
+  margin: 0 0 16px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* ---------------------------------- days ---------------------------------- */
+
+/*
+ * The days that have something left. A scrolling row on a phone rather than a
+ * wrap to four lines, which would push the times off the screen.
+ */
+.days {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 18px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.days::-webkit-scrollbar {
+  display: none;
+}
+
+.day {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease;
+}
+
+.day:hover {
+  border-color: var(--brand);
+}
+
+.dayOn {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--brand-contrast);
+}
+
+.dayLabel {
+  font-size: 0.85rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.dayFree {
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+
+/* ---------------------------------- slots --------------------------------- */
+
+/*
+ * Every slot, with the taken ones disabled rather than removed. A row of gaps
+ * tells a visitor the shop is busy and that they should try another day; three
+ * lonely times tell them nothing about whether they are early or late.
+ */
+.slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  margin-bottom: 16px;
+}
+
+.slots[aria-busy='true'] {
+  opacity: 0.55;
+}
+
+/*
+ * A slot is two lines now: the time, and how full it is.
+ *
+ * A rounded rectangle rather than the pill it was - a pill deep enough for two
+ * lines of type is a lozenge, and a row of them reads as a set of tablets rather
+ * than a grid of times.
+ */
+.slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 5.4rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease;
+}
+
+.slotTime {
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+/*
+ * How full it is, under the time.
+ *
+ * Quiet by design: it is the answer to a question a visitor only asks once they
+ * have found a time they want, and at full weight a grid of these reads as
+ * twelve warnings.
+ */
+.slotNote {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-faint);
+}
+
+.slot:hover:not(:disabled) {
+  border-color: var(--brand);
+}
+
+/*
+ * Taken, or too late.
+ *
+ * Only the **time** is struck through, not the line under it: striking out
+ * "2 of 3 booked" makes the one piece of information on a disabled button
+ * unreadable, which is the opposite of what it is for. The button stays legible
+ * rather than being faded almost away - a pale button reads as one that has not
+ * loaded yet.
+ */
+.slot:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  background: var(--surface-sunken);
+}
+
+.slot:disabled .slotTime {
+  text-decoration: line-through;
+}
+
+/* Full is a different fact from late, and worth the colour: it is the one a
+   visitor can act on by taking another time. */
+.slot:disabled .slotNote {
+  color: var(--text-muted);
+}
+
+.slotOn {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--brand-contrast);
+}
+
+/* On the chosen slot the count has to lift out of the fill, or it disappears
+   into it. */
+.slotOn .slotNote {
+  color: color-mix(in srgb, var(--brand-contrast) 78%, transparent);
+}
+
+.empty {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* ---------------------------------- form ---------------------------------- */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 520px) {
+  .fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.field input {
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font: inherit;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.field input:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+.as {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* What is about to be requested, under the button rather than over it — it is a
+   confirmation of the choice, not an instruction. */
+.chosen {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.error {
+  margin: 0 0 12px;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--danger, #b91c1c) 30%, transparent);
+  background: color-mix(in srgb, var(--danger, #b91c1c) 8%, transparent);
+  font-size: 0.86rem;
+  color: var(--danger, #b91c1c);
+}
+
+.signIn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* ------------------------------- confirmed -------------------------------- */
+
+.confirmed {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}

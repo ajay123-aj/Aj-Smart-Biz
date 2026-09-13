@@ -5,6 +5,8 @@ const config = require('../config/env');
 const logger = require('../utils/logger');
 const { menus: defaultMenus } = require('./defaultMenus');
 const defaultSliders = require('./defaultSliders');
+const { Op } = require('sequelize');
+const { uniqueSlug } = require('../utils/slug');
 const { SUPER_ADMIN_ROLE, STATUS, PERMISSION_ACTIONS, FUNCTIONALITY } = require('../constants');
 
 /**
@@ -322,6 +324,211 @@ async function ensureSlideLinks() {
 }
 
 /**
+ * Carries every existing tenant across the day the enquiry button and the diary
+ * became functionalities of their own.
+ *
+ * Without this the split is a silent regression on live websites. Both were
+ * settings inside `services` this morning; from tonight they are grants, and no
+ * plan sold before today lists either - so every company with an enquiry button
+ * on its service cards would have none, for a change of ours rather than one of
+ * theirs. Nobody was asked, and the answer would have been no.
+ *
+ * Three passes, in the order the grant is actually read - the same shape
+ * `ensureFiguresGrant` uses, and for the same reason:
+ *
+ *   1. **Plans.** Anything that sells Services now sells Service enquiries too.
+ *      That is what the key was when it was a setting inside Services, so it is
+ *      what a customer paid for. Appointments are **not** added: the diary was
+ *      off by default and a tenant who never switched it on was never sold it.
+ *   2. **Live subscriptions.** The grant is read off `planSnapshot` where a term
+ *      has one, precisely so re-pricing a plan cannot change what a running
+ *      subscription was sold. That protection would freeze this fix out, so the
+ *      snapshots are amended with it.
+ *   3. **The switch rows.** A company with Services switched on had an enquiry
+ *      button this morning unless it had turned the button off, so it gets a
+ *      `service_enquiry` row in the state it was actually in. A company that had
+ *      switched the **diary** on gets `service_booking` switched on to match -
+ *      restoring what was already there, which is the only thing this may do.
+ *
+ * Idempotent throughout: every pass skips what already carries the key.
+ */
+async function ensureServiceGrants() {
+  /**
+   * Which tenants were actually *using* the diary this morning.
+   *
+   * Read first, because it decides what the plans have to sell. A company with
+   * `booking.enabled` was taking appointments on its website under the plan it
+   * is on - so that plan effectively included them, whatever it says, and adding
+   * the key is describing what was already true rather than giving anything
+   * away.
+   */
+  const services = await db.CompanyFunctionality.findAll({ where: { key: FUNCTIONALITY.SERVICES } });
+
+  const hadBooking = new Set(
+    services.filter((row) => row.settings?.booking?.enabled === true).map((row) => row.companyId)
+  );
+
+  /* The running term for each of those, so the right plan is amended. */
+  const terms = hadBooking.size
+    ? await db.CompanySubscription.findAll({
+      where: {
+        companyId: { [Op.in]: [...hadBooking] },
+        status: { [Op.in]: [STATUS.ACTIVE, 'pending', 'suspended'] },
+      },
+      attributes: ['id', 'companyId', 'planId', 'planSnapshot'],
+    })
+    : [];
+
+  const bookingPlans = new Set(terms.map((term) => term.planId).filter(Boolean));
+
+  const withKeys = (list, keys) => {
+    if (!Array.isArray(list)) return null;
+    if (!list.includes(FUNCTIONALITY.SERVICES)) return null;
+
+    const missing = keys.filter((key) => !list.includes(key));
+    return missing.length ? [...list, ...missing] : null;
+  };
+
+  /* ---- 1. the plans ---- */
+  const plans = await db.Plan.findAll({ attributes: ['id', 'functionalities'] });
+  let planned = 0;
+
+  for (const plan of plans) {
+    /**
+     * Everything that sells Services now sells the enquiry: that is what the
+     * button was when it lived inside Services, so it is what a customer paid
+     * for. Appointments are added **only** to a plan somebody was actually
+     * running a diary on - a feature nobody switched on was never sold, and
+     * handing it to every plan on the platform is not a backfill's business.
+     */
+    const keys = [FUNCTIONALITY.SERVICE_ENQUIRY];
+    if (bookingPlans.has(plan.id)) keys.push(FUNCTIONALITY.SERVICE_BOOKING);
+
+    const next = withKeys(plan.functionalities, keys);
+    if (!next) continue;
+
+    // eslint-disable-next-line no-await-in-loop
+    await plan.update({ functionalities: next });
+    planned += 1;
+  }
+
+  /* ---- 2. the running terms ---- */
+  const subscriptions = await db.CompanySubscription.findAll({
+    where: { status: { [Op.in]: [STATUS.ACTIVE, 'pending', 'suspended'] } },
+    attributes: ['id', 'companyId', 'planSnapshot'],
+  });
+  let snapshots = 0;
+
+  for (const subscription of subscriptions) {
+    /* The snapshot is what a live term is actually read from - amending the plan
+       alone would leave every running subscription without the key. */
+    const keys = [FUNCTIONALITY.SERVICE_ENQUIRY];
+    if (hadBooking.has(subscription.companyId)) keys.push(FUNCTIONALITY.SERVICE_BOOKING);
+
+    const snapshot = subscription.planSnapshot;
+    const next = withKeys(snapshot?.functionalities, keys);
+    if (!next) continue;
+
+    // eslint-disable-next-line no-await-in-loop
+    await subscription.update({ planSnapshot: { ...snapshot, functionalities: next } });
+    snapshots += 1;
+  }
+
+  /* ---- 3. the switch rows ---- */
+  let switched = 0;
+
+  for (const row of services) {
+    const settings = row.settings ?? {};
+
+    /* What the tenant actually had this morning: the button unless they had
+       turned it off, and the diary only if they had turned it on. */
+    const wanted = [
+      { key: FUNCTIONALITY.SERVICE_ENQUIRY, on: settings.showEnquiry !== false },
+      { key: FUNCTIONALITY.SERVICE_BOOKING, on: settings.booking?.enabled === true },
+    ];
+
+    for (const entry of wanted) {
+      // eslint-disable-next-line no-await-in-loop
+      const [, created] = await db.CompanyFunctionality.findOrCreate({
+        where: { companyId: row.companyId, key: entry.key },
+        defaults: {
+          companyId: row.companyId,
+          key: entry.key,
+          status: entry.on && row.status === STATUS.ACTIVE ? STATUS.ACTIVE : STATUS.INACTIVE,
+        },
+      });
+      if (created) switched += 1;
+    }
+  }
+
+  if (planned || snapshots || switched) {
+    logger.info(
+      `Service enquiries/appointments carried over: ${planned} plan(s), ${snapshots} subscription(s), ${switched} switch row(s)`
+    );
+  }
+}
+
+/**
+ * Gives an address to every row that gained one after it already existed.
+ *
+ * ### Why this is needed at all
+ *
+ * `company_services.slug` was added to a table with rows in it. `sync({alter})`
+ * adds the column as `NOT NULL`, and the database fills what is already there
+ * with the empty string - so on the morning after the upgrade, every service a
+ * tenant had written was published at `/services/` instead of at
+ * `/services/fuse-box-replacement`.
+ *
+ * What that looks like from the outside is the worst kind of bug: the console
+ * shows the service, the website shows the card, and **clicking it goes back to
+ * the list**. Nothing errors, nothing is logged, and the tenant reasonably
+ * concludes the whole feature is broken. A slug is only generated on create, so
+ * without this the rows would stay that way until somebody opened and re-saved
+ * all of them by hand.
+ *
+ * ### What it does
+ *
+ * One pass per table that gained a slug late, filling only the rows that have
+ * none. The address is built from the row's own name and made unique within its
+ * tenant by the same function the create path uses, so a backfilled service is
+ * addressed exactly as a new one would have been.
+ *
+ * Soft-deleted rows are included deliberately (`paranoid: false`): a tenant who
+ * restores a service should get a working page rather than the one row in the
+ * table that is still broken.
+ *
+ * Idempotent, and cheap on every boot after the first - it is one `WHERE slug IS
+ * NULL OR slug = ''` per table, which finds nothing once this has run.
+ */
+async function ensureSlugs() {
+  const tables = [
+    { model: db.CompanyService, from: 'title', label: 'service' },
+    /* Categories cannot have legacy rows today - the table is new - but the
+       same ALTER hazard applies the moment anything is added beside them, and
+       one more empty query on boot is a fair price for not meeting this twice. */
+    { model: db.CompanyServiceCategory, from: 'name', label: 'service category' },
+  ];
+
+  for (const table of tables) {
+    // eslint-disable-next-line no-await-in-loop
+    const rows = await table.model.findAll({
+      where: { [Op.or]: [{ slug: null }, { slug: '' }] },
+      paranoid: false,
+    });
+    if (!rows.length) continue;
+
+    for (const row of rows) {
+      // eslint-disable-next-line no-await-in-loop
+      const slug = await uniqueSlug(table.model, row.companyId, row[table.from], row.id);
+      // eslint-disable-next-line no-await-in-loop
+      await row.update({ slug }, { hooks: false });
+    }
+
+    logger.info(`Gave ${rows.length} ${table.label}(s) a web address they were missing`);
+  }
+}
+
+/**
  * Carries every existing tenant across the day Figures stopped being part of
  * About us and became a functionality of its own.
  *
@@ -427,11 +634,17 @@ async function runBootstrap() {
   await ensureDefaultSliders();
   await ensureAboutRows();
   await ensureFiguresGrant();
+  /* After the schema sync that created the column, and before anything serves a
+     page from it. */
+  await ensureSlugs();
+  await ensureServiceGrants();
   await ensureSlideLinks();
 }
 
 module.exports = {
   runBootstrap,
+  ensureSlugs,
+  ensureServiceGrants,
   ensureSuperAdmin,
   ensureSystemMenus,
   ensureSystemRolePermissions,

@@ -6,6 +6,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { success } = require('../utils/response');
 const { getPagination, buildSearch, getSort, mergeWhere } = require('../utils/query');
 const cardResource = require('./cardResource.factory');
+const { assertOfferIsAnOffer } = require('./catalogue.controller');
 const functionalityService = require('../services/functionality.service');
 const {
   AUTH_SCOPE,
@@ -89,6 +90,44 @@ const services = cardResource({
   label: 'Service',
   searchFields: ['title', 'summary'],
   imageFields: ['image'],
+  /**
+   * A service has a page of its own now, so it needs an address. Built from the
+   * title and never rewritten when the title changes - see the factory.
+   */
+  slugFrom: 'title',
+  /** A service may only be filed under one of its own company's categories. */
+  owned: [{ field: 'categoryId', model: () => db.CompanyServiceCategory, label: 'category' }],
+  include: [
+    { model: db.CompanyServiceCategory, as: 'category', attributes: ['id', 'name', 'slug'], required: false },
+  ],
+  /**
+   * An offer has to be below the price, checked against the **stored** row.
+   *
+   * The schema catches a body carrying both numbers; a body carrying only one -
+   * "put this on offer at 1,999", against a price already saved - has nothing to
+   * compare until the row is loaded. The same function the catalogue uses, so a
+   * service and a product cannot disagree about what an offer is.
+   */
+  check: (patch, row) => assertOfferIsAnOffer(row ?? {}, patch),
+});
+
+/**
+ * How a business sorts the work it sells.
+ *
+ * A card list rather than the catalogue's tree controller, with one addition the
+ * factory now provides: a slug, because a category is a filter with an address -
+ * `/services?category=bridal`. The *nesting* is a `parentId` on the row, checked
+ * by `serviceCategory.controller`, which is what this router's write routes go
+ * through for the checks a schema cannot make: a parent from another company, a
+ * parent that is the row's own descendant, and a tree pushed past its depth.
+ */
+const serviceCategories = cardResource({
+  model: db.CompanyServiceCategory,
+  functionality: FUNCTIONALITY.SERVICES,
+  label: 'Service category',
+  searchFields: ['name', 'description'],
+  imageFields: ['image'],
+  slugFrom: 'name',
 });
 
 /**
@@ -497,6 +536,7 @@ module.exports = {
   testimonials,
   features,
   services,
+  serviceCategories,
   getAbout,
   saveAbout,
   clearAbout,

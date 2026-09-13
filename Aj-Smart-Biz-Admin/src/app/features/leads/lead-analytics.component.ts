@@ -5,6 +5,7 @@ import { CompanyService } from '../../core/services/company.service';
 import { Branch, LeadAnalytics, LEAD_STAGES } from '../../core/models/domain.model';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { LeadBreakdownComponent } from './lead-breakdown.component';
+import { stageLabel } from '../../shared/utils';
 
 /**
  * Where this company's website visitors come from.
@@ -52,6 +53,9 @@ export class LeadAnalyticsComponent {
   readonly loading = signal(true);
   readonly data = signal<LeadAnalytics | null>(null);
   readonly branches = signal<Branch[]>([]);
+  /** The same words the badges use. */
+  stageLabel = stageLabel;
+
   readonly stages = LEAD_STAGES;
 
   private readonly filters = signal<Record<string, string | boolean>>({});

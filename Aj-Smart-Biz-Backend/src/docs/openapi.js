@@ -30,6 +30,8 @@ const authValidator = require('../validators/auth.validator');
 const companyValidator = require('../validators/company.validator');
 const functionalityValidator = require('../validators/functionality.validator');
 const sliderValidator = require('../validators/slider.validator');
+const orderValidator = require('../validators/order.validator');
+const warehouseValidator = require('../validators/warehouse.validator');
 const subscriptionValidator = require('../validators/subscription.validator');
 const planRequestValidator = require('../validators/planRequest.validator');
 const masterValidator = require('../validators/master.validator');
@@ -70,6 +72,8 @@ const SCHEMA_SOURCES = {
   GallerySectionCopy: functionalityValidator.settingsSchema?.('gallery') ?? null,
   TestimonialsSettings: functionalityValidator.settingsSchema?.('testimonials') ?? null,
   ShareLinkSettings: functionalityValidator.settingsSchema?.('share_link') ?? null,
+  ProductsSettings: functionalityValidator.settingsSchema?.('products') ?? null,
+  OrdersSettings: functionalityValidator.settingsSchema?.('orders') ?? null,
   WhatsappNumberCreate: pick(functionalityValidator.whatsappCreate),
   WhatsappNumberUpdate: pick(functionalityValidator.whatsappUpdate),
   AboutCopySave: pick(functionalityValidator.aboutSave),
@@ -81,6 +85,21 @@ const SCHEMA_SOURCES = {
   TestimonialUpdate: pick(functionalityValidator.testimonialUpdate),
   TestimonialModerate: pick(functionalityValidator.testimonialModerate),
   CardReorder: pick(functionalityValidator.reorder),
+  /**
+   * Orders and stock. The public `OrderSubmit` is listed beside the console's
+   * schemas deliberately: the difference between them is the whole security
+   * story of this module — one carries ids and quantities, the other carries the
+   * money, and no schema lets a stranger name a price.
+   */
+  OrderSubmit: pick(orderValidator.submit),
+  OrderStatusUpdate: pick(orderValidator.statusUpdate),
+  OrderPaymentUpdate: pick(orderValidator.paymentUpdate),
+  OrderUpdate: pick(orderValidator.orderUpdate),
+  WarehouseCreate: pick(warehouseValidator.warehouseCreate),
+  WarehouseUpdate: pick(warehouseValidator.warehouseUpdate),
+  StockMovementCreate: pick(warehouseValidator.movementCreate),
+  StockTransferCreate: pick(warehouseValidator.transferCreate),
+  StockSettingsSave: pick(warehouseValidator.stockSettings),
   SliderCreate: pick(sliderValidator.create),
   SliderUpdate: pick(sliderValidator.update),
   PlanRequestCreate: pick(planRequestValidator.create),

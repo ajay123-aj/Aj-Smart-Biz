@@ -15,15 +15,24 @@ import {
   Functionality,
   FunctionalityCatalogue,
   ServiceCard,
+  ServiceCategory,
   ServicesSettings,
 } from '../../core/models/domain.model';
-import { touchAll } from '../../shared/utils';
+import { numberOrNull, touchAll } from '../../shared/utils';
 import { FieldErrorComponent } from '../../shared/ui/field-error.component';
 import { FeatureGateComponent } from '../../shared/ui/feature-gate.component';
 import { IconPickerComponent } from '../../shared/ui/icon-picker.component';
 import { ImageUploadComponent } from '../../shared/ui/image-upload.component';
 import { ModalComponent } from '../../shared/ui/modal.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
+
+/** Every category as one indented option, parents before children. */
+function flattenCategories(nodes: ServiceCategory[], depth = 0): { id: number; label: string }[] {
+  return nodes.flatMap((node) => [
+    { id: node.id, label: `${'\u2014 '.repeat(depth)}${node.name}` },
+    ...flattenCategories(node.children ?? [], depth + 1),
+  ]);
+}
 
 /** The key this whole screen is about. Written once rather than in eight places. */
 const KEY = 'services' as const;
@@ -134,6 +143,17 @@ const HIGHLIGHTS_MAX = 6;
       .empty-note { padding: 26px 0; text-align: center; color: var(--text-3); font-size: 13px; }
 
       /* The inclusions editor: a row per line, with its own remove button. */
+      /* The days a shop works, as seven toggles rather than a multi-select: a
+         week is short enough to show whole, and a list nobody has to open is
+         faster to read and to change. */
+      .days { display: flex; gap: 6px; flex-wrap: wrap; }
+      .day {
+        padding: 6px 12px; border-radius: 999px; cursor: pointer;
+        border: 1px solid var(--border); background: var(--surface);
+        font-size: 12.5px; font-weight: 600; color: var(--text-2);
+      }
+      .day-on { border-color: var(--brand-600); background: var(--brand-600); color: #fff; }
+
       .points-rows { display: grid; gap: 8px; }
       .points-row { display: flex; gap: 8px; align-items: center; }
       .points-row .input { flex: 1; }
@@ -161,11 +181,32 @@ export class ServicesManagerComponent {
   readonly canEdit = computed(() => this.auth.isCompanyAdmin());
 
   readonly feature = signal<Functionality | null>(null);
+
+  /**
+   * The two things sold on top of Services: the enquiry button and the diary.
+   *
+   * Each is a functionality of its own now, so this screen shows their settings
+   * only where the plan actually carries them - a tenant who bought a price list
+   * is not shown working hours they can never publish, and the switch that turns
+   * either on lives where every other switch does, on Functionality.
+   */
+  readonly enquiryFeature = signal<Functionality | null>(null);
+  readonly bookingFeature = signal<Functionality | null>(null);
+
+  /** Granted: the plan pays for it, so its settings are worth filling in. */
+  readonly canEnquire = computed(() => this.enquiryFeature()?.granted ?? false);
+  readonly canBook = computed(() => this.bookingFeature()?.granted ?? false);
+
+  /** Live: granted, switched on, and still being served - what the site shows. */
+  readonly enquiryLive = computed(() => this.enquiryFeature()?.active ?? false);
+  readonly bookingLive = computed(() => this.bookingFeature()?.active ?? false);
   readonly items = signal<ServiceCard[]>([]);
   readonly icons = signal<FeatureIconMeta[]>([]);
   /** The branch filter currently applied; drives what a new card is pinned to. */
   readonly branchFilter = signal<string>('');
   readonly branches = signal<Branch[]>([]);
+  /** The tree, flattened for the picker. Empty for a tenant that never sorted. */
+  readonly categories = signal<{ id: number; label: string }[]>([]);
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly savingCopy = signal(false);
@@ -186,7 +227,76 @@ export class ServicesManagerComponent {
     enquiryTarget: ['both'],
     formTitle: [''],
     formNote: [''],
+
+    /* The offers band's own wording. The categories band's is on the Service
+       categories screen, which saves into the same blob merged. */
+    offersEyebrow: [''],
+    offersTitle: [''],
+    offersLead: [''],
+    bookLabel: [''],
+
+    /**
+     * The diary.
+     *
+     * Flat controls rather than a nested group, because a form control per
+     * setting is what the template binds to - the shape is put back together on
+     * save. `days` is the exception and is held as a signal: a row of seven
+     * toggles is not a control, it is seven of them.
+     */
+    bookingOpenTime: ['09:30'],
+    bookingCloseTime: ['18:30'],
+    bookingSlotMinutes: [30],
+    bookingSlotCapacity: [1],
+    bookingLeadHours: [2],
+    bookingHorizonDays: [30],
+    bookingNote: [''],
   });
+
+  /**
+   * Which weekdays the shop works, 0-6 with Sunday at 0 - the same numbering
+   * `Date.getDay()` uses, so nothing has to translate a weekday between here,
+   * the API and a browser.
+   */
+  readonly bookingDays = signal<number[]>([1, 2, 3, 4, 5, 6]);
+
+  readonly weekdays = [
+    { day: 1, label: 'Mon' },
+    { day: 2, label: 'Tue' },
+    { day: 3, label: 'Wed' },
+    { day: 4, label: 'Thu' },
+    { day: 5, label: 'Fri' },
+    { day: 6, label: 'Sat' },
+    { day: 0, label: 'Sun' },
+  ];
+
+  /**
+   * What a visitor can actually do on a service card, as one sentence.
+   *
+   * The two switches are independent and each is sensible on its own, but the
+   * combination is what a tenant is really choosing - and "both off" is a
+   * decision worth stating out loud rather than leaving somebody to discover on
+   * their own website.
+   */
+  readonly actionSummary = computed(() => {
+    const enquiry = this.enquiryLive();
+    const booking = this.bookingLive();
+
+    if (enquiry && booking) return 'Cards show Book a time where you allow it, and an enquiry button everywhere else.';
+    if (booking) return 'Cards show Book a time on the services you allow it on. Nothing else has a button.';
+    if (enquiry) return 'Every card shows an enquiry button.';
+    return 'No buttons at all — your services read as a price list, and people ring the number in your header.';
+  });
+
+  /** What one slot holds today, for the hint under the per-service box. */
+  readonly companyCapacity = computed(() => Number(this.copyForm.controls.bookingSlotCapacity.value) || 1);
+
+  /** The grids the API accepts. A day has to divide into them sensibly. */
+  readonly slotChoices = [10, 15, 20, 30, 45, 60, 90, 120];
+
+  toggleDay(day: number): void {
+    const days = this.bookingDays();
+    this.bookingDays.set(days.includes(day) ? days.filter((entry) => entry !== day) : [...days, day].sort());
+  }
 
   readonly form = this.fb.nonNullable.group({
     branchId: [''],
@@ -195,7 +305,21 @@ export class ServicesManagerComponent {
     title: ['', [Validators.required]],
     summary: [''],
     highlights: this.fb.array<FormControl<string>>([]),
+    /** Free text. Overrides the numbers below it wherever it is filled in. */
     priceLabel: [''],
+    /* The numbers, for a business that has them. A salon charges 300 for a
+       haircut; a surveyor cannot say until they have seen the job. */
+    price: [''],
+    offerPrice: [''],
+    onOffer: [false],
+    showPrice: [true],
+    categoryId: [''],
+    slug: [''],
+    description: [''],
+    durationMinutes: [''],
+    bookable: [false],
+    /** Empty inherits the company's limit - see `BookingSettings.slotCapacity`. */
+    slotCapacity: [''],
     /** Blank means "use the section's label" — see `ServiceCard.ctaLabel`. */
     ctaLabel: [''],
     featured: [false],
@@ -215,13 +339,17 @@ export class ServicesManagerComponent {
     this.loading.set(true);
     this.companies.functionalities().subscribe({
       next: (view) => {
-        const item = (view.items ?? []).find((row) => row.key === KEY) ?? null;
+        const items = view.items ?? [];
+        const item = items.find((row) => row.key === KEY) ?? null;
         this.feature.set(item);
+        this.enquiryFeature.set(items.find((row) => row.key === 'service_enquiry') ?? null);
+        this.bookingFeature.set(items.find((row) => row.key === 'service_booking') ?? null);
         this.patchCopyForm();
         this.loading.set(false);
         if (item?.granted) {
           this.loadItems();
           this.loadBranches();
+          this.loadCategories();
         }
       },
       error: (error: HttpErrorResponse) => {
@@ -247,6 +375,21 @@ export class ServicesManagerComponent {
     this.cards.list(this.branchFilter() || undefined).subscribe({
       next: (rows) => this.items.set(rows),
       error: () => this.items.set([]),
+    });
+  }
+
+  /**
+   * The category picker's options, flattened with an indent.
+   *
+   * Fetched rather than derived: the tree is edited on its own screen, and a
+   * tenant that has never opened that screen simply gets an empty picker and
+   * files nothing - which is the ordinary case for a business with five
+   * services.
+   */
+  private loadCategories(): void {
+    this.companies.serviceCategoryTree().subscribe({
+      next: (tree) => this.categories.set(flattenCategories(tree)),
+      error: () => this.categories.set([]),
     });
   }
 
@@ -276,7 +419,24 @@ export class ServicesManagerComponent {
       enquiryTarget: settings.enquiryTarget ?? 'both',
       formTitle: settings.formTitle ?? '',
       formNote: settings.formNote ?? '',
+
+      offersEyebrow: settings.offersEyebrow ?? '',
+      offersTitle: settings.offersTitle ?? '',
+      offersLead: settings.offersLead ?? '',
+      bookLabel: settings.bookLabel ?? '',
+
+      /* The diary, resolved by the API - so an unset blob arrives as the
+         platform's own working day rather than as blanks. */
+      bookingOpenTime: settings.booking?.openTime ?? '09:30',
+      bookingCloseTime: settings.booking?.closeTime ?? '18:30',
+      bookingSlotMinutes: settings.booking?.slotMinutes ?? 30,
+      bookingSlotCapacity: settings.booking?.slotCapacity ?? 1,
+      bookingLeadHours: settings.booking?.leadHours ?? 2,
+      bookingHorizonDays: settings.booking?.horizonDays ?? 30,
+      bookingNote: settings.booking?.note ?? '',
     });
+
+    this.bookingDays.set(settings.booking?.days ?? [1, 2, 3, 4, 5, 6]);
   }
 
   saveCopy(): void {
@@ -295,12 +455,67 @@ export class ServicesManagerComponent {
         enquiryTarget: raw.enquiryTarget,
         formTitle: raw.formTitle || null,
         formNote: raw.formNote || null,
+
+        offersEyebrow: raw.offersEyebrow || null,
+        offersTitle: raw.offersTitle || null,
+        offersLead: raw.offersLead || null,
+        bookLabel: raw.bookLabel || null,
+
+        /**
+         * The diary, put back together from the flat controls.
+         *
+         * Sent whole every time, including when it is switched off: the API
+         * replaces a settings blob wholesale, so half a diary would be a diary
+         * with the platform's defaults quietly filling the rest.
+         */
+        booking: {
+          days: this.bookingDays(),
+          openTime: raw.bookingOpenTime,
+          closeTime: raw.bookingCloseTime,
+          /* A cleared box falls back to the platform's own answer rather than to
+             zero - an empty "least notice" is somebody who has not decided, not
+             a shop that will take a booking for two minutes' time. */
+          slotMinutes: numberOrNull(raw.bookingSlotMinutes) ?? 30,
+          slotCapacity: numberOrNull(raw.bookingSlotCapacity) ?? 1,
+          leadHours: numberOrNull(raw.bookingLeadHours) ?? 2,
+          horizonDays: numberOrNull(raw.bookingHorizonDays) ?? 30,
+          note: raw.bookingNote || null,
+        },
+
+        /* The categories band's wording lives on the same blob and is edited on
+           its own screen; sent back as it stands so saving here cannot clear it. */
+        categoriesEyebrow: (this.feature()?.settings as Partial<ServicesSettings>)?.categoriesEyebrow ?? null,
+        categoriesTitle: (this.feature()?.settings as Partial<ServicesSettings>)?.categoriesTitle ?? null,
+        categoriesLead: (this.feature()?.settings as Partial<ServicesSettings>)?.categoriesLead ?? null,
       })
       .subscribe({
         next: (updated) => {
           this.savingCopy.set(false);
           this.feature.set(updated);
           this.patchCopyForm();
+
+          /**
+           * Did the API actually keep what we sent?
+           *
+           * It answers with the settings **resolved**, so this is a direct
+           * comparison rather than a guess — and it catches the one failure this
+           * screen otherwise hides completely: an API older than this console
+           * strips a setting it has never heard of, answers 200, and the switch
+           * springs back on the next load with nothing to say why.
+           *
+           * Somebody who unticks a box, saves, sees a success toast and then
+           * watches the button stay on their website has no way to work that out.
+           */
+          const ignored = this.ignoredBy(updated);
+
+          if (ignored.length) {
+            this.toast.error(
+              'Saved, but some settings were not kept',
+              `Your API did not accept: ${ignored.join(', ')}. It is running an older version than this console — restart it and save again.`
+            );
+            return;
+          }
+
           this.toast.success('Section wording saved');
         },
         error: (error: HttpErrorResponse) => {
@@ -308,6 +523,25 @@ export class ServicesManagerComponent {
           this.toast.error('Could not save the wording', messageOf(error));
         },
       });
+  }
+
+  /**
+   * The fields the API quietly dropped, by name.
+   *
+   * Only the settings this console has learned about more recently than the API
+   * might have: everything older is either accepted everywhere or has been
+   * failing loudly since the day it shipped. Compared against the **resolved**
+   * settings the save returns, so an API that knows the field always matches.
+   */
+  private ignoredBy(updated: Functionality): string[] {
+    const saved = (updated?.settings ?? {}) as Partial<ServicesSettings>;
+    const dropped: string[] = [];
+
+    if (saved.booking?.slotCapacity === undefined) {
+      dropped.push('Bookings per slot');
+    }
+
+    return dropped;
   }
 
   resetCopy(): void {
@@ -379,6 +613,23 @@ export class ServicesManagerComponent {
       title: row?.title ?? '',
       summary: row?.summary ?? '',
       priceLabel: row?.priceLabel ?? '',
+      price: row?.price === null || row?.price === undefined ? '' : String(row.price),
+      offerPrice: row?.offerPrice === null || row?.offerPrice === undefined ? '' : String(row.offerPrice),
+      onOffer: row?.onOffer ?? false,
+      categoryId: String(row?.categoryId ?? ''),
+      /* Shown rather than hidden, and only sent when it is deliberately
+         changed - see `save`. */
+      slug: row?.slug ?? '',
+      description: row?.description ?? '',
+      durationMinutes:
+        row?.durationMinutes === null || row?.durationMinutes === undefined ? '' : String(row.durationMinutes),
+      bookable: row?.bookable ?? false,
+      slotCapacity:
+        row?.slotCapacity === null || row?.slotCapacity === undefined ? '' : String(row.slotCapacity),
+      /* `?? true` rather than `|| true`: a stored `false` is the shop saying do
+         not publish this, and treating it as "never set" would put the price back
+         on the website every time somebody opened the card. */
+      showPrice: row?.showPrice ?? true,
       ctaLabel: row?.ctaLabel ?? '',
       featured: row?.featured ?? false,
       status: row?.status ?? 'active',
@@ -407,6 +658,25 @@ export class ServicesManagerComponent {
       // of six boxes should not get a validation error for the two they left.
       highlights: raw.highlights.map((line) => line.trim()).filter(Boolean),
       priceLabel: raw.priceLabel || null,
+      /**
+       * A cleared box is a cleared price, and it goes as null.
+       *
+       * `numberOrNull` rather than a comparison against `''`: a `type="number"`
+       * control holds `null` once somebody clears it, so the old check missed it
+       * and `Number(null)` published a price of zero - "free" on the website,
+       * from somebody deleting a figure.
+       */
+      price: numberOrNull(raw.price),
+      offerPrice: numberOrNull(raw.offerPrice),
+      onOffer: raw.onOffer,
+      showPrice: raw.showPrice,
+      categoryId: raw.categoryId ? Number(raw.categoryId) : null,
+      description: raw.description || null,
+      durationMinutes: numberOrNull(raw.durationMinutes),
+      bookable: raw.bookable,
+      /* Empty is "use the company's limit", which is a real answer and not a
+         missing one - so it goes as null rather than as 1. */
+      slotCapacity: numberOrNull(raw.slotCapacity),
       /* Blank means "use the section's", so it goes as null rather than as an
          empty string that would render an empty button. */
       ctaLabel: raw.ctaLabel || null,
@@ -415,6 +685,17 @@ export class ServicesManagerComponent {
     };
 
     const row = this.editing();
+
+    /**
+     * The address is sent **only when it has actually been changed**.
+     *
+     * A service's page is linked to from other people's sites and indexed by
+     * search engines; sending the slug on every save is one refactor away from
+     * regenerating it from the title, and an address that moves silently breaks
+     * every link anybody has shared.
+     */
+    if (raw.slug.trim() && raw.slug.trim() !== row?.slug) payload['slug'] = raw.slug.trim();
+
     this.saving.set(true);
 
     const request = row ? this.cards.update(row.id, payload) : this.cards.create(payload);

@@ -184,13 +184,13 @@ the company built itself are left exactly as configured.
 
 ## Data model
 
-31 tables — platform masters (states, business types, themes, plans), tenants
+33 tables — platform masters (states, business types, themes, plans), tenants
 (companies, branches, branch contacts, company domains, sliders), website
 content (company functionalities, WhatsApp numbers, About copy, About stats,
-services, team members, gallery items, testimonials, benefit cards, Contact page
-settings), billing (subscriptions, subscription events, plan requests,
-transactions), the enquiry queue (service leads) and identity (super admins,
-roles, menus, role permissions, admins).
+services, product categories, products, team members, gallery items,
+testimonials, benefit cards, Contact page settings), billing (subscriptions,
+subscription events, plan requests, transactions), the enquiry queue (service
+leads) and identity (super admins, roles, menus, role permissions, admins).
 
 The full schema is in [`Aj-Smart-Biz-Backend/docs/schema.dbml`](Aj-Smart-Biz-Backend/docs/schema.dbml)
 — paste it into dbdiagram.io to view it or diff it against your own diagram.
@@ -282,6 +282,10 @@ entry to `FUNCTIONALITY_CATALOGUE`, and nothing else enumerates them.
 | `gallery` | A Gallery section of the company's own photographs |
 | `contact_page` | A Contact page with the tenant's own wording and an enquiry form |
 | `features_benefits` | A Features / Benefits band the tenant writes, an icon per card |
+| `products` | A product catalogue — nested categories, several photographs per product, real prices, and offers highlighted on the home page and a page of their own |
+| `orders` | A cart on top of that catalogue — an *Add to cart* button on every product the company allows, a basket the visitor can change, and one button that sends the order to WhatsApp or to payment. Sold separately from `products`, and withheld without it |
+| `warehouse` | Stock control on top of that — one or more warehouses, a running quantity per product in each, a ledger of every movement, and the analytics over both. It is also the only thing that can make a website's availability *true* rather than remembered |
+| `customers` | Sign-in on the website — a mobile number and a one-time code, saved delivery addresses, and an order history. The shop gets a customer list rather than a pile of orders it has to group by phone number itself |
 
 **Three switches, all of which must be on** before a visitor sees anything:
 
@@ -419,6 +423,417 @@ Company Details → Services has a *Menu name* field, so a studio can call it
 *Work* and a clinic *Treatments*. It is the first page whose label lives on the
 functionality's own `settings` blob rather than in a settings table, because the
 section has only cards and no settings row to keep one in; see `NAV_LABEL_SOURCE`.
+
+### Products, categories and offers
+
+What the business **sells**, as opposed to the work it does. Services is priced
+in words because a joiner quotes per job; a product is a *thing*, and a thing has
+a number on it. That one difference is what the whole feature turns on: with a
+number the platform can say what a visitor is saving, and everything about
+offers follows from being able to compute that honestly.
+
+It is four pages and three bands, from one payload:
+
+| | What is on it |
+| --- | --- |
+| **`/products`** | Everything, filtered by category. One listing that filters rather than a page per category — the filter is visible and changeable, so somebody who landed on *Dining tables* can widen to *Furniture* without the back button, and there is one page to keep right rather than thirty. |
+| **`/products/<slug>`** | One product: its photographs, price, what is included, a specifications table and the long description. Addressed by slug, so a shared link outlives a migration. |
+| **`/categories`** | Every main category with its subcategories named on the tile. |
+| **`/offers`** | Everything reduced today. |
+| **The home page** | A band of categories, a band of offers and a band of the range — in that order, each with a *View all* link. Categories first because *what kind of thing do you sell* comes before *show me one*; offers before the full range because they are the argument for looking **now**. |
+
+Only **Products** is in the site's menu. `/categories` and `/offers` are real
+pages reached from where a visitor is already browsing — a five-product shop with
+three catalogue entries in its header has a menu longer than its stock list.
+
+#### Categories nest, and the tree is one table
+
+"Main category" and "subcategory" are the same thing seen from different heights,
+so they are one self-referencing table rather than two. A business that starts
+with two levels asks for a third the week it takes on a second supplier; two
+tables answer that with a migration, and a `parentId` answers it with a dropdown.
+
+Three levels is the cap, and it is enforced on **re-parenting as well as on
+create** — moving a two-level branch under a second-level category is how a
+tenant reaches level four without ever creating one there. A category cannot be
+moved under its own descendant either; that is the one move that produces a tree
+no page can finish rendering.
+
+**A product is filed in the deepest category that fits, and found from any of
+them.** Somebody browsing *Furniture* gets the dining tables underneath it,
+because the API sends each product its finished ancestry rather than a single id.
+Nothing files anything twice.
+
+**Deleting a category deletes the category and nothing else.** Its subcategories
+are promoted to where it was and its products fall back to uncategorised — done
+in one transaction and by hand, because these tables are paranoid, so the delete
+is an `UPDATE` and the database's `ON DELETE SET NULL` never fires. The
+confirmation says which, in those words, because neither consequence is obvious
+and both are recoverable.
+
+**An empty category is absent from the website**, pruned before the payload is
+sent, so a heading on a live site always leads somewhere.
+
+#### Price, offer price, and the label over both
+
+Three fields, and the order they are read in is the whole of it:
+
+| | |
+| --- | --- |
+| `price` | What it normally costs. |
+| `offerPrice` | What it costs today, when that is less. **The discount is computed, never typed** — so a card can never advertise "30% off" beside two numbers that are 12% apart. An offer price at or above the normal one is refused at the door. |
+| `priceLabel` | Free text that **overrides the display entirely** — `From ₹24,999`, `₹1,200/metre`, `On request`. A business that cannot publish one number keeps the catalogue; what it gives up is the arithmetic, and that is its own choice rather than the platform's. |
+
+`onOffer` exists for exactly that case. Usually an offer is *derived* — there is
+an offer price below the price — but a tenant pricing in words has no pair to
+derive from and still runs offers, and "free fitting this month" is an offer no
+percentage can express. **One function decides it** (`isOnOffer`), and the offers
+band, the `/offers` page, the badge on every card and the console's Offers tab
+all read that one answer — so a product can never be badged on a page it is
+missing from.
+
+Money is formatted from the tenant's own currency, not a hardcoded symbol.
+
+#### Several photographs, in an order the tenant sets
+
+The first is the card image everywhere in the catalogue, so the order is a
+decision and the admin says so on the tile rather than leaving it to be
+discovered. Up to eight; the detail page shows one large with a strip of
+thumbnails under it, and **that gallery needs no JavaScript** — it is a
+scroll-snapping track with anchors for thumbnails, because a product page is the
+one most likely to be opened cold from a search result on a slow connection.
+
+#### Where each console sees it
+
+- **Company Details → Categories (:4300)** — the tree, with a product count on
+  every row, a parent picker that refuses the row's own descendants, and the
+  wording above the categories band.
+- **Company Details → Products (:4300)** — the catalogue. The one screen in this
+  section that pages, searches and filters, because a team has ten people and a
+  catalogue has however many things the business sells. Tabs for *On offer*,
+  *Featured* and *Hidden* are filters the API already answers. The price fields
+  show what the card will say **while you type** — the one number on the form
+  nobody can work out at a glance.
+- **The website** — the three bands and the four pages above.
+
+**The catalogue never rides along on pages that do not show it.** Anything handed
+to a client component is serialised into the page's HTML, and the header is on
+every page — so the header, the slider and the gallery are given the company
+*without* the catalogue (`siteCompany`). A three-hundred-product shop would
+otherwise put a quarter of a megabyte of product JSON into the markup of its
+contact page.
+
+### Cart and orders
+
+The catalogue is the shop window; this is the counter. **It is a grant of its
+own** (`orders`), sold on top of `products` and never instead of it — a showroom
+that prices everything and takes its orders on the phone is a real business, and
+it should not have to buy a cart to publish a price list. The reverse is not a
+business: a cart with nothing to put in it is a button leading to an empty
+basket, so the public payload withholds this block whenever the catalogue is
+absent, including when the tenant simply has not published a product yet.
+
+**Where an order goes is the company's choice**, set on Company Details →
+Cart & orders:
+
+| Setting | What happens |
+| --- | --- |
+| `whatsapp` | The basket is written out as a plain-text message and opened in the company's WhatsApp, ready to send — with the order number at the top of it. |
+| `payment` | The visitor is sent to pay through the tenant's own UPI id or payment link, with the total already on it. The order still reaches WhatsApp alongside wherever a number is published, because a payment with no idea what was bought is not an order. |
+| `none` | No cart and no order button anywhere on the site; the catalogue reads as a brochure with prices on it. A real setting rather than "switch the feature off" — the labels, the number and the payment details are all kept, so a shop pausing orders for a fortnight sets none of it up again. |
+
+**A route with nothing behind it produces no cart at all.** Pointing orders at
+WhatsApp with no published number, or at payment with no UPI id and no link,
+withholds the whole block rather than painting a button that leads nowhere — the
+line `publicServices` already takes on its enquiry button. The console says so
+before it happens, so nobody finds out from their own website.
+
+**The basket is optional too.** Switched off, a product is ordered one at a time:
+the button says *Order now* and sends that single line straight away. A trade
+counter selling one large thing at a time wants that; a shop selling six small
+ones wants the basket.
+
+**A product can be excluded.** `company_products.orderable` is on by default, so
+switching the cart on puts a button on the whole catalogue rather than on
+nothing; it is the exception that is worth setting — the made-to-measure item,
+the thing priced *On request*, the display piece that is not for sale. An
+out-of-stock product is never orderable whatever the flag says, and the API folds
+the two into one boolean so no template can check one and forget the other.
+
+**Every order is recorded**, and the mode above decides only what happens
+*next*. That was not always true: the cart shipped without an orders table on the
+same bargain Services' `whatsapp` target makes — the shop already has a phone,
+and a queue nobody has open is a queue nobody packs. The bargain holds right up
+until somebody asks *how many did we sell last month*, and then it does not hold
+at all: a chat thread cannot be counted, filtered, or reconciled against a shelf.
+So the record is the record and the message is the notification, which is the
+conclusion `SERVICE_ENQUIRY_TARGET` reached with `both` as its default.
+
+The *basket* still lives in the visitor's own browser until they send it — a
+snapshot per line rather than a product id, so one filled last week does not have
+to be re-resolved against a catalogue that has since changed.
+
+**Nothing about money is read from the request.** The cart posts product ids and
+quantities; every price on the resulting order comes from the tenant's own
+catalogue at the moment it is placed. A body that could name its own price is a
+shop that can be bought from at a price the customer chose.
+
+### Order management
+
+`GET /my-company/orders` and the **Orders** menu: the queue a shop works down
+every morning, and — on the same screen, behind a tab — what it has come to.
+One screen rather than two menu entries, because *how are we doing* is a question
+asked **while** working through the morning's orders.
+
+**Six steps, forward or cancelled, never backward.**
+
+| | |
+| --- | --- |
+| `pending` | it arrived, nobody has looked at it |
+| `confirmed` | accepted — and where stock is **reserved**, if it is being tracked |
+| `packed` | picked and boxed. It earns its own step because it is the one that takes the time and the one a customer rings up about |
+| `dispatched` | it left — and where reserved stock actually **comes off** |
+| `delivered` | terminal |
+| `cancelled` | terminal, and it **puts stock back** |
+
+Backward is refused outright. An order that has been dispatched has left the
+building, and a console that could put it back to `packed` would be one where the
+stock ledger and the order list tell different stories about the same box; a
+mistake is fixed by cancelling and re-entering, which leaves both of them saying
+what actually happened. **The status change and its stock effect are one
+transaction**, so a reservation that cannot be met leaves the order exactly where
+it was.
+
+**Payment is a second axis, not a seventh status.** They move independently: cash
+on delivery dispatches unpaid every day of the week, and UPI up front pays for an
+order nobody has packed. One list would force every business into one of those
+two shapes.
+
+**There is no *Add order* button and no delete.** The only writer is the public
+website — an order that could be typed in would make the list a place where
+"somebody bought this" and "somebody typed this in" are indistinguishable, and
+one that could be deleted would make every revenue figure provisional. The
+*lines* are read-only for the same reason: an order records what was bought at
+what price, and a console that could rewrite that turns every sales report into
+an opinion. What a shop legitimately changes after the fact — which warehouse,
+a delivery charge agreed on the phone, its own notes — it can.
+
+**A total that cannot include everything says so.** A catalogue may price in
+words, and those lines are real parts of real orders that cannot be added up.
+`unpricedItems` counts them, and every screen prints "₹18,400 plus 2 items to be
+quoted" rather than a total that quietly under-counts. Nothing anywhere treats a
+missing price as zero.
+
+### Warehouse and stock
+
+Sold separately again (`warehouse`), for the reason `orders` sits on top of
+`products`: a shop can take orders all day and count its stock on a clipboard,
+and plenty do. What this buys is the counting.
+
+**A warehouse is not a branch.** A branch is a place the business trades from —
+it has a website, an address on the Contact page, its own team. A warehouse is a
+place things are *kept*, and the two are not the same cardinality: three shops
+can run out of one central store, or one shop can have a stockroom and an
+overflow unit across town. `branchId` says which shop a store serves where that is
+true, which is what lets an order placed on the Surat site default to the right
+shelf.
+
+**A level and a ledger, and both are kept on purpose.**
+`company_stock_movements` is the truth — every receipt, issue and correction, in
+order, never edited. `company_stock` is the running total of it, written in the
+same transaction, because summing the ledger would be correct and would get
+slower every week on the one query the platform runs most: *is this in stock*,
+asked once per product per page load by a public website. Each movement stamps
+the resulting `balanceAfter`, which makes any drift between the two locatable to
+the movement where it started.
+
+**The ledger is append-only.** No update route, no delete route. A mistake is
+corrected by a `correction` movement recording that a count disagreed, which
+leaves both the error and the fix visible — the whole difference between a stock
+system and a number in a spreadsheet.
+
+**Direction comes from the reason**, never from the request: a receipt goes in, a
+breakage goes out, a stock count is an adjustment. Asking for both is asking
+somebody to contradict themselves. Which means `quantity` means two things, and
+the console says so beside the box because nobody reads it anywhere else — *how
+many arrived*, except on a count where it is *how many there are now*.
+
+**`sale` and `transfer` cannot be typed in.** Both are written by the platform in
+pairs, alongside something else that has to be true at the same moment: an order
+that was dispatched, a unit that received what another one sent. A ledger that
+let them be entered on their own ends up holding a sale against no order, and a
+warehouse that shipped to nowhere.
+
+**Reserved is not moved.** Confirming an order promises stock; dispatching it
+issues it. Only the second writes a movement, because only the second is a thing
+that physically happened. *Available* is `quantity - reserved`, and it is what
+everything compares against — a box that is physically present and already sold
+to somebody else is not one a stranger can buy.
+
+**This is what makes a website's availability true.** A product with
+`trackInventory` on takes its `in_stock` / `out_of_stock` from the shelf instead
+of from a flag somebody remembered to set, so the site stops selling it the
+moment the last one leaves the building. Still one of the three words rather than
+a count, which is the platform's long-standing position: a visitor needs to know
+whether to ring up, and a number the platform cannot keep true is worse there
+than no number.
+
+### Customer accounts
+
+The first functionality that gives **the public** something to sign in to, which
+is why it is sold apart from the cart: plenty of shops want an order button and
+no wish to run a membership list, and every account is a name and a phone number
+the tenant then holds.
+
+**The mobile number is the identity, and there is no password.** Not a shortcut
+— a password is a thing to forget, to reset over email, to store safely and to
+be blamed for when it leaks, and the entire value of the account is remembering
+an address and an order history. A phone number is the one identifier this kind
+of shop already has for every customer, already prints on every order, and
+already rings when something goes wrong. Sign-in is a six-digit code to it.
+
+Numbers are **normalised on every route**: `+91 98250 11223`, `098250 11223` and
+`9825011223` are one customer rather than three. A shop with three accounts for
+one person has a list that cannot be counted, a sign-in that sometimes finds the
+wrong history, and an order filed under a number nobody will search for.
+
+**Unique per company, not per platform.** The same person buying from two shops
+here is two customers — they are two businesses, and one has no business knowing
+what the other sold.
+
+#### Until an SMS gateway is connected
+
+There is none yet, so `sendOtp` stands in for one: every code is
+`CUSTOMER_OTP_DEV_CODE`, which defaults to **123456** and is read from the
+environment. The API returns it in the response **labelled as a development
+code**, and the sign-in page prints it with that label rather than pretending a
+message was sent.
+
+That is deliberate and it is confined to one function. A real random code with
+nothing to deliver it would make sign-in impossible rather than secure — which
+is worse for a feature nobody could then test. When a provider is added,
+`hasSmsGateway()` returns true, that function generates and sends a real code and
+stops returning one, and **nothing else changes**: not the routes, not the
+expiry, not the attempt counting, not the website.
+
+#### One field to begin with, and the shop decides what happens next
+
+The sign-in form asks for the **number** and nothing else. `request-otp` answers
+with `registered`, and the page goes where that says:
+
+| | |
+| --- | --- |
+| known | the code step, with a code already sent |
+| not known | the **sign-up** step, with the number already filled in |
+| barred | neither will help, so it says to get in touch |
+
+Nobody is asked whether they have an account before they know, nobody is told a
+code is coming and left waiting for a message that was never sent, and nobody has
+to work out for themselves that they were supposed to register instead.
+
+**That `registered` exists at all is a deliberate trade.** The route originally
+answered identically either way, which meant it could not be used to test which
+numbers a shop has. It can now. Three things keep that bounded, and they are why
+this is a trade rather than a hole:
+
+- the **rate limit** on the route, which is what makes working through a list of
+  numbers impractical rather than merely rude;
+- it reveals only *that* an account exists — never a name, an email or an order,
+  all of which still need a code from that person's own phone;
+- a **barred** customer reads as `registered`, so the answer cannot be used to
+  work out who a shop has shut out, and cannot be used to get a fresh account on
+  a number the shop deliberately stopped.
+
+`verify` is unchanged: no account, wrong code and expired code still say the same
+thing. Knowing an account exists is a long way from being able to open it.
+
+#### Addresses
+
+Several per customer, because people have several. Home, work, and a parent's
+address at the weekend — the last is the one that makes a single-address design
+annoying. Exactly one is the default, and the checkout starts there.
+
+**An address is copied onto the order as text, never referenced by it.** People
+move and correct typos; an order that resolved its address through a join would
+silently start claiming it was delivered somewhere it never went. Which also
+makes deleting one safe: the orders that went there still say so.
+
+At checkout a signed-in customer **picks one** instead of typing it again, and
+what is sent is an **id** — checked against that customer's own addresses by the
+API, which then writes its own formatting of it onto the order. A body that could
+name any address id would be a way of reading other people's addresses back out
+of an order confirmation.
+
+#### Their order history
+
+`/account/orders`, with the lines on every order — a history showing only a date
+and a total is one nobody can check against what actually arrived, which is the
+commonest reason somebody opens it.
+
+Each order carries **two tags, never one**. *Where it went* is the shop's order
+mode at the time, snapshotted, so a shop that switches from WhatsApp to card
+payments next month does not relabel what somebody already bought. *Whether it is
+paid* is the other axis entirely. Folding them into one badge is what makes an
+order history unreadable.
+
+The shop's private notes and the order's provenance are stripped on the way out:
+harmless-looking, and none of the customer's business.
+
+#### The session
+
+The token lives in an **httpOnly cookie** the browser cannot read, and every
+authenticated call is made from the server — which is why the account pages are
+Server Components and Server Actions rather than client `fetch`. An expired
+session is treated as *signed out* rather than as an error: somebody whose only
+problem is that a month has passed should see a sign-in form, not a wall of red.
+
+#### What the console can and cannot do
+
+**Company Details → Customers** lists them with what they have spent, and opens
+one to show their addresses and their orders in a single request.
+
+There is **no *Add customer*** button: an account is made by the person it belongs
+to, and one a shop could manufacture would be a row nobody consented to attached
+to somebody's phone number. The **phone number is not editable** — it is the
+identity and the sign-in, so an edit would both move the account to a different
+person and lock the original out. The screen says so rather than showing a greyed
+box, which is the thing people ring up about.
+
+Barring somebody stops them signing in and ordering. **Their orders stay exactly
+where they are**: barring a customer is not the same as pretending they never
+bought anything, and the sales figures must not move because a shop fell out with
+one.
+
+### Analytics
+
+Two endpoints — `/my-company/orders/analytics` and
+`/my-company/stock/analytics` — over a **closed list of windows** (7, 30, 90 or
+365 days). Closed because each is a query the database has to answer quickly, and
+because "the last 3,650 days" is a report nobody reads and every tenant would
+eventually ask for.
+
+Three rules they both keep:
+
+- **Cancelled orders are not sales.** Every revenue figure excludes them. The
+  status breakdown includes them, because that one has to add up to what actually
+  arrived.
+- **The series is gap-filled by the API.** Every day in the window comes back,
+  with zeroes where nothing happened — otherwise a chart drawn straight from a
+  `GROUP BY day` shows a fortnight of trading as four bars in a row and lies
+  about the shape of the week. Doing it server-side means the three consoles do
+  not each have to get the timezone arithmetic right.
+- **Two stock valuations, and the honest caveat on the second.** `retailValue` is
+  the stock at what the catalogue sells it for; `costValue` is what it was bought
+  for, from the costs typed onto receipts. `costCoverage` reports what share of
+  the stock actually has a cost behind it, so nobody reads a partial valuation as
+  complete.
+
+The console draws them as **hand-written SVG** — no charting library. What is
+needed is a row of rectangles with a baseline, which is forty lines that inherit
+the console's colours, against a dependency that would be the largest thing in
+the bundle and would bring its own theming system to fight with. The bars start
+at zero, always: a baseline at the minimum makes a 3% change look like a
+collapse, which is the most common way a chart lies.
 
 ### The enquiry form, and where it goes
 
@@ -725,6 +1140,8 @@ now, nested under Company Details:
 | Functionality | `/company/functionality` | `company-details` | — |
 | Slider | `/company/sliders` | `slider-management` | — |
 | Services | `/company/services` | `company-details` | `services` |
+| Categories | `/company/categories` | `company-details` | `products` |
+| Products | `/company/products` | `company-details` | `products` |
 | About us | `/company/about` | `company-details` | `about_us` |
 | Team | `/company/team` | `company-details` | `team` |
 | Gallery | `/company/gallery` | `company-details` | `gallery` |

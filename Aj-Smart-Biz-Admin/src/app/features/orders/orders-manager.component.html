@@ -1,0 +1,485 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:420px"></div>
+  } @else {
+    <!-- The queue and what it adds up to: the same subject at two distances.
+         One screen because "how are we doing" is asked *while* working through
+         the morning's orders. -->
+    <div class="tabs">
+      <button type="button" class="tab" [class.tab-on]="view() === 'queue'" (click)="setView('queue')">
+        Order queue
+      </button>
+      <button type="button" class="tab" [class.tab-on]="view() === 'analytics'" (click)="setView('analytics')">
+        Sales analytics
+      </button>
+    </div>
+
+    @if (view() === 'queue') {
+      <!-- The four numbers somebody reads before deciding what to open. The
+           API's, and unwindowed: an order still open from five weeks ago is the
+           one that matters most. -->
+      @if (summary(); as s) {
+        <div class="kpis">
+          <div class="kpi">
+            <div class="kpi-label">Waiting on you</div>
+            <div class="kpi-value">{{ s.open | number }}</div>
+            <div class="kpi-note">New, confirmed, packed or out</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">New today</div>
+            <div class="kpi-value">{{ s.today | number }}</div>
+            <div class="kpi-note">Since midnight</div>
+          </div>
+          <div class="kpi" [class.kpi-warn]="s.unpaid.orders > 0">
+            <div class="kpi-label">Unpaid</div>
+            <div class="kpi-value">{{ money(s.unpaid.amount) }}</div>
+            <div class="kpi-note">{{ s.unpaid.orders | number }} order(s) owing</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Cancelled</div>
+            <div class="kpi-value">{{ countOf('cancelled') | number }}</div>
+            <div class="kpi-note">All time</div>
+          </div>
+        </div>
+      }
+
+      <!-- Every step, named and counted by the API. A tab strip with gaps in it
+           reads as broken rather than as a quiet week. -->
+      <div class="tabs">
+        <button type="button" class="tab" [class.tab-on]="statusFilter() === ''" (click)="setStatus('')">
+          Everything
+        </button>
+        <button type="button" class="tab" [class.tab-on]="statusFilter() === 'open'" (click)="setStatus('open')">
+          Open <span class="n">{{ summary()?.open ?? 0 }}</span>
+        </button>
+        @for (step of statuses(); track step.key) {
+          <button
+            type="button"
+            class="tab"
+            [class.tab-on]="statusFilter() === step.key"
+            [title]="step.summary ?? ''"
+            (click)="setStatus(step.key)"
+          >
+            {{ step.name }} <span class="n">{{ countOf(step.key) }}</span>
+          </button>
+        }
+      </div>
+
+      <div class="filters">
+        <input
+          class="input grow"
+          type="search"
+          placeholder="Order number, name or phone"
+          [value]="search()"
+          (change)="onSearch(inputValue($event))"
+        />
+
+        <select class="select" style="width:auto" (change)="onPayment(selectValue($event))">
+          <option value="">Any payment</option>
+          @for (pay of paymentStatuses(); track pay.key) {
+            <option [value]="pay.key" [selected]="paymentFilter() === pay.key">{{ pay.name }}</option>
+          }
+        </select>
+
+        @if (branches().length > 0) {
+          <select class="select" style="width:auto" (change)="onBranch(selectValue($event))">
+            <option value="">All branches</option>
+            <option value="none">Company-wide only</option>
+            @for (branch of branches(); track branch.id) {
+              <option [value]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+        }
+
+        <!-- Dates rather than a window, because this is the screen somebody uses
+             to answer "what did we ship in the first week of March". -->
+        <input class="input" style="width:auto" type="date" [value]="from()" (change)="onFrom(inputValue($event))" />
+        <input class="input" style="width:auto" type="date" [value]="to()" (change)="onTo(inputValue($event))" />
+      </div>
+
+      @if (listing()) {
+        <div class="skeleton" style="height:240px"></div>
+      } @else if (!items().length) {
+        <p class="empty-note">Nothing here yet. Orders arrive from your website.</p>
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Customer</th>
+                <th class="n">Items</th>
+                <th class="n">Total</th>
+                <th>Status</th>
+                <th>Payment</th>
+                <th>Placed</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of items(); track row.id) {
+                <tr>
+                  <td>
+                    <span class="mono">{{ row.orderNo }}</span>
+                    @if (row.branch) {
+                      <div class="muted-sm">{{ row.branch.name }}</div>
+                    }
+                  </td>
+                  <td>
+                    {{ row.customerName || '—' }}
+                    @if (row.customerPhone) {
+                      <div class="muted-sm">{{ row.customerPhone }}</div>
+                    }
+                  </td>
+                  <td class="n">{{ row.itemCount | number }}</td>
+                  <td class="n">
+                    {{ money(row.total) }}
+                    <!-- Said out loud rather than folded into a total that would
+                         quietly under-count the order. -->
+                    @if (row.unpricedItems > 0) {
+                      <div class="muted-sm">+{{ row.unpricedItems }} to quote</div>
+                    }
+                  </td>
+                  <td><span class="badge badge-{{ toneOf(row.status) }}">{{ nameOf(row.status) }}</span></td>
+                  <td><span class="badge badge-{{ toneOf(row.paymentStatus) }}">{{ nameOf(row.paymentStatus) }}</span></td>
+                  <td class="muted-sm">{{ row.createdAt | date: 'd MMM, HH:mm' }}</td>
+                  <td>
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="open(row)">Open</button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <app-pager [meta]="meta()" (pageChange)="onPage($event)" />
+      }
+    } @else {
+      <!-- ---------------------------------------------------------------- -->
+      <!-- Analytics                                                         -->
+      <!-- ---------------------------------------------------------------- -->
+      <div class="tabs">
+        @for (range of ranges(); track range) {
+          <button type="button" class="tab" [class.tab-on]="days() === range" (click)="setDays(range)">
+            {{ range === 365 ? 'Last year' : 'Last ' + range + ' days' }}
+          </button>
+        }
+      </div>
+
+      @if (loadingAnalytics()) {
+        <div class="skeleton" style="height:380px"></div>
+      } @else if (analytics(); as a) {
+        <div class="kpis">
+          <div class="kpi">
+            <div class="kpi-label">Revenue</div>
+            <div class="kpi-value">{{ money(a.totals.revenue) }}</div>
+            <!-- Every revenue figure here excludes cancellations, and says so —
+                 a number that counted refunded money would be one a shop plans
+                 against. -->
+            <div class="kpi-note">Cancelled orders excluded</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Orders</div>
+            <div class="kpi-value">{{ a.totals.orders | number }}</div>
+            <div class="kpi-note">{{ a.totals.units | number }} items</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Average order</div>
+            <div class="kpi-value">{{ money(a.totals.averageOrderValue) }}</div>
+            <div class="kpi-note">Across the window</div>
+          </div>
+          <div class="kpi" [class.kpi-warn]="a.totals.awaitingPayment > 0">
+            <div class="kpi-label">Awaiting payment</div>
+            <div class="kpi-value">{{ money(a.totals.awaitingPayment) }}</div>
+            <div class="kpi-note">{{ a.totals.open | number }} order(s) still open</div>
+          </div>
+        </div>
+
+        <!-- The caveat, printed where the numbers are rather than in a footnote.
+             A line priced in words is a real part of a real order that cannot be
+             added up, and nothing here treats it as zero. -->
+        @if (a.totals.unpricedItems > 0) {
+          <p class="tiny muted" style="margin:-6px 0 16px">
+            {{ a.totals.unpricedItems }} line(s) in this window are priced in words &mdash; “On request”,
+            “From &hellip;” &mdash; so they are counted in the orders above but not in the revenue.
+          </p>
+        }
+
+        <div class="cards" style="margin-bottom:14px">
+          <div class="panel">
+            <app-mini-chart
+              [points]="revenueSeries()"
+              [title]="'Revenue per day'"
+              [format]="'money'"
+              [currency]="currency()"
+            />
+          </div>
+          <div class="panel">
+            <app-mini-chart [points]="orderSeries()" [title]="'Orders per day'" />
+          </div>
+        </div>
+
+        <div class="cards">
+          <div class="panel">
+            <h5>Best sellers</h5>
+            @if (!a.topProducts.length) {
+              <p class="tiny muted" style="margin:0">Nothing has sold in this window yet.</p>
+            } @else {
+              <ul class="rank">
+                @for (product of a.topProducts; track product.name) {
+                  <li>
+                    <span class="name">{{ product.name }}</span>
+                    <!-- Ranked by units, not revenue: the question a shop has is
+                         what it is going to run out of, and sorting by money puts
+                         the one expensive thing at the top of a re-order list. -->
+                    <span class="num">{{ product.units | number }}</span>
+                    <span class="sub">{{ money(product.revenue) }}</span>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+
+          <div class="panel">
+            <h5>Where they are</h5>
+            <ul class="rank">
+              @for (step of statuses(); track step.key) {
+                <li>
+                  <span class="name">{{ step.name }}</span>
+                  <span class="num">{{ analyticsCount(step.key) | number }}</span>
+                </li>
+              }
+            </ul>
+          </div>
+
+          <div class="panel">
+            <h5>All time</h5>
+            <ul class="rank">
+              <li><span class="name">Orders</span><span class="num">{{ a.lifetime.orders | number }}</span></li>
+              <li><span class="name">Revenue</span><span class="num">{{ money(a.lifetime.revenue) }}</span></li>
+              <li><span class="name">Cancelled in window</span><span class="num">{{ a.totals.cancelled | number }}</span></li>
+            </ul>
+          </div>
+        </div>
+      }
+    }
+  }
+</div>
+
+<!-- ------------------------------------------------------------------ -->
+<!-- One order, in full                                                  -->
+<!-- ------------------------------------------------------------------ -->
+@if (detailOpen() && current(); as order) {
+  <app-modal
+    [title]="order.orderNo"
+    [subtitle]="(order.customerName || 'No name given') + ' · ' + nameOf(order.status)"
+    size="lg"
+    [closeOnBackdrop]="false"
+    (closed)="detailOpen.set(false)"
+  >
+    <!-- The lines. Read-only, and deliberately: an order records what was bought
+         at what price, and a console that could rewrite that would turn every
+         sales report into an opinion. -->
+    <table class="lines">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th class="n">Qty</th>
+          <th class="n">Each</th>
+          <th class="n">Line</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (line of order.items ?? []; track line.id) {
+          <tr>
+            <td>
+              {{ line.productName }}
+              @if (line.productSku) {
+                <div class="muted-sm">{{ line.productSku }}</div>
+              }
+            </td>
+            <td class="n">{{ line.quantity | number }}</td>
+            <td class="n">
+              <!-- A null price is not a zero. It is a line nobody can add up,
+                   and it prints as whatever the card printed instead. -->
+              {{ line.unitPrice !== null ? money(line.unitPrice) : (line.priceLabel || 'On request') }}
+            </td>
+            <td class="n">{{ line.lineTotal !== null ? money(line.lineTotal) : '—' }}</td>
+          </tr>
+        }
+      </tbody>
+      <tfoot>
+        @if (order.adjustment) {
+          <tr>
+            <td colspan="3">{{ order.adjustmentNote || 'Adjustment' }}</td>
+            <td class="n">{{ money(order.adjustment) }}</td>
+          </tr>
+        }
+        <tr>
+          <td colspan="3">Total</td>
+          <td class="n">{{ money(order.total) }}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    @if (order.unpricedItems > 0) {
+      <p class="tiny muted" style="margin:8px 0 0">
+        {{ order.unpricedItems }} line(s) have no price on them, so the total above is the rest of the
+        order. Quote them and add the figure as an adjustment below.
+      </p>
+    }
+
+    @if (order.customerNote) {
+      <p class="tiny" style="margin:12px 0 0"><strong>They wrote:</strong> {{ order.customerNote }}</p>
+    }
+
+    <h4 style="margin:20px 0 8px">Where it has got to</h4>
+    <div class="detail-grid">
+      <dl class="trail">
+        <div><dt>Placed</dt><dd>{{ order.createdAt | date: 'd MMM y, HH:mm' }}</dd></div>
+        @if (order.confirmedAt) { <div><dt>Confirmed</dt><dd>{{ order.confirmedAt | date: 'd MMM y, HH:mm' }}</dd></div> }
+        @if (order.packedAt) { <div><dt>Packed</dt><dd>{{ order.packedAt | date: 'd MMM y, HH:mm' }}</dd></div> }
+        @if (order.dispatchedAt) { <div><dt>Dispatched</dt><dd>{{ order.dispatchedAt | date: 'd MMM y, HH:mm' }}</dd></div> }
+        @if (order.deliveredAt) { <div><dt>Delivered</dt><dd>{{ order.deliveredAt | date: 'd MMM y, HH:mm' }}</dd></div> }
+        @if (order.cancelledAt) {
+          <div><dt>Cancelled</dt><dd>{{ order.cancelledAt | date: 'd MMM y, HH:mm' }}</dd></div>
+          @if (order.cancelReason) { <div><dt>Because</dt><dd>{{ order.cancelReason }}</dd></div> }
+        }
+      </dl>
+
+      <dl class="trail">
+        @if (order.customerPhone) { <div><dt>Phone</dt><dd>{{ order.customerPhone }}</dd></div> }
+        @if (order.customerAddress) { <div><dt>Deliver to</dt><dd>{{ order.customerAddress }}</dd></div> }
+        @if (order.warehouse) { <div><dt>Filling from</dt><dd>{{ order.warehouse.name }}</dd></div> }
+        <!-- Said plainly, because it is the thing somebody needs to know before
+             cancelling: this order is holding boxes on a shelf. -->
+        @if (order.stockIssued) {
+          <div><dt>Stock</dt><dd>Taken off the shelf</dd></div>
+        } @else if (order.stockReserved) {
+          <div><dt>Stock</dt><dd>Reserved, not yet dispatched</dd></div>
+        }
+      </dl>
+    </div>
+
+    @if (canEdit()) {
+      <!-- The moves this order may make, as the API decides them. This screen
+           renders them rather than working them out, so a button it offers and a
+           request the API accepts can never disagree. -->
+      <h4 style="margin:20px 0 8px">Move it along</h4>
+      @if (!order.nextStatuses.length) {
+        <p class="tiny muted" style="margin:0">
+          {{ nameOf(order.status) }} is the end of the line &mdash; nothing more can change it.
+        </p>
+      } @else {
+        <div class="moves">
+          @for (next of order.nextStatuses; track next) {
+            <button
+              type="button"
+              class="btn btn-sm"
+              [class.btn-primary]="next !== 'cancelled'"
+              [class.btn-danger]="next === 'cancelled'"
+              [disabled]="saving()"
+              (click)="move(next)"
+            >
+              Mark {{ nameOf(next) }}
+            </button>
+          }
+        </div>
+      }
+
+      <h4 style="margin:20px 0 8px">Payment</h4>
+      <div class="detail-grid">
+        <div class="field">
+          <label for="ord-ref">Reference</label>
+          <input
+            id="ord-ref"
+            class="input"
+            [formControl]="paymentForm.controls.reference"
+            placeholder="UPI reference or receipt number"
+            maxlength="120"
+          />
+        </div>
+        <div class="field">
+          <label>Mark as</label>
+          <div class="moves">
+            @if (!order.nextPaymentStatuses.length) {
+              <span class="tiny muted">{{ nameOf(order.paymentStatus) }} &mdash; nothing further.</span>
+            }
+            @for (next of order.nextPaymentStatuses; track next) {
+              <button type="button" class="btn btn-sm btn-ghost" [disabled]="saving()" (click)="markPayment(next)">
+                {{ nameOf(next) }}
+              </button>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- The few things a person may legitimately change after the fact. Not
+           the lines, and not the prices. -->
+      <h4 style="margin:20px 0 8px">Corrections</h4>
+      <form [formGroup]="editForm" (ngSubmit)="saveEdits()">
+        <div class="detail-grid">
+          @if (warehouses().length > 0) {
+            <div class="field">
+              <label for="ord-wh">Fill from</label>
+              <select id="ord-wh" class="select" formControlName="warehouseId">
+                <option value="">Not decided</option>
+                @for (warehouse of warehouses(); track warehouse.id) {
+                  <option [value]="warehouse.id">{{ warehouse.name }}</option>
+                }
+              </select>
+              @if (order.stockReserved || order.stockIssued) {
+                <span class="hint">
+                  This order is already holding stock here, so it cannot be moved. Cancel and re-enter it
+                  to fill it from somewhere else.
+                </span>
+              }
+            </div>
+          }
+
+          <div class="field">
+            <label for="ord-adj">Delivery or discount</label>
+            <input id="ord-adj" class="input" type="number" step="0.01" formControlName="adjustment" placeholder="0" />
+            <span class="hint">A charge adds, a discount is negative. One figure, and the total follows it.</span>
+          </div>
+
+          <div class="field">
+            <label for="ord-adj-note">What that was for</label>
+            <input id="ord-adj-note" class="input" formControlName="adjustmentNote" maxlength="120" />
+          </div>
+
+          <div class="field">
+            <label for="ord-name">Customer name</label>
+            <input id="ord-name" class="input" formControlName="customerName" maxlength="120" />
+          </div>
+
+          <div class="field">
+            <label for="ord-phone">Phone</label>
+            <input id="ord-phone" class="input" formControlName="customerPhone" maxlength="30" />
+          </div>
+
+          <div class="field">
+            <label for="ord-addr">Delivery address</label>
+            <input id="ord-addr" class="input" formControlName="customerAddress" maxlength="500" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="ord-note">Your notes</label>
+          <textarea id="ord-note" class="textarea" formControlName="internalNote" maxlength="1000"></textarea>
+          <span class="hint">Never shown to the customer.</span>
+        </div>
+
+        <div class="row-end">
+          <button type="submit" class="btn btn-primary btn-sm" [disabled]="saving()">
+            {{ saving() ? 'Saving…' : 'Save corrections' }}
+          </button>
+        </div>
+      </form>
+    }
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="detailOpen.set(false)">Close</button>
+    </ng-container>
+  </app-modal>
+}

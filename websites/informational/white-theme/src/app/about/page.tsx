@@ -8,7 +8,7 @@ import CtaBand from '@/components/CtaBand';
 import FiguresSection from '@/components/FiguresSection';
 import { ABOUT_PAGE } from '@/config/site';
 import { resolveAbout } from '@/lib/about';
-import { fillCompany, toFileUrl } from '@/lib/company';
+import { fillCompany, siteCompany, toFileUrl } from '@/lib/company';
 import { getCompanyDetails } from '@/lib/company.server';
 import styles from './page.module.css';
 
@@ -154,7 +154,9 @@ export default async function AboutPage() {
       {/* Each renders nothing at all unless the tenant is entitled to it and
           has put something in it, so neither needs a guard here. */}
       <TeamSection company={company} />
-      <GallerySection company={company} />
+      {/* The gallery is a client component, so it takes the lightened company —
+          the catalogue has no business in this page's payload. See `siteCompany`. */}
+      <GallerySection company={siteCompany(company)} />
 
       {/*
         The figures, immediately before the closing band — the same place the

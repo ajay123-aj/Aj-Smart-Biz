@@ -1,5 +1,12 @@
 import { SERVICES_COPY } from '@/config/site';
-import { fillCompany, type CompanyDetails, type ServiceItem, type ServicesFeature } from './company';
+import {
+  fillCompany,
+  type CompanyDetails,
+  type ServiceBooking,
+  type ServiceCategoryNode,
+  type ServiceItem,
+  type ServicesFeature,
+} from './company';
 
 /**
  * What the Services section should say — the things the business sells, and
@@ -40,6 +47,22 @@ export interface ResolvedServices {
   total: number;
   /** True when `items` is a shortened list and there is more to see. */
   truncated: boolean;
+
+  /** The taxonomy, already pruned of anything empty by the API. */
+  categories: ServiceCategoryNode[];
+  /** The services on offer, featured first. */
+  offers: ServiceItem[];
+  /** The diary, or null when this tenant is not taking appointments. */
+  booking: ServiceBooking | null;
+
+  /* The two other bands' wording. Held here rather than in the components so
+     that the page, the band and the archive all say the same thing. */
+  categoriesEyebrow: string;
+  categoriesTitle: string;
+  categoriesLede: string;
+  offersEyebrow: string;
+  offersTitle: string;
+  offersLede: string;
 }
 
 /**
@@ -56,10 +79,36 @@ export interface ResolvedServices {
  * something blank — a heading of empty space is the one outcome worth spending
  * a fallback on.
  */
-export function resolveServices(company: CompanyDetails, limit?: number): ResolvedServices | null {
+export function resolveServices(
+  company: CompanyDetails,
+  limit?: number,
+  options: { variant?: 'all' | 'offers'; category?: string | null } = {}
+): ResolvedServices | null {
   const services = company.features?.services ?? null;
-  const all = services?.items ?? [];
-  if (!all.length) return null;
+  if (!services?.items?.length) return null;
+
+  /**
+   * Which list this is.
+   *
+   * `offers` is the band a salon wants read first, and it is a **subset of the
+   * same items** rather than a second source - the API partitions them, so a
+   * service cannot be on the offers band and missing from the price list.
+   */
+  const source = options.variant === 'offers' ? services.offers ?? [] : services.items;
+  if (!source.length) return null;
+
+  /**
+   * A category filter, matched against the whole **path** rather than the leaf.
+   *
+   * Picking `Hair` shows everything under `Hair › Colour` too, which is what a
+   * visitor means by it. A slug that names nothing falls through to the full
+   * list rather than to an empty page: a stale link somebody shared should show
+   * the shop, not a dead end.
+   */
+  const filtered = options.category
+    ? source.filter((item) => item.categoryPath?.some((step) => step.slug === options.category))
+    : source;
+  const all = filtered.length ? filtered : source;
 
   const items = typeof limit === 'number' && limit > 0 ? all.slice(0, limit) : all;
 
@@ -84,5 +133,92 @@ export function resolveServices(company: CompanyDetails, limit?: number): Resolv
     })),
     total: all.length,
     truncated: items.length < all.length,
+
+    categories: services.categories ?? [],
+    offers: services.offers ?? [],
+    /* Passed through as sent. Whether a slot can be taken is the API's answer,
+       not something to re-derive from a set of opening hours here. */
+    booking: services.booking ?? null,
+
+    categoriesEyebrow: services.categoriesEyebrow?.trim() || SERVICES_COPY.categoriesEyebrow,
+    categoriesTitle: fillCompany(services.categoriesTitle?.trim() || SERVICES_COPY.categoriesTitle, company),
+    categoriesLede: fillCompany(services.categoriesLead?.trim() || SERVICES_COPY.categoriesLede, company),
+    offersEyebrow: services.offersEyebrow?.trim() || SERVICES_COPY.offersEyebrow,
+    offersTitle: fillCompany(services.offersTitle?.trim() || SERVICES_COPY.offersTitle, company),
+    offersLede: fillCompany(services.offersLead?.trim() || SERVICES_COPY.offersLede, company),
   };
+}
+
+/**
+ * What a service costs, resolved in the **one** order every surface reads it in.
+ *
+ * Three fields, three answers, and the order is the whole of the rule:
+ *
+ *  1. `priceLabel` wins outright. A business that wrote "From ₹4,999" meant it,
+ *     and a number printed beside those words would contradict them.
+ *  2. Then the offer pair - today's price, with the old one struck through.
+ *  3. Then the plain price.
+ *
+ * `null` means the tenant is not publishing a price for this service at all,
+ * which is a real state and not a missing one: the API withholds both the words
+ * and the figures when `showPrice` is off. The card then shows nothing rather
+ * than "₹0".
+ */
+export function servicePrice(
+  item: ServiceItem,
+  company: CompanyDetails
+): { now: string; was: string | null; words: boolean; saving: number | null } | null {
+  if (item.priceLabel) return { now: item.priceLabel, was: null, words: true, saving: null };
+
+  const money = (value: number) => formatMoney(value, company);
+
+  if (item.offerPrice !== null && item.price !== null && item.offerPrice < item.price) {
+    return { now: money(item.offerPrice), was: money(item.price), words: false, saving: item.discountPercent };
+  }
+
+  if (item.price !== null) return { now: money(item.price), was: null, words: false, saving: null };
+
+  return null;
+}
+
+/**
+ * Money in the tenant's own currency, formatted where the server can and printed
+ * plainly where it cannot.
+ *
+ * `Intl` is given the company's currency and a fixed `en-IN` locale rather than
+ * the reader's: a price formatted per-visitor renders differently on the server
+ * and in the browser, which React reports as a hydration mismatch.
+ */
+export function formatMoney(value: number, company: CompanyDetails): string {
+  const currency = company.locale?.currency || 'INR';
+  try {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    }).format(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/** How long an appointment takes, said the way a person would. */
+export function durationLabel(minutes: number | null): string | null {
+  if (!minutes || minutes <= 0) return null;
+  if (minutes < 60) return `${minutes} min`;
+
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  const hourPart = hours === 1 ? '1 hour' : `${hours} hours`;
+  return rest ? `${hourPart} ${rest} min` : hourPart;
+}
+
+/** One service by slug, or null. The detail page's only lookup. */
+export function findService(company: CompanyDetails, slug: string): ServiceItem | null {
+  return company.features?.services?.items?.find((item) => item.slug === slug) ?? null;
+}
+
+/** Every category as a flat list, parents before children - for a filter row. */
+export function flattenCategories(nodes: ServiceCategoryNode[], depth = 0): { node: ServiceCategoryNode; depth: number }[] {
+  return nodes.flatMap((node) => [{ node, depth }, ...flattenCategories(node.children ?? [], depth + 1)]);
 }

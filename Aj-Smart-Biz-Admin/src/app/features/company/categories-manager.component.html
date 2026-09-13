@@ -1,0 +1,266 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:340px"></div>
+  } @else {
+    <app-feature-gate [feature]="feature()" />
+
+    <!-- The wording above the categories band. Saved merged with the rest of the
+         catalogue's settings, so it never clears what the Products screen holds. -->
+    <form class="section-form" [formGroup]="copyForm" (ngSubmit)="saveCopy()">
+      <h4 style="margin:0 0 4px">How the categories band reads</h4>
+      <p class="tiny muted" style="margin:0 0 14px;max-width:64ch">
+        The heading above your categories, on the home page and on the
+        <em>All categories</em> page. Leave a field empty to use the standard wording. The wording for
+        products and offers is on the <strong>Products</strong> screen.
+      </p>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="cat-eyebrow">Eyebrow</label>
+          <input id="cat-eyebrow" class="input" formControlName="categoriesEyebrow" placeholder="Browse" />
+          <span class="hint">The small line above the heading.</span>
+        </div>
+
+        <div class="field">
+          <label for="cat-title">Heading</label>
+          <input id="cat-title" class="input" formControlName="categoriesTitle" placeholder="Shop by category" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="cat-lead">Introduction</label>
+        <textarea id="cat-lead" class="textarea" formControlName="categoriesLead"
+                  placeholder="Start with the kind of thing you are after."></textarea>
+      </div>
+
+      @if (writable()) {
+        <div class="row-end" style="gap:8px">
+          <button type="button" class="btn btn-ghost" [disabled]="savingCopy()" (click)="resetCopy()">Reset</button>
+          <button type="submit" class="btn btn-primary" [disabled]="savingCopy()">
+            {{ savingCopy() ? 'Saving…' : 'Save wording' }}
+          </button>
+        </div>
+      }
+    </form>
+
+    <div class="row-between" style="align-items:flex-start;gap:12px">
+      <div>
+        <h4 style="margin:0 0 4px">Your categories</h4>
+        <p class="tiny muted" style="margin:0 0 16px;max-width:70ch">
+          How you sort what you sell. A category can sit inside another &mdash; up to
+          {{ depthMax }} levels &mdash; and a product filed in the deepest one is still found by
+          somebody browsing the top. Use <strong>＋ Subcategory</strong> on a row to add one beneath it.
+        </p>
+      </div>
+      <div class="row-end" style="gap:8px">
+        @if (feature()?.granted && branches().length > 0) {
+          <select class="select" style="width:auto" (change)="onBranchFilter(selectValue($event))">
+            <option value="">All categories</option>
+            <option value="none">Company-wide only</option>
+            @for (branch of branches(); track branch.id) {
+              <option [value]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+        }
+        @if (writable()) {
+          <button type="button" class="btn btn-sm btn-primary" (click)="open(null)">＋ Add category</button>
+        }
+      </div>
+    </div>
+
+    @if (!feature()?.granted) {
+      <div class="empty-note">Products are not part of your plan.</div>
+    } @else if (flat().length === 0) {
+      <div class="empty-note">
+        No categories yet. You can add products without them &mdash; they show as uncategorised &mdash;
+        but a catalogue of any size reads better sorted.
+      </div>
+    } @else {
+      <div class="tree">
+        @for (entry of flat(); track entry.row.id) {
+          <article
+            class="node"
+            [class]="'node node-depth-' + entry.depth"
+            [class.node-inactive]="entry.row.status !== 'active'"
+            [class.node-featured]="entry.row.featured"
+          >
+            <!-- The photograph if there is one, the glyph if there is not —
+                 exactly what the website falls back to. -->
+            <span class="node-art" [title]="labelOf(entry.row.icon)" aria-hidden="true">
+              @if (imageUrl(entry.row.image); as photo) {
+                <img [src]="photo" alt="" loading="lazy" />
+              } @else {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  @for (d of pathsOf(entry.row.icon); track $index) {
+                    <path [attr.d]="d" />
+                  }
+                </svg>
+              }
+            </span>
+
+            <div class="node-main">
+              <div class="node-name">
+                {{ entry.row.name }}
+                @if (entry.row.featured) {
+                  <span class="badge badge-warning">Featured</span>
+                }
+                <app-status-badge [value]="entry.row.status" />
+                @if (entry.row.branch) {
+                  <span class="badge badge-info">{{ entry.row.branch.name }}</span>
+                }
+                <!-- What is filed here, and a warning when nothing is: an empty
+                     category is absent from the website entirely. -->
+                <span class="count-pill" [class.count-zero]="!entry.row.productCount"
+                      [title]="entry.row.productCount ? 'Products filed directly in this category' : 'Nothing is filed here, so this category does not appear on your website'">
+                  {{ entry.row.productCount ?? 0 }} product{{ entry.row.productCount === 1 ? '' : 's' }}
+                </span>
+              </div>
+
+              <div class="node-slug">/{{ entry.row.slug }}</div>
+
+              @if (entry.row.description) {
+                <p class="node-text">{{ entry.row.description }}</p>
+              }
+            </div>
+
+            @if (writable()) {
+              <div class="node-tools">
+                <span class="seq-num">{{ entry.row.sequence }}</span>
+                <button type="button" class="btn btn-sm btn-ghost" title="Move up"
+                        [disabled]="isFirst(entry.row) || reordering()" (click)="move(entry.row, -1)">↑</button>
+                <button type="button" class="btn btn-sm btn-ghost" title="Move down"
+                        [disabled]="isLast(entry.row) || reordering()" (click)="move(entry.row, 1)">↓</button>
+
+                @if (entry.depth < depthMax) {
+                  <button type="button" class="btn btn-sm btn-ghost" title="Add a category inside this one"
+                          (click)="open(null, entry.row)">＋ Subcategory</button>
+                }
+
+                <button type="button" class="btn btn-sm btn-ghost" (click)="toggle(entry.row)">
+                  {{ entry.row.status === 'active' ? 'Hide' : 'Show' }}
+                </button>
+                <button type="button" class="btn btn-sm btn-ghost" (click)="open(entry.row)">Edit</button>
+                <button type="button" class="btn btn-sm btn-danger" (click)="remove(entry.row)">Delete</button>
+              </div>
+            }
+          </article>
+        }
+      </div>
+
+      <p class="tiny muted" style="margin:14px 0 0">
+        Only active categories with something filed in them appear on the website.
+      </p>
+    }
+  }
+</div>
+
+@if (modalOpen()) {
+  <app-modal
+    [title]="editing() ? 'Edit category' : 'Add category'"
+    size="md"
+    [closeOnBackdrop]="false"
+    (closed)="modalOpen.set(false)"
+  >
+    <form [formGroup]="form" (ngSubmit)="save()" id="category-form">
+      <div class="form-grid">
+        <div class="field">
+          <label for="cat-branch">Shows on</label>
+          <select id="cat-branch" class="select" formControlName="branchId">
+            <option value="">All branches (company-wide)</option>
+            @for (branch of branches(); track branch.id) {
+              <option [value]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+          <p class="tiny muted mb-0">
+            A branch site shows its own. If it has none, it falls back to the company-wide ones.
+          </p>
+        </div>
+
+        <div class="field">
+          <label for="cat-parent">Parent category</label>
+          <select id="cat-parent" class="select" formControlName="parentId">
+            <option value="">None — this is a main category</option>
+            @for (option of parentOptions(); track option.id) {
+              <option [value]="option.id">{{ option.label }}</option>
+            }
+          </select>
+          <p class="tiny muted mb-0">
+            Pick one to make this a subcategory. A category cannot be moved inside itself, and the
+            tree stops at {{ depthMax }} levels.
+          </p>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="cat-name">Category <span class="req">*</span></label>
+        <input id="cat-name" class="input" formControlName="name" placeholder="Dining tables" maxlength="150" />
+        <app-field-error [control]="form.controls.name" label="Category" />
+        <span class="hint">Name it the way a customer would look for it.</span>
+      </div>
+
+      <div class="field">
+        <label for="cat-slug">Web address</label>
+        <input id="cat-slug" class="input" formControlName="slug" placeholder="dining-tables" maxlength="160" />
+        <span class="hint">
+          @if (editing()) {
+            Changing this breaks any link already shared to this category. Leave it alone unless you
+            mean to.
+          } @else {
+            Optional &mdash; made from the name if you leave it empty.
+          }
+        </span>
+      </div>
+
+      <div class="field">
+        <label for="cat-desc">Description</label>
+        <textarea id="cat-desc" class="textarea" formControlName="description"
+                  placeholder="Solid wood tables, seating four to twelve."></textarea>
+        <span class="hint">Optional &mdash; shown under the heading on the category&rsquo;s own page.</span>
+      </div>
+
+      <div class="field">
+        <label>Photograph</label>
+        <app-image-upload
+          formControlName="image"
+          label="Photograph"
+          folder="category"
+          hint="Optional — square or landscape, 800×800 or larger · PNG, JPG or WEBP"
+        />
+        <span class="hint">A picture of the kind of thing in here. Without one the tile uses the icon.</span>
+      </div>
+
+      <div class="field">
+        <label>Icon <span class="req">*</span></label>
+        <app-icon-picker formControlName="icon" [icons]="icons()" />
+        <span class="hint">Used when there is no photograph.</span>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="cat-featured">Feature this category</label>
+          <select id="cat-featured" class="select" formControlName="featured">
+            <option [value]="false">No</option>
+            <option [value]="true">Yes — show it first</option>
+          </select>
+          <span class="hint">Featured categories lead the band on the home page.</span>
+        </div>
+
+        <div class="field">
+          <label for="cat-status">Status</label>
+          <select id="cat-status" class="select" formControlName="status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+      <button type="submit" form="category-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Add category' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

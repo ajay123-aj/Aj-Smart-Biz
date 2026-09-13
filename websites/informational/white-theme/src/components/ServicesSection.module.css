@@ -274,6 +274,55 @@
   border-radius: 2px;
 }
 
+/* ---------------------------------- meta ---------------------------------- */
+
+/*
+ * How long it takes, and what it is filed under.
+ *
+ * Chips rather than more text on the price line: they are facts of a different
+ * kind from the figure — what a visitor weighs the price *against* — and hanging
+ * them off it made a line that grew ragged as soon as a service had both.
+ */
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.chip,
+.chipQuiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* The duration carries the accent: it is the one a visitor is actually
+   budgeting for. The category is context and stays out of the way. */
+.chip {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 26%, transparent);
+  color: var(--brand-strong);
+}
+
+.chipQuiet {
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+
+.chipIcon {
+  width: 13px;
+  height: 13px;
+  opacity: 0.8;
+}
+
 .summary {
   margin-top: 14px;
   color: var(--text-muted);
@@ -313,25 +362,115 @@
   color: var(--accent);
 }
 
+/* ------------------------------- action bar ------------------------------- */
+
 /*
- * The card's hook on its button.
+ * Where a card's actions live.
  *
- * The button is `ServiceEnquiryButton` and brings its own appearance — it has
- * to, since it renders a dialog nothing here knows about. What stays with the
- * card is the two things only the card can decide: where the button sits, and
- * that hovering anywhere on the card lights it up. `margin-top: auto` is what
- * keeps a row of cards with different amounts of copy from having their buttons
- * at different heights.
+ * Pinned to the bottom with `margin-top: auto`, which is what keeps a row of
+ * cards carrying different amounts of copy from having their buttons at
+ * different heights. The hairline separates *what this is* from *what you can
+ * do about it* — the same rule the tick list above it uses.
+ *
+ * It holds two things of deliberately different weight: the primary action, and
+ * a quiet link to the service's own page. `space-between` puts one at each end,
+ * and the `<span />` the component renders when there is no primary action keeps
+ * the quiet one on the right rather than letting it slide left.
  */
-.cta {
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
   margin-top: auto;
-  padding-top: 22px;
-  align-self: flex-start;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
 }
 
+/*
+ * The primary action: booking a time, or the page where the booking is.
+ *
+ * A **compact** pill rather than the site's own `.btn`, which is sized for a
+ * hero and looks like a landing page when three of them sit in a grid. The
+ * arrow is what says it goes somewhere, and it moves on hover — the one bit of
+ * motion on the card that is about the action rather than about the card.
+ *
+ * This is where the book button was wrong: it carried `.cta`, a class written
+ * for the underline-style enquiry trigger, whose `padding-top: 22px` landed
+ * *inside* a solid button and pushed its label off centre.
+ */
+.book {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--brand);
+  color: var(--brand-contrast);
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.book:hover {
+  background: var(--brand-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--brand) 24%, transparent);
+}
+
+.arrow {
+  width: 15px;
+  height: 15px;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.book:hover .arrow {
+  transform: translateX(3px);
+}
+
+/*
+ * The enquiry trigger's hook.
+ *
+ * It brings its own appearance — an underline that grows — because it renders a
+ * dialog nothing here knows about. All the card adds is that hovering anywhere
+ * on it lights the button up.
+ */
 .card:hover .cta {
   background-size: 100% 1.5px;
   color: var(--accent);
+}
+
+/* The quiet way to the full description. Never competing with the button. */
+.details {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.details::after {
+  content: ' \2192';
+}
+
+.details:hover {
+  color: var(--brand);
+  border-bottom-color: currentColor;
+}
+
+/*
+ * The body of a card is a column that ends in the action bar, so it has to be
+ * allowed to grow: without this the hairline sits directly under the copy on a
+ * short card and halfway up a tall one.
+ */
+.body {
+  min-height: 0;
 }
 
 /* ---------------------------------- wide ---------------------------------- */
@@ -636,4 +775,75 @@
   .card:hover .icon {
     transform: none;
   }
+}
+
+/* --------------------------- prices and offers ---------------------------- */
+
+/*
+ * The price line now carries up to three things — today's figure, the one it
+ * replaced, and how long the appointment takes. They sit on one line because a
+ * visitor reads them as one answer: what it costs and what it costs me in time.
+ */
+/*
+ * The figure itself, a step larger than the line it sits on. It is the thing a
+ * visitor came to find, and at the same size as the label beside it there was
+ * nothing to run an eye down a column of cards for.
+ */
+.priceNow {
+  font-size: 1.16rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.priceWas {
+  color: var(--text-faint);
+  text-decoration: line-through;
+  font-weight: 500;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * The offer badge, in the corner of the header. The same device the catalogue
+ * uses, so an offer reads identically whether it is on a product or a treatment
+ * — a badge rather than a colour, because a colour is not a fact.
+ */
+/*
+ * The offer badge, in the accent rather than the brand.
+ *
+ * It is the one thing on a card that is about *today* rather than about the
+ * service, so it is the one thing allowed to use the accent as a fill. In the
+ * brand colour it read as a category label; in the accent it reads as a price
+ * change, which is what it is.
+ */
+.offerFlag {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 3;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* The title is a link now. It keeps the heading's weight and picks up the brand
+   colour on hover, so it reads as a heading that happens to be clickable rather
+   than as a link that happens to be big. */
+.titleLink {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.titleLink:hover {
+  color: var(--brand);
+  border-bottom-color: currentColor;
 }

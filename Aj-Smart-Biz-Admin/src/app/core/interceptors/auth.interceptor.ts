@@ -54,8 +54,20 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 };
 
 /** Flattens `{ message, errors: [{ field, message }] }` into one string. */
-export function messageOf(error: HttpErrorResponse): string {
-  const body = error.error as { message?: string; errors?: FieldError[] } | undefined;
+export function messageOf(error: HttpErrorResponse | { name?: string; message?: string }): string {
+  /**
+   * A write that ran out of time, said as a sentence.
+   *
+   * `timeout()` throws an rxjs `TimeoutError` rather than an
+   * `HttpErrorResponse`, so without this the one failure a person is most likely
+   * to meet — a save that hung — would print "Timeout has occurred" and leave
+   * them no wiser about whether their change landed.
+   */
+  if ((error as { name?: string })?.name === 'TimeoutError') {
+    return 'The server did not answer in time. Your change may not have been saved — reload and check before trying again.';
+  }
+
+  const body = (error as HttpErrorResponse).error as { message?: string; errors?: FieldError[] } | undefined;
   if (body?.errors?.length) {
     return body.errors.map((item) => `${item.field}: ${item.message}`).join(', ');
   }

@@ -43,6 +43,20 @@ const config = {
   bcryptSaltRounds: int(process.env.BCRYPT_SALT_ROUNDS, 10),
   defaultCompanyAdminPassword: process.env.DEFAULT_COMPANY_ADMIN_PASSWORD || 'Company@123',
 
+  /**
+   * The sign-in code every customer gets while no SMS gateway is connected.
+   *
+   * Read **here** rather than straight out of `process.env` in the constants,
+   * and that is not tidiness: this file is the one that calls `dotenv.config()`,
+   * so anything reading `process.env` without going through it is honoured or
+   * ignored depending on which module happened to load first. Read the constants
+   * on their own — a script, a test — and the value in `.env.development` was
+   * silently dropped for the built-in default.
+   *
+   * See `CUSTOMER_OTP_DEV_CODE`, which is where the rest of the reasoning lives.
+   */
+  customerOtpDevCode: process.env.CUSTOMER_OTP_DEV_CODE || '123456',
+
   uploads: {
     // Directory on disk; served read-only at `publicPath`.
     dir: process.env.UPLOAD_DIR || 'uploads',

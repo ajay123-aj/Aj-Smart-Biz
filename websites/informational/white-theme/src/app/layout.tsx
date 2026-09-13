@@ -5,10 +5,13 @@ import Footer from '@/components/Footer';
 import { WhatsAppFab } from '@/components/WhatsAppButton';
 import { ShareFab } from '@/components/ShareButton';
 import LeadTracker from '@/components/LeadTracker';
+import CartProvider from '@/components/CartProvider';
+import CartPanel from '@/components/CartPanel';
 import { getCompanyDetails } from '@/lib/company.server';
+import { getAccount } from '@/lib/session.server';
 import ServiceUnavailable from '@/components/ServiceUnavailable';
 import { SERVICE_UNAVAILABLE } from '@/config/site';
-import { fillCompany, shareLinkOf, toFileUrl, type CompanyDetails } from '@/lib/company';
+import { fillCompany, shareLinkOf, siteCompany, toFileUrl, type CompanyDetails } from '@/lib/company';
 import './globals.css';
 
 /** Shown until — and unless — the tenant uploads a favicon of its own. */
@@ -132,6 +135,16 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const share = shareLinkOf(company);
   const hasWhatsapp = Boolean(company.features?.whatsapp);
 
+  /**
+   * The signed-in customer, for the checkout.
+   *
+   * Asked for **only** where the tenant actually runs accounts — on every other
+   * site this is a request that would always answer "not signed in", once per
+   * page, forever. A guest gets `null` and the cart behaves exactly as it did
+   * before accounts existed.
+   */
+  const account = company.features?.customers ? await getAccount() : null;
+
   return (
     <html lang="en">
       <body style={themeVariables(company)}>
@@ -153,11 +166,33 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         </Suspense>
 
         {served ? (
-          <>
+          /**
+           * The basket wraps the whole served site, because every part of it is
+           * somewhere different: the Add button is inside a card in `main`, the
+           * count is in the header above it, and the panel that sends the order
+           * is a sibling of both. One provider is the only arrangement where
+           * adding from the home page moves the header's count without a
+           * reload.
+           *
+           * Mounted whether or not this tenant takes orders — `features.orders`
+           * is null when they do not and every consumer renders nothing on it,
+           * which keeps that decision in the API rather than splitting it
+           * between here and four components.
+           *
+           * `siteCompany` again, for the reason the header gets it: everything
+           * inside is a client component, and the catalogue has no business
+           * being serialised into every page. A basket line is a snapshot taken
+           * when the button was pressed — see `CartLine`.
+           */
+          <CartProvider company={siteCompany(company)} account={account}>
             <a className="skip-link" href="#main">
               Skip to content
             </a>
-            <Header company={company} />
+            {/* `siteCompany` rather than `company`: the header is a client
+                component, so whatever it is given is serialised into every
+                page's payload — and the catalogue has no business being there.
+                See `siteCompany`. */}
+            <Header company={siteCompany(company)} />
             <main id="main">{children}</main>
             <Footer company={company} />
             <WhatsAppFab company={company} />
@@ -166,7 +201,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
               message={share ? fillCompany(share.message, company) : ''}
               raised={hasWhatsapp}
             />
-          </>
+            {/* Mounted once, opened from anywhere. Renders nothing at all for a
+                tenant that takes no orders. */}
+            <CartPanel />
+          </CartProvider>
         ) : (
           children
         )}

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import type { LeadStage } from '../../core/models/domain.model';
+import { stageLabel } from '../../shared/utils';
 
 /**
  * A lead's stage as a coloured pill.
@@ -30,8 +31,5 @@ export class LeadStageBadgeComponent {
   readonly value = input.required<LeadStage | null | undefined>();
 
   readonly tone = computed(() => TONES[this.value() as LeadStage] ?? 'muted');
-  readonly label = computed(() => {
-    const raw = String(this.value() ?? 'new');
-    return raw.charAt(0).toUpperCase() + raw.slice(1);
-  });
+  readonly label = computed(() => stageLabel(this.value() ?? 'new'));
 }

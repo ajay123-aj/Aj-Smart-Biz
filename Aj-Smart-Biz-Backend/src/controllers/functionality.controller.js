@@ -22,6 +22,13 @@ const {
   FEATURE_ICONS,
   DEFAULT_FEATURE_ITEMS,
   PAYMENT_MODE_CATALOGUE,
+  ORDER_MODE_CATALOGUE,
+  ORDER_DEFAULTS,
+  ORDER_STATUS_CATALOGUE,
+  ORDER_PAYMENT_STATUS_CATALOGUE,
+  STOCK_REASON_CATALOGUE,
+  STOCK_MANUAL_REASONS,
+  ANALYTICS_RANGES,
 } = require('../constants');
 
 /**
@@ -67,6 +74,41 @@ const catalogue = asyncHandler(async (req, res) =>
       shareDefaults: SHARE_LINK_DEFAULTS,
       statModes: STAT_MODE_VALUES,
       statUnits: STAT_UNIT_VALUES,
+      /**
+       * Where an order goes, and what each route needs to work — sent rather
+       * than written out in the console, for the reason the payment modes are:
+       * a mode added to the platform must not need a second release of the
+       * browser app to become selectable, and a list typed twice is a list that
+       * eventually disagrees with itself.
+       */
+      orderModes: ORDER_MODE_CATALOGUE,
+      /**
+       * The cart's own wording, so the Cart & orders screen can show the
+       * platform's text as a placeholder and tell "they typed the standard
+       * wording" from "they never opened the field" — the distinction every
+       * other copy screen on the console makes.
+       */
+      orderDefaults: ORDER_DEFAULTS,
+      /**
+       * The order queue's own vocabulary — what each step is called, what it
+       * means, and what colour it reads as. Sent rather than written out in the
+       * console for the reason every other list here is: a step added to the
+       * platform must not need a second release of the browser app before
+       * anybody can see its name.
+       */
+      orderStatuses: ORDER_STATUS_CATALOGUE,
+      orderPaymentStatuses: ORDER_PAYMENT_STATUS_CATALOGUE,
+      /**
+       * Why stock moved, and which way each reason moves it. `manual` is the
+       * subset a **person** may write: `sale` and `transfer` are written by the
+       * platform alongside something else that has to be true at the same
+       * moment, so a form that offered them would be a form that could put a
+       * sale in the ledger against no order.
+       */
+      stockReasons: STOCK_REASON_CATALOGUE,
+      stockManualReasons: STOCK_MANUAL_REASONS,
+      /** The windows the analytics screens may ask for. A closed list — see the constant. */
+      analyticsRanges: ANALYTICS_RANGES,
       /**
        * The glyphs a benefit card may carry, with the artwork to draw them.
        *

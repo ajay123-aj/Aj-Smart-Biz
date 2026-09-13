@@ -111,6 +111,102 @@ export interface Plan extends AuditFields {
 /* --------------------------- optional functionality --------------------------- */
 
 /** A key the platform implements. Mirrors `FUNCTIONALITY` in the API. */
+/* --------------------------- platform insight --------------------------- */
+
+/**
+ * One customer of one tenant, as the **platform** sees them.
+ *
+ * Thinner than the tenant's own view on purpose. Their addresses and the lines
+ * of their orders are absent: the operator has a legitimate interest in how many
+ * customers a company has and what they are worth — that is billing and support
+ * — and none at all in where a particular person lives.
+ */
+export interface PlatformCustomer {
+  id: number;
+  name: string;
+  phone: string;
+  email: string | null;
+  status: Status;
+  phoneVerified: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  company: { id: number; name: string; code: string } | null;
+  orders: number;
+  /** Cancellations excluded, the rule every revenue figure here follows. */
+  spent: number;
+}
+
+export interface PlatformCustomerSummary {
+  total: number;
+  active: number;
+  inactive: number;
+  joinedLast30: number;
+  /** How many tenants have any at all — whether the feature is used or just sold. */
+  companies: number;
+}
+
+/**
+ * How one tenant is actually doing.
+ *
+ * **Every block is `null` unless that functionality is live for them.** A company
+ * that never bought the warehouse showing a row of noughts reads as a company
+ * with no stock rather than one that never bought stock control, and those are
+ * very different things to somebody deciding what to sell them next.
+ */
+export interface CompanyInsights {
+  company: { id: number; name: string; code: string; status: Status };
+  range: { days: number };
+  /** What they are entitled to, so the screen can say why a block is missing. */
+  activeKeys: FunctionalityKey[];
+
+  orders: {
+    window: {
+      orders: number;
+      revenue: number;
+      units: number;
+      unpricedItems: number;
+      averageOrderValue: number;
+      cancelled: number;
+    };
+    lifetime: { orders: number; revenue: number };
+    daily: { day: string; orders?: number; revenue?: number }[];
+    byStatus: Record<string, number>;
+    topProducts: { name: string; units: number; revenue: number }[];
+    open: number;
+    unpaidAmount: number;
+  } | null;
+
+  catalogue: { products: number; live: number; categories: number } | null;
+
+  warehouse: {
+    units: number;
+    onHand: number;
+    available: number;
+    low: number;
+    out: number;
+    retailValue: number;
+  } | null;
+
+  services: {
+    published: number;
+    enquiries: number;
+    quoted: number;
+    collected: number;
+    outstanding: number;
+  } | null;
+
+  customers: { total: number; active: number; joinedLast30: number; withOrders: number } | null;
+
+  /**
+   * The blog, and `lastPostedAt` is the field this block exists for.
+   *
+   * A tenant who bought a blog and stopped writing four months ago is a
+   * different conversation from one who posts weekly, and a post count cannot
+   * tell the two apart.
+   */
+  blog: { posts: number; live: number; lastPostedAt: string | null } | null;
+}
+
 export type FunctionalityKey =
   | 'whatsapp'
   | 'share_link'
@@ -121,7 +217,14 @@ export type FunctionalityKey =
   | 'gallery'
   | 'contact_page'
   | 'testimonials'
-  | 'features_benefits';
+  | 'features_benefits'
+  | 'products'
+  | 'orders'
+  | 'warehouse'
+  | 'customers'
+  | 'blog'
+  | 'service_enquiry'
+  | 'service_booking';
 
 /** What a WhatsApp number is for, and therefore which button it lands on. */
 export type WhatsappType = 'inquiry' | 'contact' | 'support' | 'orders';

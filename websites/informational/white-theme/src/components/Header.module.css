@@ -13,12 +13,20 @@
   box-shadow: var(--shadow-sm);
 }
 
+/*
+ * Brand on the left, then everything else pushed to the right.
+ *
+ * `space-between` used to spread the children across the bar, which put the
+ * navigation in the middle and left it drifting as links were added and removed
+ * per tenant — a menu whose position depends on how many pages a shop has
+ * bought. The brand takes the left, `margin-left: auto` on the nav carries it and
+ * the actions after it to the right, and the bar reads the same for every tenant.
+ */
 .inner {
   height: var(--header-height);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 24px;
+  gap: 20px;
 }
 
 /* ------------------------------ brand ------------------------------ */
@@ -77,6 +85,8 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  /* Takes itself and the actions after it to the right-hand end. */
+  margin-left: auto;
 }
 
 .navLink {
@@ -107,6 +117,76 @@
 .navCta {
   margin-left: 8px;
   padding: 11px 22px;
+}
+
+/* ------------------------------- actions ------------------------------- */
+
+/*
+ * WhatsApp, the account and the basket: three glyphs, one group, hard right.
+ *
+ * They are not places on the site — they are things about *you* and about this
+ * moment — which is why they sit outside the navigation and stay reachable when
+ * the mobile menu is shut. Grouped so the gap between them is tighter than the
+ * gap to the menu; a row of evenly spaced controls reads as one undifferentiated
+ * strip.
+ */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+/*
+ * One round button for all three, so they line up whatever is inside them.
+ *
+ * **Scoped under `.actions` deliberately.** Each of these components carries its
+ * own base class too — the WhatsApp link is a full button elsewhere on the page,
+ * the basket is a pill in its own module — and two single-class rules would be
+ * left to fight it out on stylesheet order, which is not a thing to leave to
+ * chance. Two classes beats one, everywhere, every time.
+ *
+ * Sized to the touch target a thumb needs rather than to the glyph inside it.
+ */
+.actions .action {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  padding: 0;
+  gap: 0;
+
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.actions .action:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.actions .action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.actions .action svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* WhatsApp keeps its own colour: it is the one action that leaves the site. */
+.actions .action:first-child {
+  color: var(--whatsapp-dark);
 }
 
 /* ------------------------------ mobile ------------------------------ */
@@ -182,8 +262,22 @@
     font-size: 1rem;
   }
 
-  /* In the mobile sheet both actions become full-width rows. */
-  .navWhatsapp,
+  /*
+   * The nav leaves the flow here and becomes a sheet, so its `margin-left: auto`
+   * stops doing anything. The actions take over holding the right-hand end, with
+   * the menu button after them.
+   */
+  .actions {
+    margin-left: auto;
+  }
+
+  /* Tighter on a phone: three circles and a menu button is most of a narrow bar. */
+  .actions .action {
+    width: 36px;
+    height: 36px;
+  }
+
+  /* The one action still rendered inside the sheet, where it is a real row. */
   .navCta {
     margin: 10px 0 0;
     width: 100%;

@@ -5,130 +5,327 @@
   </button>
 </app-page-header>
 
-@if (loading() && !data()) {
-  <div class="grid grid-3">
-    @for (item of [1, 2, 3]; track item) {
-      <div class="skeleton" style="height:118px"></div>
-    }
-  </div>
-} @else if (data(); as d) {
-  <!-- Admin counters are the headline figure for this portal -->
-  <section class="grid grid-3">
-    <article class="tile">
-      <div class="tile-top">
-        <span class="tile-icon" style="background:var(--brand-100);color:var(--brand-700)">👥</span>
-        <span class="tile-label">Total admins</span>
-      </div>
-      <div class="tile-value">{{ d.admins.total }}</div>
-      <div class="tile-foot">
-        <span class="badge badge-success">{{ d.admins.active }} active</span>
-        <span class="badge badge-muted">{{ d.admins.inactive }} inactive</span>
-      </div>
-    </article>
+<!--
+  One `.stack` around the whole page, and no margin on any section inside it.
 
-    <article class="tile">
-      <div class="tile-top">
-        <span class="tile-icon" style="background:var(--info-bg);color:var(--info)">📍</span>
-        <span class="tile-label">Branches</span>
-      </div>
-      <div class="tile-value">{{ d.branches.total }}</div>
-      <div class="tile-foot">
-        <span class="badge badge-success">{{ d.branches.active }} active</span>
-        <span class="tiny muted">{{ d.roles.total }} roles configured</span>
-      </div>
-    </article>
-
-    <article class="tile">
-      <div class="tile-top">
-        <span class="tile-icon" style="background:var(--success-bg);color:var(--success)">💳</span>
-        <span class="tile-label">Current plan</span>
-      </div>
-      @if (d.subscription; as sub) {
-        <div class="tile-value" style="font-size:20px">{{ sub.planName || '—' }}</div>
-        <!-- Live countdown rather than a static day count, so the tile stays true. -->
-        <div style="margin:6px 0 2px">
-          <app-plan-timer [timer]="sub.timer" [showBar]="false" [showMeta]="false" />
-        </div>
-        <div class="tile-foot">
-          <span class="tiny muted">Until {{ sub.endDate | date: 'dd MMM yyyy' }}</span>
-          <a class="tiny" routerLink="/plan">View plan →</a>
-        </div>
-      } @else {
-        <div class="tile-value" style="font-size:18px">No active plan</div>
-        <div class="tile-foot"><span class="tiny muted">Contact your platform administrator</span></div>
+  Every block below used to carry its own `margin-top`, and the four that were
+  added later did not — which is why Orders, Warehouse, Catalogue and Customers
+  sat flush against each other with no gap at all. The rhythm is the parent's job
+  now: each section is spaced from the one before it, a section that is switched
+  off takes its gap with it, and nothing has to know what comes after it.
+-->
+<div class="stack">
+  @if (loading() && !data()) {
+    <div class="grid grid-3">
+      @for (item of [1, 2, 3]; track item) {
+        <div class="skeleton" style="height:136px"></div>
       }
-    </article>
-  </section>
+    </div>
+  } @else if (data(); as d) {
+    <!-- Admin counters are the headline figure for this portal -->
+    <section class="grid grid-3">
+      <article class="tile">
+        <div class="tile-top">
+          <span class="tile-icon tile-icon-brand">👥</span>
+          <span class="tile-label">Total admins</span>
+        </div>
+        <div class="tile-value">{{ d.admins.total }}</div>
+        <div class="tile-foot">
+          <span class="badge badge-success">{{ d.admins.active }} active</span>
+          <span class="badge badge-muted">{{ d.admins.inactive }} inactive</span>
+        </div>
+      </article>
 
-  @if (d.subscription?.limits; as limits) {
-    <section class="card" style="margin-top:20px">
-      <div class="card-head">
-        <h3>Plan usage</h3>
-        <span class="tiny muted">Limits come from your active subscription</span>
-      </div>
-      <div class="card-body">
-        <div class="grid grid-3">
-          <div>
-            <div class="row-between">
-              <span class="tiny strong">Admins</span>
-              <span class="tiny muted">{{ d.admins.total }} / {{ limits.maxAdmins ?? '∞' }}</span>
-            </div>
-            <div class="meter"><div class="meter-fill" [style.width.%]="usage(d.admins.total, limits.maxAdmins)"></div></div>
+      <article class="tile">
+        <div class="tile-top">
+          <span class="tile-icon tile-icon-info">📍</span>
+          <span class="tile-label">Branches</span>
+        </div>
+        <div class="tile-value">{{ d.branches.total }}</div>
+        <div class="tile-foot">
+          <span class="badge badge-success">{{ d.branches.active }} active</span>
+          <span class="tiny muted">{{ d.roles.total }} roles configured</span>
+        </div>
+      </article>
+
+      <article class="tile">
+        <div class="tile-top">
+          <span class="tile-icon tile-icon-success">💳</span>
+          <span class="tile-label">Current plan</span>
+        </div>
+        @if (d.subscription; as sub) {
+          <div class="tile-value tile-value-sm">{{ sub.planName || '—' }}</div>
+          <!-- Live countdown rather than a static day count, so the tile stays true. -->
+          <div class="tile-sub">
+            <app-plan-timer [timer]="sub.timer" [showBar]="false" [showMeta]="false" />
           </div>
-          <div>
-            <div class="row-between">
-              <span class="tiny strong">Branches</span>
-              <span class="tiny muted">{{ d.branches.total }} / {{ limits.maxBranches ?? '∞' }}</span>
-            </div>
-            <div class="meter"><div class="meter-fill" [style.width.%]="usage(d.branches.total, limits.maxBranches)"></div></div>
+          <div class="tile-foot">
+            <span class="tiny muted">Until {{ sub.endDate | date: 'dd MMM yyyy' }}</span>
+            <a class="tiny" routerLink="/plan">View plan →</a>
           </div>
-          <div>
-            <div class="row-between">
-              <span class="tiny strong">Users</span>
-              <span class="tiny muted">up to {{ limits.maxUsers ?? '∞' }}</span>
+        } @else {
+          <div class="tile-value tile-value-sm">No active plan</div>
+          <div class="tile-foot"><span class="tiny muted">Contact your platform administrator</span></div>
+        }
+      </article>
+    </section>
+
+    @if (d.subscription?.limits; as limits) {
+      <section class="card">
+        <div class="card-head">
+          <h3>Plan usage</h3>
+          <span class="tiny muted">Limits come from your active subscription</span>
+        </div>
+        <div class="card-body">
+          <div class="grid grid-3">
+            <div>
+              <div class="row-between">
+                <span class="tiny strong">Admins</span>
+                <span class="tiny muted">{{ d.admins.total }} / {{ limits.maxAdmins ?? '∞' }}</span>
+              </div>
+              <div class="meter"><div class="meter-fill" [style.width.%]="usage(d.admins.total, limits.maxAdmins)"></div></div>
             </div>
-            <div class="meter"><div class="meter-fill" style="width:0%"></div></div>
+            <div>
+              <div class="row-between">
+                <span class="tiny strong">Branches</span>
+                <span class="tiny muted">{{ d.branches.total }} / {{ limits.maxBranches ?? '∞' }}</span>
+              </div>
+              <div class="meter"><div class="meter-fill" [style.width.%]="usage(d.branches.total, limits.maxBranches)"></div></div>
+            </div>
+            <div>
+              <div class="row-between">
+                <span class="tiny strong">Users</span>
+                <span class="tiny muted">up to {{ limits.maxUsers ?? '∞' }}</span>
+              </div>
+              <div class="meter"><div class="meter-fill" style="width:0%"></div></div>
+            </div>
           </div>
         </div>
+      </section>
+    }
+
+    <!-- ================================================================== -->
+    <!-- What the shop actually does, where it has bought it                  -->
+    <!--                                                                      -->
+    <!-- Each block is absent unless its functionality is live. A shop without -->
+    <!-- the catalogue getting an empty Products card reads as something       -->
+    <!-- broken rather than something not purchased, so the API sends null and -->
+    <!-- the template renders on presence.                                     -->
+    <!-- ================================================================== -->
+
+    @if (d.orders; as o) {
+      <section class="card">
+        <div class="card-head">
+          <h3>Orders</h3>
+          <a class="btn btn-sm btn-ghost" routerLink="/orders">Open the queue</a>
+        </div>
+        <div class="card-body">
+          <div class="stat-grid">
+            <div class="stat" [class.stat-warn]="o.open > 0">
+              <span class="stat-label">Waiting on you</span>
+              <span class="stat-value">{{ o.open | number }}</span>
+              <span class="stat-note">New, confirmed, packed or out</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">New today</span>
+              <span class="stat-value">{{ o.today | number }}</span>
+              <span class="stat-note">Since midnight</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Last 30 days</span>
+              <span class="stat-value">{{ money(o.month.revenue) }}</span>
+              <!-- Cancellations are not sales — said here so nobody reads this as
+                   everything that arrived. -->
+              <span class="stat-note">{{ o.month.orders | number }} orders, cancellations excluded</span>
+            </div>
+            <div class="stat" [class.stat-warn]="o.unpaid.orders > 0">
+              <span class="stat-label">Unpaid</span>
+              <span class="stat-value">{{ money(o.unpaid.amount) }}</span>
+              <span class="stat-note">{{ o.unpaid.orders | number }} order(s) owing</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    }
+
+    <!--
+      The service side, immediately after the order book.
+
+      They are the two halves of what a business sells - things and work - and a
+      dashboard showing one without the other tells a tradesman nothing. The
+      figures a person opens this screen for are the two on the left: somebody
+      asked and has not been answered, and somebody asked for a time and is
+      waiting to hear.
+    -->
+    @if (d.services; as sv) {
+      <section class="card">
+        <div class="card-head">
+          <h3>Services</h3>
+          <a class="btn btn-sm btn-ghost" routerLink="/service-leads">Open the inbox</a>
+        </div>
+        <div class="card-body">
+          <div class="stat-grid">
+            <div class="stat" [class.stat-warn]="sv.new > 0">
+              <span class="stat-label">Not answered</span>
+              <span class="stat-value">{{ sv.new | number }}</span>
+              <span class="stat-note">of {{ sv.enquiries | number }} enquiries</span>
+            </div>
+
+            <!-- Only where the tenant actually takes appointments: a shop that
+                 does not would otherwise get two cards of permanent noughts. -->
+            @if (sv.awaiting || sv.confirmed || sv.todayBookings) {
+              <div class="stat" [class.stat-warn]="sv.awaiting > 0">
+                <span class="stat-label">Waiting to confirm</span>
+                <span class="stat-value">{{ sv.awaiting | number }}</span>
+                <span class="stat-note">{{ sv.todayBookings | number }} booked in today</span>
+              </div>
+            }
+
+            <div class="stat">
+              <span class="stat-label">Last 30 days</span>
+              <span class="stat-value">{{ sv.lastThirtyDays | number }}</span>
+              <span class="stat-note">enquiries received</span>
+            </div>
+
+            <!-- Quoted and not yet paid. The one figure here somebody can act on
+                 this afternoon. -->
+            <div class="stat" [class.stat-warn]="sv.outstanding > 0">
+              <span class="stat-label">Owed to you</span>
+              <span class="stat-value">{{ money(sv.outstanding) }}</span>
+              <span class="stat-note">{{ money(sv.collected) }} collected</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    }
+
+    @if (d.warehouse; as w) {
+      <section class="card">
+        <div class="card-head">
+          <h3>Warehouse</h3>
+          <a class="btn btn-sm btn-ghost" routerLink="/warehouse">Open the stockroom</a>
+        </div>
+        <div class="card-body">
+          <div class="stat-grid">
+            <div class="stat">
+              <span class="stat-label">On the shelves</span>
+              <span class="stat-value">{{ w.onHand | number }}</span>
+              <!-- Promised, not sold: a box committed to a confirmed order is here
+                   and not available to anybody else. -->
+              <span class="stat-note">{{ w.available | number }} available, {{ w.reserved | number }} promised</span>
+            </div>
+            <div class="stat" [class.stat-bad]="w.out > 0">
+              <span class="stat-label">Out of stock</span>
+              <span class="stat-value">{{ w.out | number }}</span>
+              <span class="stat-note">products with none left</span>
+            </div>
+            <div class="stat" [class.stat-warn]="w.low > 0">
+              <span class="stat-label">Running low</span>
+              <span class="stat-value">{{ w.low | number }}</span>
+              <span class="stat-note">under the level you set</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Warehouses</span>
+              <span class="stat-value">{{ w.units | number }}</span>
+              <span class="stat-note">{{ w.tracked | number }} products counted</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    }
+
+    @if (d.catalogue; as c) {
+      <section class="card">
+        <div class="card-head">
+          <h3>Your catalogue</h3>
+          <a class="btn btn-sm btn-ghost" routerLink="/company/products">Manage products</a>
+        </div>
+        <div class="card-body">
+          <div class="stat-grid">
+            <div class="stat">
+              <span class="stat-label">On the website</span>
+              <span class="stat-value">{{ c.live | number }}</span>
+              <span class="stat-note">{{ c.hidden | number }} hidden</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Categories</span>
+              <span class="stat-value">{{ c.categories | number }}</span>
+              <span class="stat-note">visitors browse by these</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">On offer</span>
+              <span class="stat-value">{{ c.offers | number }}</span>
+              <span class="stat-note">reduced right now</span>
+            </div>
+            <div class="stat" [class.stat-bad]="c.outOfStock > 0">
+              <span class="stat-label">Marked out of stock</span>
+              <span class="stat-value">{{ c.outOfStock | number }}</span>
+              <span class="stat-note">by hand, not by the warehouse</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    }
+
+    @if (d.customers; as cu) {
+      <section class="card">
+        <div class="card-head">
+          <h3>Customers</h3>
+          <a class="btn btn-sm btn-ghost" routerLink="/customers">Open the list</a>
+        </div>
+        <div class="card-body">
+          <div class="stat-grid">
+            <div class="stat">
+              <span class="stat-label">Accounts</span>
+              <span class="stat-value">{{ cu.total | number }}</span>
+              <span class="stat-note">{{ cu.active | number }} can sign in</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Joined this month</span>
+              <span class="stat-value">{{ cu.joinedLast30 | number }}</span>
+              <span class="stat-note">in the last 30 days</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    }
+
+    <section class="card">
+      <div class="card-head">
+        <h3>Recently added admins</h3>
+        <a class="btn btn-sm btn-ghost" routerLink="/admins" *appCan="'admin-management'">View all</a>
+      </div>
+      <div class="card-body tight">
+        @if (d.recentAdmins.length === 0) {
+          <div class="empty"><div class="empty-icon">👥</div><div>No admins yet</div></div>
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>Admin</th><th>Role</th><th>Last login</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                @for (admin of d.recentAdmins; track admin.id) {
+                  <tr>
+                    <td>
+                      <div class="row">
+                        <span class="avatar">{{ initialsOf(admin.name) }}</span>
+                        <div>
+                          <span class="strong">{{ admin.name }}</span>
+                          <div class="tiny muted">{{ admin.email }}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="muted">{{ admin.role?.name || '—' }}</td>
+                    <td class="tiny muted nowrap">{{ admin.lastLoginAt ? (admin.lastLoginAt | date: 'dd MMM yyyy, HH:mm') : 'Never' }}</td>
+                    <td><app-status-badge [value]="admin.status" /></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
       </div>
     </section>
   }
-
-  <section class="card" style="margin-top:20px">
-    <div class="card-head">
-      <h3>Recently added admins</h3>
-      <a class="btn btn-sm btn-ghost" routerLink="/admins" *appCan="'admin-management'">View all</a>
-    </div>
-    <div class="card-body tight">
-      @if (d.recentAdmins.length === 0) {
-        <div class="empty"><div class="empty-icon">👥</div><div>No admins yet</div></div>
-      } @else {
-        <div class="table-wrap">
-          <table class="table">
-            <thead>
-              <tr><th>Admin</th><th>Role</th><th>Last login</th><th>Status</th></tr>
-            </thead>
-            <tbody>
-              @for (admin of d.recentAdmins; track admin.id) {
-                <tr>
-                  <td>
-                    <div class="row">
-                      <span class="avatar">{{ initialsOf(admin.name) }}</span>
-                      <div>
-                        <span class="strong">{{ admin.name }}</span>
-                        <div class="tiny muted">{{ admin.email }}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="muted">{{ admin.role?.name || '—' }}</td>
-                  <td class="tiny muted nowrap">{{ admin.lastLoginAt ? (admin.lastLoginAt | date: 'dd MMM yyyy, HH:mm') : 'Never' }}</td>
-                  <td><app-status-badge [value]="admin.status" /></td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      }
-    </div>
-  </section>
-}
+</div>

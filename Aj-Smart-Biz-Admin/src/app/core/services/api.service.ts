@@ -1,8 +1,22 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, map } from 'rxjs';
+import { Observable, map, timeout } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, EMPTY_META, ListQuery, PageMeta, PagedResult } from '../models/api.model';
+
+/**
+ * How long a **write** may take before the console gives up on it.
+ *
+ * A request with no deadline that never answers is the worst failure a form can
+ * have: the button stays on "Saving…", nothing is reported, and the person is
+ * left guessing whether their change landed. Thirty seconds is far longer than
+ * any write on this platform takes, and short enough that somebody is told
+ * rather than left waiting.
+ *
+ * Reads are deliberately left alone: a slow list is a slow list, not a screen
+ * stuck in a state it cannot leave.
+ */
+const WRITE_TIMEOUT_MS = 30_000;
 
 /**
  * Thin HttpClient wrapper that unwraps the `{ success, message, data, meta }`
@@ -51,19 +65,30 @@ export class ApiService {
   }
 
   post<T>(path: string, body: unknown = {}): Observable<T> {
-    return this.http.post<ApiResponse<T>>(`${this.base}${path}`, body).pipe(map((res) => res.data));
+    return this.http
+      .post<ApiResponse<T>>(`${this.base}${path}`, body)
+      /* Every write carries a deadline; see `WRITE_TIMEOUT_MS`. */
+      .pipe(timeout(WRITE_TIMEOUT_MS), map((res) => res.data));
   }
 
   put<T>(path: string, body: unknown = {}): Observable<T> {
-    return this.http.put<ApiResponse<T>>(`${this.base}${path}`, body).pipe(map((res) => res.data));
+    return this.http
+      .put<ApiResponse<T>>(`${this.base}${path}`, body)
+      /* Every write carries a deadline; see `WRITE_TIMEOUT_MS`. */
+      .pipe(timeout(WRITE_TIMEOUT_MS), map((res) => res.data));
   }
 
   patch<T>(path: string, body: unknown = {}): Observable<T> {
-    return this.http.patch<ApiResponse<T>>(`${this.base}${path}`, body).pipe(map((res) => res.data));
+    return this.http
+      .patch<ApiResponse<T>>(`${this.base}${path}`, body)
+      /* Every write carries a deadline; see `WRITE_TIMEOUT_MS`. */
+      .pipe(timeout(WRITE_TIMEOUT_MS), map((res) => res.data));
   }
 
   delete<T>(path: string): Observable<T> {
-    return this.http.delete<ApiResponse<T>>(`${this.base}${path}`).pipe(map((res) => res.data));
+    return this.http
+      .delete<ApiResponse<T>>(`${this.base}${path}`)
+      .pipe(timeout(WRITE_TIMEOUT_MS), map((res) => res.data));
   }
 
   /** Same as `post` but keeps the envelope, for endpoints whose message matters. */

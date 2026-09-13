@@ -1,9 +1,15 @@
 'use strict';
 
-const { Op } = require('sequelize');
+const { Op, fn, col, where: sqlWhere } = require('sequelize');
 const db = require('../models');
 const ApiError = require('../utils/ApiError');
 const { resolveServiceState, runningSubscription } = require('./serviceState.service');
+/* Safe at the top level: stock.service reaches only for the models, so there is
+   no cycle back to this file. `order.service` is the one that has to require
+   lazily, and it says so where it does. */
+const stockService = require('./stock.service');
+/* The diary. Reaches only for the models and the constants, so no cycle. */
+const bookingService = require('./booking.service');
 const {
   STATUS,
   FUNCTIONALITY,
@@ -35,6 +41,20 @@ const {
   NAV_LABEL_SOURCE,
   TEAM_DEFAULTS,
   GALLERY_DEFAULTS,
+  PRODUCT_DEFAULTS,
+  PRODUCT_STOCK,
+  PRODUCT_STOCK_VALUES,
+  CATALOGUE_HOME_LIMITS,
+  ORDER_MODE,
+  ORDER_MODE_VALUES,
+  ORDER_DEFAULTS,
+  ORDER_QTY_MAX,
+  ORDER_LINES_MAX,
+  BLOG_DEFAULTS,
+  BLOG_HOME_LIMIT,
+  BLOG_TAGS_MAX,
+  BLOG_READ_WPM,
+  SERVICE_HOME_LIMITS,
 } = require('../constants');
 
 /**
@@ -215,6 +235,220 @@ function serviceSettings(stored) {
       : SERVICE_DEFAULTS.enquiryTarget,
     formTitle: settings.formTitle || SERVICE_DEFAULTS.formTitle,
     formNote: settings.formNote || SERVICE_DEFAULTS.formNote,
+
+    /* The categories band and the offers band, each making its own argument -
+       the same three-blocks-of-copy arrangement the catalogue has, and for the
+       same reason: "what kind of work we do" and "what is reduced this month"
+       are different sentences. */
+    categoriesEyebrow: settings.categoriesEyebrow || SERVICE_DEFAULTS.categoriesEyebrow,
+    categoriesTitle: settings.categoriesTitle || SERVICE_DEFAULTS.categoriesTitle,
+    categoriesLead: settings.categoriesLead || SERVICE_DEFAULTS.categoriesLead,
+    offersEyebrow: settings.offersEyebrow || SERVICE_DEFAULTS.offersEyebrow,
+    offersTitle: settings.offersTitle || SERVICE_DEFAULTS.offersTitle,
+    offersLead: settings.offersLead || SERVICE_DEFAULTS.offersLead,
+    /** The button on a bookable card, where "Enquire" is the wrong word. */
+    bookLabel: settings.bookLabel || SERVICE_DEFAULTS.bookLabel,
+
+    /**
+     * The diary. Normalised by the service that owns it rather than here, so
+     * the hours the website paints and the hours the booking route enforces are
+     * the same object - see `booking.service`.
+     */
+    booking: bookingService.bookingSettings(settings.booking),
+  };
+}
+
+/**
+ * The catalogue's three blocks of copy, plus the name its page carries in the
+ * menu — normalised the same way `serviceSettings` normalises its own.
+ *
+ * Three blocks rather than one because the catalogue puts three bands on a site
+ * and each makes a different argument; see `PRODUCT_DEFAULTS`. `navLabel` stays
+ * null rather than defaulted, so the console can tell "they typed the standard
+ * name" from "they never opened the field".
+ */
+function productSettings(stored) {
+  const settings = stored && typeof stored === 'object' ? stored : {};
+
+  return {
+    navLabel: settings.navLabel || null,
+    eyebrow: settings.eyebrow || PRODUCT_DEFAULTS.eyebrow,
+    title: settings.title || PRODUCT_DEFAULTS.title,
+    lead: settings.lead || PRODUCT_DEFAULTS.lead,
+    categoriesEyebrow: settings.categoriesEyebrow || PRODUCT_DEFAULTS.categoriesEyebrow,
+    categoriesTitle: settings.categoriesTitle || PRODUCT_DEFAULTS.categoriesTitle,
+    categoriesLead: settings.categoriesLead || PRODUCT_DEFAULTS.categoriesLead,
+    offersEyebrow: settings.offersEyebrow || PRODUCT_DEFAULTS.offersEyebrow,
+    offersTitle: settings.offersTitle || PRODUCT_DEFAULTS.offersTitle,
+    offersLead: settings.offersLead || PRODUCT_DEFAULTS.offersLead,
+    ctaLabel: settings.ctaLabel || PRODUCT_DEFAULTS.ctaLabel,
+  };
+}
+
+/**
+ * The blog's wording, plus the name its page carries in the menu - normalised
+ * the same way the services and catalogue blobs are.
+ *
+ * `showAuthor` uses `??` rather than `||`, like every other boolean on the
+ * platform: `false` is a deliberate choice - a company that writes as itself and
+ * wants no bylines - and `||` would quietly put them back on every article.
+ */
+function blogSettings(stored) {
+  const settings = stored && typeof stored === 'object' ? stored : {};
+
+  return {
+    navLabel: settings.navLabel || null,
+    eyebrow: settings.eyebrow || BLOG_DEFAULTS.eyebrow,
+    title: settings.title || BLOG_DEFAULTS.title,
+    lead: settings.lead || BLOG_DEFAULTS.lead,
+    ctaLabel: settings.ctaLabel || BLOG_DEFAULTS.ctaLabel,
+    showAuthor: settings.showAuthor ?? BLOG_DEFAULTS.showAuthor,
+  };
+}
+
+/**
+ * The cart's wording and terms, normalised the way every other settings blob
+ * on the platform is.
+ *
+ * `mode` and `whatsappType` are validated on the way out as well as on the way
+ * in — the same double check the testimonial mode and the service enquiry
+ * target get, and for the same reason. This value decides whether a stranger is
+ * shown a button that asks them for money, so a blob that somehow holds
+ * nonsense has to fail closed onto the default rather than open.
+ *
+ * The labels are trimmed before they are tested, so a field holding three
+ * spaces asks for the platform's wording back rather than rendering a button
+ * with nothing on it.
+ */
+function orderSettings(stored) {
+  const settings = stored && typeof stored === 'object' ? stored : {};
+  const text = (value, fallback) => {
+    const trimmed = typeof value === 'string' ? value.trim() : '';
+    return trimmed || fallback;
+  };
+
+  /** Null unless it is a real, positive number — a floor of zero is no floor. */
+  const minimum = Number(settings.minOrderAmount);
+  const minOrderAmount = Number.isFinite(minimum) && minimum > 0 ? minimum : null;
+
+  return {
+    mode: ORDER_MODE_VALUES.includes(settings.mode) ? settings.mode : ORDER_DEFAULTS.mode,
+    cart: settings.cart === undefined || settings.cart === null ? ORDER_DEFAULTS.cart : Boolean(settings.cart),
+
+    addToCartLabel: text(settings.addToCartLabel, ORDER_DEFAULTS.addToCartLabel),
+    buyNowLabel: text(settings.buyNowLabel, ORDER_DEFAULTS.buyNowLabel),
+    submitLabel: text(settings.submitLabel, ORDER_DEFAULTS.submitLabel),
+    cartTitle: text(settings.cartTitle, ORDER_DEFAULTS.cartTitle),
+    cartNote: text(settings.cartNote, ORDER_DEFAULTS.cartNote),
+
+    whatsappType: WHATSAPP_TYPE_CATALOGUE.some((entry) => entry.key === settings.whatsappType)
+      ? settings.whatsappType
+      : ORDER_DEFAULTS.whatsappType,
+    messageIntro: text(settings.messageIntro, ORDER_DEFAULTS.messageIntro),
+
+    requireName:
+      settings.requireName === undefined || settings.requireName === null
+        ? ORDER_DEFAULTS.requireName
+        : Boolean(settings.requireName),
+    requirePhone:
+      settings.requirePhone === undefined || settings.requirePhone === null
+        ? ORDER_DEFAULTS.requirePhone
+        : Boolean(settings.requirePhone),
+    requireAddress: Boolean(settings.requireAddress),
+
+    minOrderAmount,
+
+    upiId: text(settings.upiId, '') || null,
+    payeeName: text(settings.payeeName, '') || null,
+    paymentUrl: text(settings.paymentUrl, '') || null,
+    paymentLabel: text(settings.paymentLabel, ORDER_DEFAULTS.paymentLabel),
+    paymentNote: text(settings.paymentNote, ORDER_DEFAULTS.paymentNote),
+  };
+}
+
+/**
+ * What the cart can actually do on this tenant's site today — or `null`, which
+ * is the whole of "this site does not take orders".
+ *
+ * The one place that decides it, called by the public payload, so a button a
+ * visitor can press and a route the API would honour can never disagree. Four
+ * ways to end up with nothing, and the website tells none of them apart:
+ *
+ *   no catalogue    a cart with nothing to put in it. The `orders` grant sits
+ *                   on top of `products` rather than beside it, so this block
+ *                   is withheld whenever that one is — including when the
+ *                   tenant simply has not published a product yet.
+ *   mode `none`     the tenant's own choice, and a real one: the labels, the
+ *                   number and the payment details are all kept, so turning
+ *                   orders back on next month sets nothing up again.
+ *   `whatsapp`, no number
+ *                   an order composed for nobody. The same line `publicServices`
+ *                   takes on its enquiry button, for the same reason.
+ *   `payment`, no UPI id and no link
+ *                   a Pay button that leads nowhere, which is worse in this
+ *                   position than no button at all.
+ *
+ * The WhatsApp number is taken from the block already resolved for the page
+ * rather than queried again — which also means orders degrade correctly when
+ * the WhatsApp functionality itself is not live, without this having to ask.
+ */
+function publicOrders(settings, whatsappFeature) {
+  if (settings.mode === ORDER_MODE.NONE) return null;
+
+  const whatsapp =
+    whatsappFeature?.byType?.[settings.whatsappType] ?? whatsappFeature?.primary ?? null;
+
+  /**
+   * Something to pay *into*. UPI first because that is what the tenants here
+   * use and what a phone can open without a browser; a hosted link is the
+   * answer for a business taking cards. Either is enough, and a tenant with
+   * both gets both — the website offers the two side by side rather than
+   * choosing for the payer.
+   */
+  const payment =
+    settings.upiId || settings.paymentUrl
+      ? {
+        upiId: settings.upiId,
+        /* Falls back on the website to the company's own name. Sent as null
+           rather than guessed here: this service has no company row in hand. */
+        payeeName: settings.payeeName,
+        url: settings.paymentUrl,
+        label: settings.paymentLabel,
+        note: settings.paymentNote,
+      }
+      : null;
+
+  if (settings.mode === ORDER_MODE.WHATSAPP && !whatsapp) return null;
+  if (settings.mode === ORDER_MODE.PAYMENT && !payment) return null;
+
+  return {
+    mode: settings.mode,
+    cart: settings.cart,
+
+    addToCartLabel: settings.addToCartLabel,
+    buyNowLabel: settings.buyNowLabel,
+    submitLabel: settings.submitLabel,
+    cartTitle: settings.cartTitle,
+    cartNote: settings.cartNote,
+    messageIntro: settings.messageIntro,
+
+    requireName: settings.requireName,
+    requirePhone: settings.requirePhone,
+    requireAddress: settings.requireAddress,
+    minOrderAmount: settings.minOrderAmount,
+
+    /**
+     * The number the order goes to, even in `payment` mode. A payment with no
+     * idea what was bought is not an order, so where a tenant taking payment
+     * has published a number the website sends the basket there as well.
+     * `null` when they have not, and the payment then stands alone.
+     */
+    whatsapp,
+    payment,
+
+    /** The platform's caps, sent so the template enforces the same numbers. */
+    quantityMax: ORDER_QTY_MAX,
+    linesMax: ORDER_LINES_MAX,
   };
 }
 
@@ -314,10 +548,22 @@ function settingsFor(key, stored) {
   if (key === FUNCTIONALITY.TESTIMONIALS) return testimonialSettings(stored);
   if (key === FUNCTIONALITY.FEATURES) return featureSettings(stored);
   if (key === FUNCTIONALITY.SERVICES) return serviceSettings(stored);
+  if (key === FUNCTIONALITY.PRODUCTS) return productSettings(stored);
+  if (key === FUNCTIONALITY.BLOG) return blogSettings(stored);
   /* Team, Gallery and Figures keep only the words above their cards. */
   if (key === FUNCTIONALITY.TEAM) return sectionCopy(stored, TEAM_DEFAULTS);
   if (key === FUNCTIONALITY.GALLERY) return sectionCopy(stored, GALLERY_DEFAULTS);
   if (key === FUNCTIONALITY.FIGURES) return sectionCopy(stored, STATS_DEFAULTS);
+  /**
+   * `orders` is **deliberately not** normalised here, unlike every key above it.
+   *
+   * Its console screen shows the platform's wording as placeholders and needs to
+   * tell "they typed the standard label" from "they never opened the field" —
+   * the same distinction `navLabel` stays null for. Filling the blob on the way
+   * out would hand that screen a form pre-filled with defaults and lose it.
+   * The website reads `orderSettings` directly (see `publicFeatures`), so the
+   * defaults still apply everywhere they are actually rendered.
+   */
   return stored ?? {};
 }
 
@@ -339,6 +585,27 @@ const CONTENT_SOURCES = {
   [FUNCTIONALITY.TEAM]: { model: () => db.CompanyTeamMember, where: { status: STATUS.ACTIVE } },
   [FUNCTIONALITY.GALLERY]: { model: () => db.CompanyGalleryItem, where: { status: STATUS.ACTIVE } },
   [FUNCTIONALITY.FEATURES]: { model: () => db.CompanyFeature, where: { status: STATUS.ACTIVE } },
+  /**
+   * Products, not categories. A tenant that has built a category tree and filed
+   * nothing in it has published a set of empty shelves, and the console saying
+   * "on your website" over that is the exact disagreement this list exists to
+   * prevent — the catalogue band, the products page and the nav entry all wait
+   * on a product, so this counts the same thing they do.
+   */
+  [FUNCTIONALITY.PRODUCTS]: { model: () => db.CompanyProduct, where: { status: STATUS.ACTIVE } },
+  /**
+   * Posts, and only the ones a reader could actually be looking at.
+   *
+   * The only entry in this list whose `where` is about **time** rather than
+   * status, and it has to be: a tenant with four articles scheduled for next
+   * month has published nothing today, and a console saying "on your website"
+   * over an archive that 404s is the exact disagreement this list exists to
+   * prevent. It counts what `publicBlog` counts.
+   */
+  [FUNCTIONALITY.BLOG]: {
+    model: () => db.CompanyBlogPost,
+    where: { status: STATUS.ACTIVE, publishedAt: { [Op.ne]: null, [Op.lte]: new Date() } },
+  },
   /**
    * Only an approved review is published, so a queue of pending ones still
    * counts as nothing on the website — which is exactly what the tenant needs
@@ -823,16 +1090,68 @@ async function publicBenefits(companyId, branchId, settings) {
  * every `.map` on it. A row written before the validator existed, or by hand,
  * cannot break a page from this side.
  */
-const publicService = (row) => ({
+const publicService = (row, { categoryPath = [], bookingLive = false } = {}) => ({
   id: row.id,
+  /** The address of its own page - `/services/bridal-makeup`. */
+  slug: row.slug,
   icon: FEATURE_ICON_KEYS.includes(row.icon) ? row.icon : FEATURE_ICON_FALLBACK,
   image: row.image ?? null,
   title: row.title,
   summary: row.summary ?? null,
+  /** The long version, for the service's own page. Plain text, never markup. */
+  description: row.description ?? null,
+  /**
+   * Where it is filed, as a finished path - `Hair > Colour`. Sent rather than
+   * an id, so a breadcrumb costs no second request and no tree-walking in the
+   * template.
+   */
+  category: categoryPath.length ? categoryPath[categoryPath.length - 1] : null,
+  categoryPath,
   highlights: Array.isArray(row.highlights)
     ? row.highlights.map((line) => String(line).trim()).filter(Boolean)
     : [],
-  priceLabel: row.priceLabel ?? null,
+  /**
+   * The price, **only where the tenant is publishing it**.
+   *
+   * A shop that switched `showPrice` off wants the figure recorded and quotable
+   * on the phone, not sitting on a public page for a competitor to read.
+   * Withheld here rather than hidden by the template, so a theme that forgets to
+   * check cannot leak it — the rule every other gated thing in this payload
+   * follows: absence, not a flag.
+   */
+  priceLabel: row.showPrice === false ? null : row.priceLabel ?? null,
+
+  /**
+   * The numbers, withheld on exactly the same condition as the words.
+   *
+   * A shop that switched `showPrice` off wants its figures recorded and
+   * quotable, not sitting on a public page - and that has to cover the price
+   * column as well as the label, or the switch would hide the prose and publish
+   * the number. Absence, not a flag: a theme that forgets to check cannot leak
+   * it.
+   */
+  price: row.showPrice === false || row.price === null || row.price === undefined ? null : Number(row.price),
+  offerPrice:
+    row.showPrice === false || row.offerPrice === null || row.offerPrice === undefined
+      ? null
+      : Number(row.offerPrice),
+  /* Whether it is on offer is not a price and is not hidden with them: a salon
+     running a promotion still wants the badge on a card whose figure it does not
+     publish. Decided by the one function the catalogue uses. */
+  onOffer: isOnOffer(row),
+  discountPercent: row.showPrice === false ? null : discountPercent(row),
+
+  /** How long it takes. Null where the business genuinely cannot say. */
+  durationMinutes: row.durationMinutes ?? null,
+  /**
+   * Whether a visitor may pick a time for this one.
+   *
+   * Both halves have to be true: the company takes bookings **and** this service
+   * is one that can be booked. A salon takes appointments for a haircut and
+   * enquiries about a wedding party, and the second must not offer a 30-minute
+   * slot.
+   */
+  bookable: Boolean(row.bookable) && bookingLive,
   /**
    * This service's own button label, or null to use the section's. Resolved by
    * the website rather than filled in here so a company that changes the
@@ -856,11 +1175,117 @@ const publicService = (row) => ({
  * what that company actually sells, and a service nobody offers is worse on a
  * website than no list at all. See `SERVICE_DEFAULTS`.
  */
-async function publicServices(companyId, branchId, settings, whatsappNumber = null) {
-  const rows = await branchScoped(db.CompanyService, companyId, branchId, { status: STATUS.ACTIVE });
+/**
+ * @param {string[]} activeKeys  What this tenant is entitled to **today**. The
+ *   enquiry button and the diary are grants of their own now, sold on top of
+ *   Services, so the section cannot decide either for itself.
+ */
+async function publicServices(companyId, branchId, settings, whatsappNumber = null, activeKeys = []) {
+  const [rows, categoryRows] = await Promise.all([
+    branchScoped(db.CompanyService, companyId, branchId, { status: STATUS.ACTIVE }),
+    branchScoped(db.CompanyServiceCategory, companyId, branchId, { status: STATUS.ACTIVE }),
+  ]);
   if (!rows.length) return null;
 
   const target = serviceEnquiryTarget(settings, whatsappNumber);
+
+  /**
+   * Booking needs somewhere for the booking to **go**.
+   *
+   * A company that points its button at WhatsApp alone records nothing, so a
+   * confirmed appointment would exist only in a chat thread - there would be no
+   * row to accept, no status to show the customer, and no diary to keep the next
+   * person out of the slot. So the diary is live only where the enquiry is
+   * recorded, and a tenant that switches to WhatsApp-only loses the times and
+   * keeps the button.
+   */
+  /**
+   * Whether a visitor may take a time, and whether they may ask a question.
+   *
+   * Both are **grants** rather than settings: a platform sells a price list, a
+   * price list with an inbox, or a price list with a diary, and a tenant gets
+   * what it paid for. The tenant's own switch is the functionality's status, so
+   * `activeKeys` already means granted, switched on and still served.
+   *
+   * The diary additionally needs somewhere for a booking to **land**. On a
+   * WhatsApp-only site nothing is recorded, so there would be no row to accept,
+   * no status to show the customer and no diary to keep the next person out of
+   * the slot.
+   */
+  const enquiryLive = activeKeys.includes(FUNCTIONALITY.SERVICE_ENQUIRY);
+  const bookingLive =
+    activeKeys.includes(FUNCTIONALITY.SERVICE_BOOKING) &&
+    Boolean(target) &&
+    target !== SERVICE_ENQUIRY_TARGET.WHATSAPP;
+
+  /* The path to each category, resolved once for the whole section. */
+  const byId = new Map(categoryRows.map((row) => [row.id, row]));
+  const pathOf = (categoryId) => {
+    const path = [];
+    let current = byId.get(categoryId);
+    const seen = new Set();
+
+    /* `seen` is not tidiness: the write path refuses to make a cycle, but this
+       runs over whatever is in the table, and a loop here would hang the page. */
+    while (current && !seen.has(current.id)) {
+      seen.add(current.id);
+      path.unshift({ id: current.id, slug: current.slug, name: current.name });
+      current = current.parentId ? byId.get(current.parentId) : null;
+    }
+    return path;
+  };
+
+  const items = rows.map((row) => publicService(row, { categoryPath: pathOf(row.categoryId), bookingLive }));
+
+  /**
+   * How many published services sit at or below each category.
+   *
+   * The same rule the catalogue applies: a heading that leads to nothing is
+   * worse than no heading, so a category with nothing under it is dropped from
+   * the tree entirely rather than shown as an empty shelf.
+   */
+  const totals = new Map();
+  const countUp = (categoryId) => {
+    let current = byId.get(categoryId);
+    const seen = new Set();
+    while (current && !seen.has(current.id)) {
+      seen.add(current.id);
+      totals.set(current.id, (totals.get(current.id) ?? 0) + 1);
+      current = current.parentId ? byId.get(current.parentId) : null;
+    }
+  };
+  rows.forEach((row) => row.categoryId && countUp(row.categoryId));
+
+  const nodeOf = (row, seen) => {
+    if (seen.has(row.id)) return null;
+    const branch = new Set(seen).add(row.id);
+
+    const children = categoryRows
+      .filter((child) => child.parentId === row.id)
+      .map((child) => nodeOf(child, branch))
+      .filter(Boolean);
+
+    const count = totals.get(row.id) ?? 0;
+    if (!count) return null;
+
+    return publicCategory(row, { serviceCount: count, children });
+  };
+
+  const categories = categoryRows
+    .filter((row) => !row.parentId || !byId.has(row.parentId))
+    .map((row) => nodeOf(row, new Set()))
+    .filter(Boolean);
+
+  /**
+   * The offered services - the band a salon wants read first.
+   *
+   * Featured first, and otherwise in the order the tenant arranged, so this is a
+   * stable partition of `items` rather than a second sort.
+   */
+  const offers = [...items.filter((item) => item.onOffer)].sort(
+    (a, b) => Number(b.featured) - Number(a.featured)
+  );
+  const featured = items.filter((item) => item.featured);
 
   return {
     eyebrow: settings.eyebrow,
@@ -878,7 +1303,16 @@ async function publicServices(companyId, branchId, settings, whatsappNumber = nu
      * exist until they have typed it. It is the one place the website builds a
      * WhatsApp URL itself; everywhere else the API sends a finished one.
      */
-    enquiry: target
+    /**
+     * The enquiry button, withheld entirely when the tenant has switched it off.
+     *
+     * Absence, not a flag - the same rule every gated thing in this payload
+     * follows, so a theme that forgets to check cannot paint a button the shop
+     * does not want. With the diary off as well, a card has no action at all and
+     * the section is a price list, which is a legitimate thing for a business to
+     * publish.
+     */
+    enquiry: enquiryLive && target
       ? {
         target,
         /** True when a submission is recorded on the platform. */
@@ -892,7 +1326,560 @@ async function publicServices(companyId, branchId, settings, whatsappNumber = nu
           : null,
       }
       : null,
-    items: rows.map(publicService),
+
+    /* The categories band and the filter on the services page. */
+    categoriesEyebrow: settings.categoriesEyebrow,
+    categoriesTitle: settings.categoriesTitle,
+    categoriesLead: settings.categoriesLead,
+
+    /* The offers band - the services a company is promoting this month. */
+    offersEyebrow: settings.offersEyebrow,
+    offersTitle: settings.offersTitle,
+    offersLead: settings.offersLead,
+
+    /**
+     * The diary, or null when this tenant is not taking appointments today.
+     *
+     * Absent rather than a flag, like everything else in this payload: the
+     * template paints a booking panel when there is one and asks no questions
+     * about why there is not.
+     */
+    booking: bookingLive
+      ? {
+        label: settings.bookLabel,
+        note: settings.booking.note,
+        /** The grid, so the page can say what it is offering. */
+        slotMinutes: settings.booking.slotMinutes,
+        /**
+         * How many bookings one slot holds company-wide.
+         *
+         * Sent so a page can say "up to 3 per slot" without asking for a day
+         * first. A service that overrides it reports its own number on its own
+         * diary, which is where it actually matters.
+         */
+        slotCapacity: settings.booking.slotCapacity,
+        leadHours: settings.booking.leadHours,
+        horizonDays: settings.booking.horizonDays,
+        /** Which weekdays are open, 0-6 with Sunday at 0. Matches `getDay()`. */
+        days: settings.booking.days,
+        openTime: settings.booking.openTime,
+        closeTime: settings.booking.closeTime,
+        /**
+         * Whether somebody has to sign in before they can take a slot.
+         *
+         * True exactly when the tenant runs customer accounts, and it is the
+         * API's answer rather than the template's: an appointment is a promise
+         * with a name on it, and a shop that has a customer list should be able
+         * to find the person who booked. Filled in by `publicFeatures`, which is
+         * the only place that knows about the other functionality.
+         */
+        requiresSignIn: false,
+      }
+      : null,
+
+    items,
+    categories,
+    offers,
+
+    /**
+     * What the home page's three bands show before their *View all* links take
+     * over. Sliced here rather than in the template, so every theme shows the
+     * same tenant the same number of the same things.
+     */
+    home: {
+      services: (featured.length ? featured : items).slice(0, SERVICE_HOME_LIMITS.services),
+      offers: offers.slice(0, SERVICE_HOME_LIMITS.offers),
+      categories: categories.slice(0, SERVICE_HOME_LIMITS.categories),
+    },
+
+    /** Totals for the *View all* links, which say what they lead to. */
+    counts: {
+      services: items.length,
+      categories: categories.length,
+      offers: offers.length,
+    },
+  };
+}
+
+/* ------------------------------ the catalogue ----------------------------- */
+
+/**
+ * Is this product on offer?
+ *
+ * **The one place that decides it**, which is the whole point of it being a
+ * function. The offers band on the home page, the `/offers` page, the badge on
+ * every card and the console's Offers tab all ask this, so a product cannot be
+ * on the offers page without a badge, or badged on a page it is missing from.
+ *
+ * Two ways to be true, and the second is not a shortcut:
+ *
+ *  - a reduced price — `offerPrice` below `price`, which is the ordinary case
+ *  - `onOffer` ticked by hand, which is the *only* way for a tenant pricing in
+ *    free text ("From ₹4,999") to run an offer at all, and the only way to
+ *    express one that is not a reduction ("free fitting this month")
+ */
+const isOnOffer = (row) => {
+  if (row.onOffer) return true;
+  const price = row.price === null || row.price === undefined ? null : Number(row.price);
+  const offer = row.offerPrice === null || row.offerPrice === undefined ? null : Number(row.offerPrice);
+  return price !== null && offer !== null && offer < price;
+};
+
+/**
+ * What a visitor is saving, as a whole percentage — or `null` when the platform
+ * cannot honestly say.
+ *
+ * Rounded rather than truncated, and only produced from two real numbers. A
+ * product on offer by the `onOffer` flag alone has no pair to compare, so this
+ * is null and the card shows the tenant's own `offerLabel` instead. That is the
+ * bargain the free-text price makes: the catalogue still works, the arithmetic
+ * does not.
+ */
+const discountPercent = (row) => {
+  const price = row.price === null || row.price === undefined ? null : Number(row.price);
+  const offer = row.offerPrice === null || row.offerPrice === undefined ? null : Number(row.offerPrice);
+  if (price === null || offer === null || price <= 0 || offer >= price) return null;
+  return Math.round(((price - offer) / price) * 100);
+};
+
+/**
+ * One product, as the website reads it.
+ *
+ * `images` is normalised hard, the way `highlights` is on a service and for the
+ * same reason: it arrives as free-form JSON, so it is coerced to an array of
+ * non-empty strings here rather than handed to a gallery that would have to
+ * guard every `.map` on it. `image` is the first of them, named separately
+ * because every card in the catalogue wants exactly that and should not have to
+ * reach into an array to get it.
+ *
+ * The prices are returned as **numbers**, not the strings a DECIMAL column hands
+ * back. A template doing `product.price - product.offerPrice` on two strings
+ * gets a concatenation on one side of the language and NaN on the other, and
+ * neither shows up until a real price is on a real page.
+ */
+const publicProduct = (row, categoryPath = [], availability = null) => {
+  const images = Array.isArray(row.images)
+    ? row.images.map((path) => String(path).trim()).filter(Boolean)
+    : [];
+
+  const price = row.price === null || row.price === undefined ? null : Number(row.price);
+  const offerPrice = row.offerPrice === null || row.offerPrice === undefined ? null : Number(row.offerPrice);
+
+  /* The column, unless the warehouse is answering for this one. See below. */
+  const stored = PRODUCT_STOCK_VALUES.includes(row.stockStatus) ? row.stockStatus : PRODUCT_STOCK.IN_STOCK;
+  const resolvedStock = availability
+    ? stockService.availabilityOf(
+      { id: row.id, trackInventory: row.trackInventory, stockStatus: stored },
+      availability
+    )
+    : stored;
+
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    sku: row.sku || null,
+    summary: row.summary ?? null,
+    description: row.description ?? null,
+
+    images,
+    /** The card image — the first photograph, or null for a product with none. */
+    image: images[0] ?? null,
+
+    highlights: Array.isArray(row.highlights)
+      ? row.highlights.map((line) => String(line).trim()).filter(Boolean)
+      : [],
+    specs: Array.isArray(row.specs)
+      ? row.specs
+        .filter((spec) => spec && typeof spec === 'object')
+        .map((spec) => ({ label: String(spec.label ?? '').trim(), value: String(spec.value ?? '').trim() }))
+        .filter((spec) => spec.label && spec.value)
+      : [],
+
+    price,
+    offerPrice,
+    /** Set means "print this instead of the numbers". See the model. */
+    priceLabel: row.priceLabel || null,
+    /** What the visitor actually pays today. Null on a free-text price. */
+    effectivePrice: offerPrice ?? price,
+
+    onOffer: isOnOffer(row),
+    discountPercent: discountPercent(row),
+    /** The tenant's own badge wording, overriding the computed percentage. */
+    offerLabel: row.offerLabel || null,
+
+    /**
+     * What the visitor is told about availability.
+     *
+     * Still one of the three `PRODUCT_STOCK` words rather than a number — the
+     * platform’s long-standing position, and not an oversight: the website tells
+     * somebody whether to ring up, and a count it cannot keep true is worse there
+     * than no count.
+     *
+     * What the warehouse feature changes is where the word comes from. Without
+     * it, `stockStatus` is a flag somebody remembered to set. With it, on a
+     * product marked `trackInventory`, the answer is resolved from the shelf by
+     * `availabilityOf` — so the site says *out of stock* the moment the last one
+     * leaves the building, with nobody having to remember anything.
+     *
+     * `availability` is null on every tenant that has not bought it, and on
+     * every product that is not tracked, which is why the fallback is the
+     * column and not an error.
+     */
+    stockStatus: resolvedStock,
+    inStock: resolvedStock !== PRODUCT_STOCK.OUT_OF_STOCK,
+
+    /**
+     * Whether this one may go in a basket — the tenant's own flag AND the
+     * stock answering for it. Resolved into one boolean here rather than left
+     * as two for the template to remember to check together, which is how a
+     * site ends up taking money for something it has already said it has not
+     * got. Means nothing at all when `features.orders` is absent; see
+     * `publicOrders`, which is what decides whether there is a cart.
+     */
+    orderable: row.orderable !== false && resolvedStock !== PRODUCT_STOCK.OUT_OF_STOCK,
+
+    /** This product's own button label, or null to use the section's. */
+    ctaLabel: row.ctaLabel ?? null,
+    featured: Boolean(row.featured),
+
+    /**
+     * The category this is filed in, and everything above it — `[Furniture,
+     * Tables, Dining tables]`. Sent as the finished path rather than an id, so
+     * the detail page can print a breadcrumb without a second request and
+     * without the template learning how to walk a tree.
+     */
+    category: categoryPath.length ? categoryPath[categoryPath.length - 1] : null,
+    categoryPath,
+  };
+};
+
+/** One category, as the website reads it. */
+const publicCategory = (row, extra = {}) => ({
+  id: row.id,
+  slug: row.slug,
+  name: row.name,
+  description: row.description ?? null,
+  image: row.image ?? null,
+  icon: FEATURE_ICON_KEYS.includes(row.icon) ? row.icon : FEATURE_ICON_FALLBACK,
+  featured: Boolean(row.featured),
+  ...extra,
+});
+
+/**
+ * The whole catalogue for one host, or `null` when there is nothing to show.
+ *
+ * Empty means absent — the rule Team, Gallery, the benefit cards and Services
+ * all follow — and here it is decided by **products**, not categories. A tenant
+ * with a category tree and nothing filed in it has built a set of empty shelves,
+ * and a Products page listing three headings and no products is worse than no
+ * Products page. The nav entry drops on the same signal, so nothing on the site
+ * links at it.
+ *
+ * What comes back is everything the four pages need, in one payload:
+ *
+ *  - `items` — every published product, so `/products` and every category
+ *    filter on it are answered without another request
+ *  - `categories` — the tree, each node carrying the number of products at or
+ *    below it, so a heading never claims a section that turns out to be empty
+ *  - `offers` — the subset on offer today, already ordered
+ *  - `home` — the counts the home page's three bands actually render, so the
+ *    template does not have to know where to slice
+ *
+ * One payload rather than four endpoints because `/website/company-details` is
+ * already one request that returns the whole site, and a catalogue this size —
+ * one small business's range — costs less to send whole than four round trips
+ * cost to make.
+ */
+async function publicCatalogue(companyId, branchId, settings, availability = null) {
+  const [productRows, categoryRows] = await Promise.all([
+    branchScoped(db.CompanyProduct, companyId, branchId, { status: STATUS.ACTIVE }),
+    branchScoped(db.CompanyCategory, companyId, branchId, { status: STATUS.ACTIVE }),
+  ]);
+
+  if (!productRows.length) return null;
+
+  /**
+   * The ancestry of every category, resolved once.
+   *
+   * A product carries the *deepest* category it belongs to, so a visitor
+   * browsing "Furniture" has to find things filed under "Dining tables" without
+   * anyone filing them twice. Walking the parents once here and handing each
+   * product its finished path is what makes that possible on the template side
+   * without a tree walk per card.
+   */
+  const byId = new Map(categoryRows.map((row) => [row.id, row]));
+
+  const pathOf = (categoryId) => {
+    const path = [];
+    const seen = new Set();
+    let current = byId.get(categoryId);
+
+    while (current && !seen.has(current.id)) {
+      seen.add(current.id);
+      path.unshift({ id: current.id, slug: current.slug, name: current.name });
+      current = current.parentId ? byId.get(current.parentId) : null;
+    }
+
+    return path;
+  };
+
+  const items = productRows.map((row) => publicProduct(row, pathOf(row.categoryId), availability));
+
+  /**
+   * How many products sit at or below each category, counted from the paths
+   * above rather than from a query. Every product's whole ancestry is already in
+   * hand, so incrementing each ancestor is the same answer a recursive count
+   * would give and costs nothing.
+   */
+  const totals = new Map();
+  items.forEach((product) => {
+    product.categoryPath.forEach((node) => {
+      totals.set(node.id, (totals.get(node.id) ?? 0) + 1);
+    });
+  });
+
+  /**
+   * The tree, with the empty branches pruned.
+   *
+   * A category nothing is filed under is a heading that leads to an empty page,
+   * and the *View all categories* page is exactly where a visitor would meet a
+   * row of them. So a node survives only if something is under it — which, given
+   * `totals` counts descendants too, keeps a parent whose own products are all
+   * in its children.
+   */
+  /**
+   * `seen` is not defensive tidiness. The write path refuses to create a cycle,
+   * but this is the read path, and it runs over whatever is in the table —
+   * including rows written before that check existed. A cycle here would recurse
+   * until the stack gave out, taking down the request for every other section on
+   * the page with it.
+   */
+  const nodeOf = (row, seen) => {
+    if (seen.has(row.id)) return null;
+    const branch = new Set(seen).add(row.id);
+
+    const children = categoryRows
+      .filter((child) => child.parentId === row.id)
+      .map((child) => nodeOf(child, branch))
+      .filter(Boolean);
+
+    const count = totals.get(row.id) ?? 0;
+    if (!count) return null;
+
+    return publicCategory(row, { productCount: count, children });
+  };
+
+  const categories = categoryRows
+    .filter((row) => !row.parentId || !byId.has(row.parentId))
+    .map((row) => nodeOf(row, new Set()))
+    .filter(Boolean);
+
+  /**
+   * Offers, featured first. `sequence` already ordered `items`, so this is a
+   * stable partition of that order rather than a re-sort — a tenant that
+   * arranged its catalogue has arranged its offers page too.
+   */
+  const offers = [...items.filter((product) => product.onOffer)].sort(
+    (a, b) => Number(b.featured) - Number(a.featured)
+  );
+
+  const featured = items.filter((product) => product.featured);
+
+  return {
+    /* The catalogue band and the /products page. */
+    eyebrow: settings.eyebrow,
+    title: settings.title,
+    lead: settings.lead,
+    ctaLabel: settings.ctaLabel,
+
+    /* The categories band and the /categories page. */
+    categoriesEyebrow: settings.categoriesEyebrow,
+    categoriesTitle: settings.categoriesTitle,
+    categoriesLead: settings.categoriesLead,
+
+    /* The offers band and the /offers page. */
+    offersEyebrow: settings.offersEyebrow,
+    offersTitle: settings.offersTitle,
+    offersLead: settings.offersLead,
+
+    items,
+    categories,
+    offers,
+
+    /**
+     * What the home page's three bands show before their *View all* links take
+     * over. Sliced here rather than in the template so the counts are the
+     * platform's — a template that decided for itself would have every theme
+     * showing a different number of the same tenant's products.
+     *
+     * The product band prefers the featured ones and falls back to the top of
+     * the catalogue, so a tenant that has featured nothing still gets a band
+     * rather than a heading over nothing.
+     */
+    home: {
+      categories: categories.slice(0, CATALOGUE_HOME_LIMITS.categories),
+      products: (featured.length ? featured : items).slice(0, CATALOGUE_HOME_LIMITS.products),
+      offers: offers.slice(0, CATALOGUE_HOME_LIMITS.offers),
+    },
+
+    /** Totals for the *View all* links, which say what they lead to. */
+    counts: {
+      products: items.length,
+      categories: categories.length,
+      offers: offers.length,
+    },
+  };
+}
+
+/* ---------------------------------- blog ---------------------------------- */
+
+/**
+ * Roughly how long an article takes to read.
+ *
+ * Computed on the way out rather than stored, so editing a post cannot leave a
+ * stale number under its title - and so the estimate can be changed for every
+ * article on the platform by changing one constant. Never less than a minute:
+ * "0 min read" is not information.
+ */
+const readMinutes = (body) => {
+  const words = String(body ?? '').trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / BLOG_READ_WPM));
+};
+
+/**
+ * The opening of an article, for a card whose post has no standfirst.
+ *
+ * Cut at a word rather than mid-syllable, and only when there is more to come -
+ * so a two-sentence post is shown whole instead of being given an ellipsis it
+ * does not need.
+ */
+const excerptFrom = (body, limit = 180) => {
+  const flat = String(body ?? '').replace(/\s+/g, ' ').trim();
+  if (flat.length <= limit) return flat || null;
+  return flat.slice(0, flat.lastIndexOf(' ', limit) > 0 ? flat.lastIndexOf(' ', limit) : limit) + '\u2026';
+};
+
+/**
+ * Matching one tag inside the JSON column, on both dialects, in one place.
+ *
+ * `tags` is a JSON attribute, so a plain `{ tags: { [Op.like]: '%x%' } }` is
+ * **serialised as JSON before it reaches SQL** - the pattern arrives quoted,
+ * `'"%x%"'`, and matches nothing. Wrapping the column in `LOWER()` takes the
+ * comparison out of the attribute's type mapping, and buys case-insensitive
+ * matching at the same time, which is what a reader following `Kitchens` from a
+ * card expects of a tag somebody typed as `kitchens`.
+ *
+ * It matches the serialised array rather than parsing it, so it can over-match a
+ * tag that is a substring of another. The cost of that is one extra card in a
+ * filtered list; the alternative is a JSON function per dialect, and two queries
+ * that can disagree. Wildcards are stripped so a tag containing `%` cannot turn
+ * the filter into "everything".
+ */
+const tagWhere = (tag) => {
+  const needle = String(tag ?? '').trim().toLowerCase().replace(/[%_\\]/g, '');
+  if (!needle) return null;
+  return sqlWhere(fn('LOWER', col('CompanyBlogPost.tags')), { [Op.like]: `%${needle}%` });
+};
+
+const publicTags = (tags) =>
+  Array.isArray(tags)
+    ? tags.map((tag) => String(tag).trim()).filter(Boolean).slice(0, BLOG_TAGS_MAX)
+    : [];
+
+/**
+ * One post as a **card**: everything a listing needs and nothing more.
+ *
+ * The body is deliberately absent. A listing prints a title, a picture and a
+ * line or two, and shipping the whole of twenty articles to render that would
+ * make the archive page cost more than the articles themselves. The page for one
+ * post asks for it by slug and gets it; see `publicBlogPost`.
+ */
+const publicPostCard = (row) => ({
+  id: row.id,
+  slug: row.slug,
+  title: row.title,
+  /* The tenant's standfirst, or the opening of the article - a card with a hole
+     in it being the one outcome worth spending a fallback on. */
+  excerpt: row.excerpt?.trim() || excerptFrom(row.body),
+  coverImage: row.coverImage ?? null,
+  author: row.author?.trim() || null,
+  tags: publicTags(row.tags),
+  publishedAt: row.publishedAt,
+  readMinutes: readMinutes(row.body),
+  featured: Boolean(row.featured),
+});
+
+/** One post **whole**, for its own page. The card, plus the article itself. */
+const publicBlogPost = (row) => ({
+  ...publicPostCard(row),
+  body: row.body,
+});
+
+/**
+ * What a tenant is publishing right now.
+ *
+ * Two conditions, and the second is what makes scheduling work: the row is
+ * active, **and** its date has passed. A post dated next Monday is saved,
+ * complete, and invisible everywhere - the band, the archive, its own URL and
+ * the count behind the menu entry all ask this same question.
+ */
+const publishedWhere = (extra = {}) => ({
+  status: STATUS.ACTIVE,
+  publishedAt: { [Op.ne]: null, [Op.lte]: new Date() },
+  ...extra,
+});
+
+/** Featured first, then newest. The archive's order, and the band's. */
+const BLOG_ORDER = [['featured', 'DESC'], ['published_at', 'DESC'], ['id', 'DESC']];
+
+/**
+ * The rows one host should see, branch-aware - the same fallback `branchScoped`
+ * applies, written out here because a blog is ordered by date rather than by
+ * `sequence` and cannot use it.
+ */
+async function blogScoped(companyId, branchId, { limit = null, offset = 0, where = {} } = {}) {
+  const base = { companyId, ...publishedWhere(where) };
+  const query = { order: BLOG_ORDER, ...(limit ? { limit, offset } : {}) };
+
+  if (branchId) {
+    const own = await db.CompanyBlogPost.findAndCountAll({ where: { ...base, branchId }, ...query });
+    if (own.count) return own;
+  }
+
+  return db.CompanyBlogPost.findAndCountAll({ where: { ...base, branchId: null }, ...query });
+}
+
+/**
+ * The Blog section for one host, or `null` when there is nothing to show.
+ *
+ * Empty means absent - the rule Services, Team and the benefit cards all follow
+ * - and it decides the archive page and the menu entry as well as the band on
+ * the home page.
+ *
+ * **`items` is the latest few, not everything.** This block rides in the payload
+ * of every page of the site, and a blog is the one thing here that grows without
+ * limit: a tenant writing weekly has two hundred articles in four years, and
+ * sending all of them with every render would make the home page pay for the
+ * archive forever. So the band gets what the band shows, `total` says how much
+ * more there is, and the archive asks for the rest a page at a time from
+ * `GET /website/blog`.
+ */
+async function publicBlog(companyId, branchId, settings) {
+  const { rows, count } = await blogScoped(companyId, branchId, { limit: BLOG_HOME_LIMIT });
+  if (!count) return null;
+
+  return {
+    eyebrow: settings.eyebrow,
+    title: settings.title,
+    lead: settings.lead,
+    ctaLabel: settings.ctaLabel,
+    /* Whether the site prints a byline. A company-wide choice, not a per-post
+       one, so a tenant writing as itself clears them all at once. */
+    showAuthor: settings.showAuthor,
+    /** Everything published, not just what is in `items`. The archive's count. */
+    total: count,
+    items: rows.map(publicPostCard),
   };
 }
 
@@ -999,7 +1986,7 @@ async function publicNav(companyId, branchId, activeKeys, features = {}) {
     ).map((page) => page.settings)
   );
 
-  const [aboutRow, contactRow, servicesRow] = needsSettings
+  const [aboutRow, contactRow, servicesRow, productsRow, blogRow] = needsSettings
     ? await Promise.all([
         wanted.has('about') ? resolveAboutRow(companyId, branchId) : null,
         wanted.has('contact')
@@ -1020,13 +2007,23 @@ async function publicNav(companyId, branchId, activeKeys, features = {}) {
         wanted.has('services')
           ? db.CompanyFunctionality.findOne({ where: { companyId, key: FUNCTIONALITY.SERVICES } })
           : null,
+        /** Products keeps its label the same way and for the same reason. */
+        wanted.has('products')
+          ? db.CompanyFunctionality.findOne({ where: { companyId, key: FUNCTIONALITY.PRODUCTS } })
+          : null,
+        /** And the blog, which has no settings table either. */
+        wanted.has('blog')
+          ? db.CompanyFunctionality.findOne({ where: { companyId, key: FUNCTIONALITY.BLOG } })
+          : null,
       ])
-    : [null, null, null];
+    : [null, null, null, null, null];
 
   const labels = {
     about: aboutRow?.navLabel,
     contact: contactRow?.navLabel,
     services: NAV_LABEL_SOURCE.services === 'functionality' ? servicesRow?.settings?.navLabel : null,
+    products: NAV_LABEL_SOURCE.products === 'functionality' ? productsRow?.settings?.navLabel : null,
+    blog: NAV_LABEL_SOURCE.blog === 'functionality' ? blogRow?.settings?.navLabel : null,
   };
 
   return NAV_PAGES.filter(
@@ -1053,6 +2050,10 @@ async function publicFeatures(companyId, branchId = null) {
     testimonials: null,
     benefits: null,
     services: null,
+    products: null,
+    orders: null,
+    customers: null,
+    blog: null,
   };
   if (!activeKeys.length) return features;
 
@@ -1210,8 +2211,104 @@ async function publicFeatures(companyId, branchId = null) {
       companyId,
       branchId,
       serviceSettings(row?.settings),
-      features.whatsapp?.byType?.inquiry ?? null
+      features.whatsapp?.byType?.inquiry ?? null,
+      activeKeys
     );
+
+    /**
+     * Whether a slot needs a name attached to it.
+     *
+     * Decided here rather than inside `publicServices`, because it depends on a
+     * **different functionality**: a tenant running customer accounts takes
+     * bookings from account holders, exactly as it takes orders from them. The
+     * same rule, stated once, in the payload the website renders and enforced
+     * again by the write route.
+     */
+    if (features.services?.booking) {
+      features.services.booking.requiresSignIn = activeKeys.includes(FUNCTIONALITY.CUSTOMERS);
+    }
+  }
+
+  /**
+   * The catalogue. Absent — rather than empty — when the tenant has published no
+   * products, which is what drops the Products page and its nav entry with it.
+   */
+  if (activeKeys.includes(FUNCTIONALITY.PRODUCTS)) {
+    const row = await db.CompanyFunctionality.findOne({
+      where: { companyId, key: FUNCTIONALITY.PRODUCTS },
+    });
+
+    /**
+     * The shelf, read **once** for the whole catalogue rather than per product.
+     *
+     * Only where the tenant has actually bought the warehouse feature — on every
+     * other tenant this is null and every product falls back to the flag on its
+     * own row, which is exactly what it did before any of this existed.
+     *
+     * One query for every level this company holds: a small business’s
+     * catalogue times its units is a few thousand rows at the outside, and the
+     * alternative is a query per card on a page that renders twenty of them.
+     */
+    const availability = activeKeys.includes(FUNCTIONALITY.WAREHOUSE)
+      ? await stockService.availabilityFor(companyId)
+      : null;
+
+    features.products = await publicCatalogue(
+      companyId,
+      branchId,
+      productSettings(row?.settings),
+      availability
+    );
+  }
+
+  /**
+   * The cart, resolved last because it depends on two blocks above it.
+   *
+   * **`features.products` first.** The `orders` grant sits on top of the
+   * catalogue rather than beside it: a cart with nothing to put in it is a
+   * button leading to an empty basket, and that is as true of a tenant who has
+   * not published a product yet as of one whose plan never carried Products at
+   * all. One condition covers both, the way `publicCatalogue` covering "no
+   * products" already drops the Products page and its menu entry.
+   *
+   * **Then the WhatsApp block**, passed rather than queried, so an order route
+   * pointed at a number the tenant has stopped publishing — or at a WhatsApp
+   * feature their plan no longer grants — withholds the cart instead of
+   * printing a button that composes a message for nobody.
+   */
+  if (activeKeys.includes(FUNCTIONALITY.ORDERS) && features.products) {
+    const row = await db.CompanyFunctionality.findOne({
+      where: { companyId, key: FUNCTIONALITY.ORDERS },
+    });
+    features.orders = publicOrders(orderSettings(row?.settings), features.whatsapp);
+  }
+
+  /**
+   * Whether this site has a sign-in.
+   *
+   * A flag and nothing else — deliberately the thinnest block in this payload.
+   * The website needs to know whether to paint an Account link and whether to
+   * offer a saved address at checkout; it does not need, and must never be sent,
+   * anything about who the customers are. A public endpoint that leaked a count
+   * would be telling every visitor how many people shop here.
+   */
+  if (activeKeys.includes(FUNCTIONALITY.CUSTOMERS)) {
+    features.customers = { enabled: true };
+  }
+
+  /**
+   * The blog. Absent - rather than empty - when the tenant has published
+   * nothing, which is what drops the archive page and its nav entry with it.
+   *
+   * A post dated in the future counts as nothing, exactly as it should: writing
+   * next week's article today must not put a Blog link in the menu leading to a
+   * page that says there is nothing here.
+   */
+  if (activeKeys.includes(FUNCTIONALITY.BLOG)) {
+    const row = await db.CompanyFunctionality.findOne({
+      where: { companyId, key: FUNCTIONALITY.BLOG },
+    });
+    features.blog = await publicBlog(companyId, branchId, blogSettings(row?.settings));
   }
 
   return features;
@@ -1230,6 +2327,21 @@ module.exports = {
   serviceSettings,
   serviceEnquiryTarget,
   publicServices,
+  publicService,
+  productSettings,
+  publicCatalogue,
+  orderSettings,
+  publicOrders,
+  blogSettings,
+  publicBlog,
+  publicBlogPost,
+  publicPostCard,
+  blogScoped,
+  publishedWhere,
+  tagWhere,
+  readMinutes,
+  isOnOffer,
+  discountPercent,
   aboutCopy,
   contactSettings,
   publicContact,

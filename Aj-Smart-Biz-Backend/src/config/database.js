@@ -59,4 +59,22 @@ function monthExpression(column) {
   }
 }
 
-module.exports = { sequelize, ensureDatabaseExists, monthExpression, Sequelize };
+/**
+ * The same trick a day at a time, for the short analytics windows.
+ *
+ * A separate function rather than a format argument because the three dialects
+ * disagree about more than the pattern string, and a caller that had to pass
+ * '%Y-%m-%d' would be a caller that knows which database it is talking to.
+ */
+function dayExpression(column) {
+  switch (config.db.dialect) {
+    case 'sqlite':
+      return `strftime('%Y-%m-%d', ${column})`;
+    case 'postgres':
+      return `to_char(${column}, 'YYYY-MM-DD')`;
+    default:
+      return `DATE_FORMAT(${column}, '%Y-%m-%d')`;
+  }
+}
+
+module.exports = { sequelize, ensureDatabaseExists, monthExpression, dayExpression, Sequelize };

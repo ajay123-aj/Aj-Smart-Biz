@@ -21,7 +21,18 @@ const CompanyGalleryItem = require('./companyGalleryItem.model')(sequelize);
 const CompanyTestimonial = require('./companyTestimonial.model')(sequelize);
 const CompanyFeature = require('./companyFeature.model')(sequelize);
 const CompanyService = require('./companyService.model')(sequelize);
+const CompanyServiceCategory = require('./companyServiceCategory.model')(sequelize);
+const CompanyCategory = require('./companyCategory.model')(sequelize);
+const CompanyProduct = require('./companyProduct.model')(sequelize);
+const CompanyBlogPost = require('./companyBlogPost.model')(sequelize);
 const ServiceLead = require('./serviceLead.model')(sequelize);
+const CompanyOrder = require('./companyOrder.model')(sequelize);
+const CompanyOrderItem = require('./companyOrderItem.model')(sequelize);
+const CompanyWarehouse = require('./companyWarehouse.model')(sequelize);
+const CompanyStock = require('./companyStock.model')(sequelize);
+const CompanyStockMovement = require('./companyStockMovement.model')(sequelize);
+const Customer = require('./customer.model')(sequelize);
+const CustomerAddress = require('./customerAddress.model')(sequelize);
 const CompanySubscription = require('./companySubscription.model')(sequelize);
 const SubscriptionEvent = require('./subscriptionEvent.model')(sequelize);
 const PlanRequest = require('./planRequest.model')(sequelize);
@@ -121,6 +132,66 @@ Company.hasMany(CompanyService, { foreignKey: 'companyId', as: 'services', onDel
 CompanyService.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Branch.hasMany(CompanyService, { foreignKey: 'branchId', as: 'services', onDelete: 'CASCADE' });
 CompanyService.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+
+/**
+ * How a business sorts the work it sells. Its own tree rather than a corner of
+ * the product one - see `CompanyServiceCategory` for why.
+ *
+ * `SET NULL` on delete, like the catalogue's: removing a category unfiles the
+ * services in it rather than deleting work the company still does.
+ */
+Company.hasMany(CompanyServiceCategory, { foreignKey: 'companyId', as: 'serviceCategories', onDelete: 'CASCADE' });
+CompanyServiceCategory.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(CompanyServiceCategory, { foreignKey: 'branchId', as: 'serviceCategories', onDelete: 'CASCADE' });
+CompanyServiceCategory.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+CompanyServiceCategory.hasMany(CompanyService, { foreignKey: 'categoryId', as: 'services', onDelete: 'SET NULL' });
+CompanyService.belongsTo(CompanyServiceCategory, { foreignKey: 'categoryId', as: 'category' });
+
+/**
+ * The catalogue: categories, the subcategories under them, and the products
+ * filed in either.
+ *
+ * Owned by the company and branch-aware like every other content table, so a
+ * lapsed plan parks the range rather than deleting it and a branch can stock
+ * something the head office does not.
+ *
+ * Two self-references, and both are deliberately unconstrained at the database
+ * level. `parentId` points a category at another row of its own table, which
+ * `sequelize.sync()` cannot order; the controller refuses a parent from another
+ * tenant and refuses a cycle, which is a stronger guarantee than a foreign key
+ * would have given anyway.
+ *
+ * A product's category is `SET NULL` rather than `CASCADE`: deleting "Dining
+ * tables" must not delete the tables. They fall back to being uncategorised,
+ * which is a state the catalogue already renders, and the tenant re-files them.
+ */
+Company.hasMany(CompanyCategory, { foreignKey: 'companyId', as: 'categories', onDelete: 'CASCADE' });
+CompanyCategory.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(CompanyCategory, { foreignKey: 'branchId', as: 'categories', onDelete: 'CASCADE' });
+CompanyCategory.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+CompanyCategory.belongsTo(CompanyCategory, { foreignKey: 'parentId', as: 'parent', constraints: false });
+CompanyCategory.hasMany(CompanyCategory, { foreignKey: 'parentId', as: 'children', constraints: false });
+
+Company.hasMany(CompanyProduct, { foreignKey: 'companyId', as: 'products', onDelete: 'CASCADE' });
+CompanyProduct.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(CompanyProduct, { foreignKey: 'branchId', as: 'products', onDelete: 'CASCADE' });
+CompanyProduct.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+CompanyCategory.hasMany(CompanyProduct, { foreignKey: 'categoryId', as: 'products', onDelete: 'SET NULL' });
+CompanyProduct.belongsTo(CompanyCategory, { foreignKey: 'categoryId', as: 'category' });
+
+/**
+ * The blog. Company-owned and branch-aware like every other content table, and
+ * with no third association: a post belongs to nothing else on the platform.
+ *
+ * In particular it does **not** belong to an admin. Its byline is a name typed
+ * on the row rather than a link to the person who saved it, so deleting a staff
+ * account cannot strip the author off four years of articles; see
+ * `CompanyBlogPost.author`.
+ */
+Company.hasMany(CompanyBlogPost, { foreignKey: 'companyId', as: 'blogPosts', onDelete: 'CASCADE' });
+CompanyBlogPost.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(CompanyBlogPost, { foreignKey: 'branchId', as: 'blogPosts', onDelete: 'CASCADE' });
+CompanyBlogPost.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
 
 /**
  * Enquiries raised against those services.
@@ -234,6 +305,101 @@ LeadVisit.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Branch.hasMany(LeadVisit, { foreignKey: 'branchId', as: 'leadVisits', onDelete: 'SET NULL' });
 LeadVisit.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
 
+/**
+ * Orders, and the lines on them.
+ *
+ * Owned by the company and stamped with the branch whose site took them, like
+ * every other thing a stranger can send. Deleting a company takes its orders;
+ * deleting a branch does **not** — `SET NULL`, the rule the leads follow, because
+ * an order is money that changed hands and closing a shop does not un-sell it.
+ *
+ * A line points at the product it was placed against, and that reference is
+ * deliberately weak: `SET NULL`, no cascade. Everything the line needs to print
+ * is copied onto it, so a product deleted next year leaves last year’s orders
+ * exactly as they were rather than taking the record of having sold it away.
+ */
+Company.hasMany(CompanyOrder, { foreignKey: 'companyId', as: 'orders', onDelete: 'CASCADE' });
+CompanyOrder.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(CompanyOrder, { foreignKey: 'branchId', as: 'orders', onDelete: 'SET NULL' });
+CompanyOrder.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+
+CompanyOrder.hasMany(CompanyOrderItem, { foreignKey: 'orderId', as: 'items', onDelete: 'CASCADE' });
+CompanyOrderItem.belongsTo(CompanyOrder, { foreignKey: 'orderId', as: 'order' });
+Company.hasMany(CompanyOrderItem, { foreignKey: 'companyId', as: 'orderItems', onDelete: 'CASCADE' });
+CompanyOrderItem.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+CompanyProduct.hasMany(CompanyOrderItem, { foreignKey: 'productId', as: 'orderItems', onDelete: 'SET NULL' });
+CompanyOrderItem.belongsTo(CompanyProduct, { foreignKey: 'productId', as: 'product' });
+
+/**
+ * The warehouse, the level in it, and the ledger behind the level.
+ *
+ * A warehouse belongs to the company and *optionally* serves one branch — see
+ * the model for why those are different things. A branch closing leaves the unit
+ * standing (`SET NULL`): the stock in it is still there and still has to be
+ * counted.
+ *
+ * Stock levels cascade from both the warehouse and the product, and that is the
+ * one place here where losing the row is right: a level is a running total *of*
+ * a pair, and with either half gone it is a number about nothing. The ledger
+ * does not cascade from the product for the opposite reason — what moved, and
+ * who moved it, stays true after the catalogue entry is deleted.
+ */
+Company.hasMany(CompanyWarehouse, { foreignKey: 'companyId', as: 'warehouses', onDelete: 'CASCADE' });
+CompanyWarehouse.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Branch.hasMany(CompanyWarehouse, { foreignKey: 'branchId', as: 'warehouses', onDelete: 'SET NULL' });
+CompanyWarehouse.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
+CompanyWarehouse.belongsTo(State, { foreignKey: 'stateId', as: 'state' });
+
+/* Which unit is filling an order. `SET NULL`, because deleting a warehouse must
+   not delete the orders it was going to fill — they need re-assigning, which is
+   a job for a person. */
+CompanyWarehouse.hasMany(CompanyOrder, { foreignKey: 'warehouseId', as: 'orders', onDelete: 'SET NULL' });
+CompanyOrder.belongsTo(CompanyWarehouse, { foreignKey: 'warehouseId', as: 'warehouse' });
+
+CompanyWarehouse.hasMany(CompanyStock, { foreignKey: 'warehouseId', as: 'stock', onDelete: 'CASCADE' });
+CompanyStock.belongsTo(CompanyWarehouse, { foreignKey: 'warehouseId', as: 'warehouse' });
+CompanyProduct.hasMany(CompanyStock, { foreignKey: 'productId', as: 'stock', onDelete: 'CASCADE' });
+CompanyStock.belongsTo(CompanyProduct, { foreignKey: 'productId', as: 'product' });
+Company.hasMany(CompanyStock, { foreignKey: 'companyId', as: 'stockLevels', onDelete: 'CASCADE' });
+CompanyStock.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+
+Company.hasMany(CompanyStockMovement, { foreignKey: 'companyId', as: 'stockMovements', onDelete: 'CASCADE' });
+CompanyStockMovement.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+CompanyWarehouse.hasMany(CompanyStockMovement, { foreignKey: 'warehouseId', as: 'movements', onDelete: 'CASCADE' });
+CompanyStockMovement.belongsTo(CompanyWarehouse, { foreignKey: 'warehouseId', as: 'warehouse' });
+CompanyStockMovement.belongsTo(CompanyProduct, { foreignKey: 'productId', as: 'product', constraints: false });
+CompanyStockMovement.belongsTo(CompanyOrder, { foreignKey: 'orderId', as: 'order', constraints: false });
+
+/**
+ * Customers, and the addresses they keep.
+ *
+ * Owned by the company, like everything else a tenant accumulates — deleting a
+ * company takes its customer list, and a customer belongs to exactly one tenant
+ * (see the model for why the same person at two shops is two rows).
+ *
+ * The link from an order is deliberately **weak**: `SET NULL`, no cascade. An
+ * order taken before the tenant bought customer accounts has no customer and
+ * never will, and an account deleted next year must not take the sale with it.
+ * Everything an order needs to print — the name, the phone, the address — is
+ * copied onto it anyway.
+ */
+Company.hasMany(Customer, { foreignKey: 'companyId', as: 'customers', onDelete: 'CASCADE' });
+Customer.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+
+Customer.hasMany(CustomerAddress, { foreignKey: 'customerId', as: 'addresses', onDelete: 'CASCADE' });
+CustomerAddress.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });
+Company.hasMany(CustomerAddress, { foreignKey: 'companyId', as: 'customerAddresses', onDelete: 'CASCADE' });
+CustomerAddress.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+CustomerAddress.belongsTo(State, { foreignKey: 'stateId', as: 'state' });
+
+Customer.hasMany(CompanyOrder, { foreignKey: 'customerId', as: 'orders', onDelete: 'SET NULL' });
+CompanyOrder.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });
+
+/* Service enquiries too, on the same weak terms: the enquiry outlives the
+   account, and everything it needs to print is copied onto it. */
+Customer.hasMany(ServiceLead, { foreignKey: 'customerId', as: 'serviceLeads', onDelete: 'SET NULL' });
+ServiceLead.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });
+
 const db = {
   sequelize,
   Sequelize,
@@ -256,7 +422,18 @@ const db = {
   CompanyTestimonial,
   CompanyFeature,
   CompanyService,
+  CompanyServiceCategory,
+  CompanyCategory,
+  CompanyProduct,
+  CompanyBlogPost,
   ServiceLead,
+  CompanyOrder,
+  CompanyOrderItem,
+  CompanyWarehouse,
+  CompanyStock,
+  CompanyStockMovement,
+  Customer,
+  CustomerAddress,
   CompanySubscription,
   SubscriptionEvent,
   PlanRequest,

@@ -1,0 +1,723 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:420px"></div>
+  } @else {
+    <div class="tabs">
+      <button type="button" class="tab" [class.tab-on]="view() === 'stock'" (click)="setView('stock')">
+        Stock
+      </button>
+      <button type="button" class="tab" [class.tab-on]="view() === 'warehouses'" (click)="setView('warehouses')">
+        Warehouses <span class="n">{{ warehouses().length }}</span>
+      </button>
+      <button type="button" class="tab" [class.tab-on]="view() === 'movements'" (click)="setView('movements')">
+        Ledger
+      </button>
+      <button type="button" class="tab" [class.tab-on]="view() === 'analytics'" (click)="setView('analytics')">
+        Analytics
+      </button>
+    </div>
+
+    @if (!warehouses().length) {
+      <!-- Nothing works until there is somewhere to put things, so this is the
+           only thing the screen offers until there is. -->
+      <p class="empty-note">
+        You have no warehouses yet. Add one and the rest of this screen starts working &mdash; orders will
+        reserve stock from it, and your website can start telling people what is actually available.
+      </p>
+      @if (canEdit()) {
+        <div class="row-center">
+          <button type="button" class="btn btn-primary" (click)="openWarehouse(null)">＋ Add your first warehouse</button>
+        </div>
+      }
+    } @else {
+      <!-- ================================================================ -->
+      <!-- Stock                                                             -->
+      <!-- ================================================================ -->
+      @if (view() === 'stock') {
+        <div class="filters">
+          <input
+            class="input grow"
+            type="search"
+            placeholder="Product name or SKU"
+            [value]="search()"
+            (change)="onSearch(inputValue($event))"
+          />
+
+          <select class="select" style="width:auto" (change)="onWarehouseFilter(selectValue($event))">
+            <option value="">Every warehouse</option>
+            @for (warehouse of warehouses(); track warehouse.id) {
+              <option [value]="warehouse.id" [selected]="warehouseFilter() === (warehouse.id + '')">
+                {{ warehouse.name }}
+              </option>
+            }
+          </select>
+
+          <div class="tabs" style="margin:0">
+            <button type="button" class="tab" [class.tab-on]="shortage() === ''" (click)="setShortage('')">All</button>
+            <button type="button" class="tab" [class.tab-on]="shortage() === 'low'" (click)="setShortage('low')">
+              Running low
+            </button>
+            <button type="button" class="tab" [class.tab-on]="shortage() === 'out'" (click)="setShortage('out')">
+              Out
+            </button>
+          </div>
+
+          @if (canEdit()) {
+            <div style="margin-left:auto;display:flex;gap:6px">
+              <button type="button" class="btn btn-sm btn-ghost" (click)="transferOpen.set(true)">Transfer</button>
+              <button type="button" class="btn btn-sm btn-primary" (click)="openMovement(null)">＋ Record movement</button>
+            </div>
+          }
+        </div>
+
+        @if (listing()) {
+          <div class="skeleton" style="height:240px"></div>
+        } @else if (!levels().length) {
+          <p class="empty-note">
+            @if (shortage()) {
+              Nothing matches &mdash; which is the answer you wanted.
+            } @else {
+              Nothing counted in yet. Record a movement to book your first stock in.
+            }
+          </p>
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Warehouse</th>
+                  <th class="num-cell">On hand</th>
+                  <th class="num-cell">Promised</th>
+                  <th class="num-cell">Available</th>
+                  <th class="num-cell">Warn at</th>
+                  <th>Last moved</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (level of levels(); track level.id) {
+                  <tr>
+                    <td>
+                      {{ level.product?.name ?? 'Deleted product' }}
+                      @if (level.product?.sku) {
+                        <div class="muted-sm">{{ level.product?.sku }}</div>
+                      }
+                      @if (level.binLocation) {
+                        <div class="muted-sm">Bin {{ level.binLocation }}</div>
+                      }
+                    </td>
+                    <td class="muted-sm">{{ level.warehouse?.name ?? '—' }}</td>
+                    <td class="num-cell">{{ level.quantity | number }}</td>
+                    <!-- Promised, not sold. A box already committed to a confirmed
+                         order is physically here and not available to anybody else. -->
+                    <td class="num-cell">{{ level.reserved | number }}</td>
+                    <td class="num-cell" [class.low]="level.isLow || level.isOut">
+                      {{ level.available | number }}
+                      @if (level.isOut) {
+                        <div class="muted-sm low">Out</div>
+                      } @else if (level.isLow) {
+                        <div class="muted-sm low">Low</div>
+                      }
+                    </td>
+                    <td class="num-cell muted-sm">{{ level.reorderLevel > 0 ? level.reorderLevel : '—' }}</td>
+                    <td class="muted-sm">
+                      {{ level.lastMovementAt ? (level.lastMovementAt | date: 'd MMM, HH:mm') : '—' }}
+                    </td>
+                    <td>
+                      @if (canEdit()) {
+                        <button type="button" class="btn btn-sm btn-ghost" (click)="openMovement(level)">Move</button>
+                        <button type="button" class="btn btn-sm btn-ghost" (click)="openSettings(level)">Settings</button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <app-pager [meta]="meta()" (pageChange)="onPage($event)" />
+        }
+      }
+
+      <!-- ================================================================ -->
+      <!-- Warehouses                                                        -->
+      <!-- ================================================================ -->
+      @if (view() === 'warehouses') {
+        <div class="row-between" style="align-items:flex-start;gap:12px;margin-bottom:14px">
+          <p class="tiny muted" style="margin:0;max-width:64ch">
+            Where your stock physically is. <strong>Not the same as a branch</strong> &mdash; a branch is
+            somewhere you trade from, and three shops can run out of one store. The default is where an
+            order goes when nobody says.
+          </p>
+          @if (canEdit()) {
+            <button type="button" class="btn btn-sm btn-primary" (click)="openWarehouse(null)">＋ Add warehouse</button>
+          }
+        </div>
+
+        <div class="wh-grid">
+          @for (warehouse of warehouses(); track warehouse.id) {
+            <div class="wh" [class.wh-default]="warehouse.isDefault">
+              <div class="wh-head">
+                <span class="wh-name">{{ warehouse.name }}</span>
+                <span class="wh-code">{{ warehouse.code }}</span>
+                @if (warehouse.isDefault) {
+                  <span class="badge badge-brand">Default</span>
+                }
+                @if (warehouse.status !== 'active') {
+                  <span class="badge badge-warn">Switched off</span>
+                }
+              </div>
+
+              @if (warehouse.city || warehouse.branch) {
+                <div class="muted-sm">
+                  {{ warehouse.city }}@if (warehouse.city && warehouse.branch) { · }{{ warehouse.branch?.name }}
+                </div>
+              }
+
+              <div class="wh-stats">
+                <div>
+                  <b>{{ warehouse.stock?.onHand ?? 0 | number }}</b>
+                  <span class="muted-sm">on hand</span>
+                </div>
+                <div>
+                  <b>{{ warehouse.stock?.reserved ?? 0 | number }}</b>
+                  <span class="muted-sm">promised</span>
+                </div>
+                <div>
+                  <b>{{ warehouse.stock?.lines ?? 0 | number }}</b>
+                  <span class="muted-sm">products</span>
+                </div>
+              </div>
+
+              @if (canEdit()) {
+                <div class="wh-foot">
+                  <button type="button" class="btn btn-sm btn-ghost" (click)="openWarehouse(warehouse)">Edit</button>
+                  <span class="spacer"></span>
+                  <button type="button" class="btn btn-sm btn-ghost" (click)="removeWarehouse(warehouse)">Delete</button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ================================================================ -->
+      <!-- The ledger                                                        -->
+      <!-- ================================================================ -->
+      @if (view() === 'movements') {
+        <p class="tiny muted" style="margin:0 0 14px;max-width:68ch">
+          Everything that has moved, newest first. <strong>Nothing here can be edited or deleted</strong> &mdash;
+          a mistake is corrected by recording a stock count, which leaves both the error and the fix
+          visible. That is the difference between a stock record and a spreadsheet.
+        </p>
+
+        <div class="filters">
+          <select class="select" style="width:auto" (change)="onWarehouseFilter(selectValue($event))">
+            <option value="">Every warehouse</option>
+            @for (warehouse of warehouses(); track warehouse.id) {
+              <option [value]="warehouse.id" [selected]="warehouseFilter() === (warehouse.id + '')">
+                {{ warehouse.name }}
+              </option>
+            }
+          </select>
+        </div>
+
+        @if (listing()) {
+          <div class="skeleton" style="height:240px"></div>
+        } @else if (!movements().length) {
+          <p class="empty-note">Nothing has moved yet.</p>
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Product</th>
+                  <th>Warehouse</th>
+                  <th>Why</th>
+                  <th class="num-cell">Change</th>
+                  <th class="num-cell">Left</th>
+                  <th>Reference</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (move of movements(); track move.id) {
+                  <tr>
+                    <td class="muted-sm">{{ move.createdAt | date: 'd MMM, HH:mm' }}</td>
+                    <td>{{ move.product?.name ?? 'Deleted product' }}</td>
+                    <td class="muted-sm">{{ move.warehouse?.name ?? '—' }}</td>
+                    <td>
+                      {{ reasonName(move.reason) }}
+                      @if (move.order) {
+                        <div class="muted-sm mono">{{ move.order.orderNo }}</div>
+                      }
+                    </td>
+                    <!-- The sign is the direction, which is the thing being read
+                         down this column. -->
+                    <td class="num-cell" [class.low]="move.type === 'out'">
+                      {{ move.type === 'out' ? '−' : '+' }}{{ move.quantity | number }}
+                    </td>
+                    <td class="num-cell">{{ move.balanceAfter | number }}</td>
+                    <td class="muted-sm">
+                      {{ move.reference || move.note || '' }}
+                      <!-- A movement written by dispatching an order still carries
+                           whoever pressed the button; this is the rare row with
+                           nobody behind it at all. -->
+                      @if (!move.createdBy) {
+                        <div class="muted-sm">No recorded author</div>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <app-pager [meta]="meta()" (pageChange)="onPage($event)" />
+        }
+      }
+
+      <!-- ================================================================ -->
+      <!-- Analytics                                                         -->
+      <!-- ================================================================ -->
+      @if (view() === 'analytics') {
+        <div class="tabs">
+          @for (range of ranges(); track range) {
+            <button type="button" class="tab" [class.tab-on]="days() === range" (click)="setDays(range)">
+              {{ range === 365 ? 'Last year' : 'Last ' + range + ' days' }}
+            </button>
+          }
+        </div>
+
+        @if (listing()) {
+          <div class="skeleton" style="height:380px"></div>
+        } @else if (analytics(); as a) {
+          <div class="kpis">
+            <div class="kpi">
+              <div class="kpi-label">On the shelves</div>
+              <div class="kpi-value">{{ a.totals.onHand | number }}</div>
+              <div class="kpi-note">{{ a.totals.available | number }} available, {{ a.totals.reserved | number }} promised</div>
+            </div>
+            <div class="kpi" [class.kpi-warn]="a.totals.outCount > 0">
+              <div class="kpi-label">Out of stock</div>
+              <div class="kpi-value">{{ a.totals.outCount | number }}</div>
+              <div class="kpi-note">{{ a.totals.lowCount | number }} more running low</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Worth to sell</div>
+              <div class="kpi-value">{{ money(a.totals.retailValue) }}</div>
+              <div class="kpi-note">At your catalogue prices</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Money tied up</div>
+              <div class="kpi-value">{{ money(a.totals.costValue) }}</div>
+              <!-- A valuation is only as good as the costs typed onto receipts, so
+                   the coverage is printed beside it rather than left implied. -->
+              <div class="kpi-note">{{ a.totals.costCoverage }}% of stock has a cost recorded</div>
+            </div>
+          </div>
+
+          @if (a.totals.costCoverage < 100 && a.totals.onHand > 0) {
+            <p class="tiny muted" style="margin:-6px 0 16px">
+              Add a unit cost when you book a delivery in and “money tied up” becomes a real figure. Until
+              then it only counts the stock that has one.
+            </p>
+          }
+
+          <div class="cards" style="margin-bottom:14px">
+            <div class="panel">
+              <app-mini-chart [points]="movementSeries()" [title]="'Going out per day'" />
+            </div>
+            <div class="panel">
+              <app-mini-chart [points]="intakeSeries()" [title]="'Coming in per day'" />
+            </div>
+          </div>
+
+          <div class="cards">
+            <div class="panel">
+              <h5>Out of stock</h5>
+              @if (!a.out.length) {
+                <p class="tiny muted" style="margin:0">Nothing is out. Good.</p>
+              } @else {
+                <ul class="rank">
+                  @for (row of a.out; track row.productId + '-' + row.warehouseId) {
+                    <li>
+                      <span class="name">{{ row.name }}</span>
+                      <span class="sub">{{ row.warehouseName }}</span>
+                      <span class="num bad">0</span>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+
+            <div class="panel">
+              <h5>Running low</h5>
+              @if (!a.low.length) {
+                <p class="tiny muted" style="margin:0">
+                  Nothing is under its warning level. Set one on a product to be told before it runs out.
+                </p>
+              } @else {
+                <ul class="rank">
+                  @for (row of a.low; track row.productId + '-' + row.warehouseId) {
+                    <li>
+                      <span class="name">{{ row.name }}</span>
+                      <span class="sub">of {{ row.reorderLevel }}</span>
+                      <span class="num bad">{{ row.available }}</span>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+
+            <div class="panel">
+              <h5>Moving fastest</h5>
+              @if (!a.topMoving.length) {
+                <p class="tiny muted" style="margin:0">Nothing has gone out in this window.</p>
+              } @else {
+                <ul class="rank">
+                  @for (row of a.topMoving; track row.productId) {
+                    <li>
+                      <span class="name">{{ row.name }}</span>
+                      <span class="num">{{ row.units | number }}</span>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+
+            <div class="panel">
+              <h5>By warehouse</h5>
+              <ul class="rank">
+                @for (row of a.byWarehouse; track row.warehouseId) {
+                  <li>
+                    <span class="name">{{ row.name }}</span>
+                    <span class="sub">{{ row.lines | number }} products</span>
+                    <span class="num">{{ row.onHand | number }}</span>
+                  </li>
+                }
+              </ul>
+            </div>
+          </div>
+        }
+      }
+    }
+  }
+</div>
+
+<!-- ------------------------------------------------------------------ -->
+<!-- A warehouse                                                         -->
+<!-- ------------------------------------------------------------------ -->
+@if (warehouseOpen()) {
+  <app-modal
+    [title]="editingWarehouse() ? 'Edit warehouse' : 'Add warehouse'"
+    [closeOnBackdrop]="false"
+    (closed)="warehouseOpen.set(false)"
+  >
+    <form id="wh-form" [formGroup]="warehouseForm" (ngSubmit)="saveWarehouse()">
+      <div class="form-grid">
+        <div class="field">
+          <label for="wh-name">Name</label>
+          <input id="wh-name" class="input" formControlName="name" maxlength="150" />
+          <app-field-error [control]="warehouseForm.controls.name" label="Name" />
+        </div>
+
+        <div class="field">
+          <label for="wh-code">Code</label>
+          <input id="wh-code" class="input" formControlName="code" maxlength="30" placeholder="MAIN" />
+          <app-field-error [control]="warehouseForm.controls.code" label="Code" />
+          <span class="hint">Short, and yours &mdash; it goes on a pick list and gets said out loud.</span>
+        </div>
+      </div>
+
+      @if (branches().length > 0) {
+        <div class="field">
+          <label for="wh-branch">Serves</label>
+          <select id="wh-branch" class="select" formControlName="branchId">
+            <option value="">The whole company</option>
+            @for (branch of branches(); track branch.id) {
+              <option [value]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+          <span class="hint">
+            An order placed on that branch&rsquo;s site will be filled from here by default.
+          </span>
+        </div>
+      }
+
+      <div class="field">
+        <label for="wh-address">Address</label>
+        <input id="wh-address" class="input" formControlName="addressLine" maxlength="300" />
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="wh-city">City</label>
+          <input id="wh-city" class="input" formControlName="city" maxlength="120" />
+        </div>
+        <div class="field">
+          <label for="wh-pin">Pincode</label>
+          <input id="wh-pin" class="input" formControlName="pincode" maxlength="20" />
+        </div>
+        <div class="field">
+          <label for="wh-contact">Who to ring</label>
+          <input id="wh-contact" class="input" formControlName="contactName" maxlength="120" />
+        </div>
+        <div class="field">
+          <label for="wh-phone">On</label>
+          <input id="wh-phone" class="input" formControlName="contactPhone" maxlength="30" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="wh-notes">Notes</label>
+        <textarea id="wh-notes" class="textarea" formControlName="notes" maxlength="500"></textarea>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="wh-status">Status</label>
+          <select id="wh-status" class="select" formControlName="status">
+            <option value="active">Active</option>
+            <option value="inactive">Switched off</option>
+          </select>
+          <span class="hint">
+            Switched off means stop sending things here. It keeps its stock and its ledger &mdash; a unit
+            being wound down still has things in it.
+          </span>
+        </div>
+
+        <div class="field">
+          <label style="display:flex;gap:8px;align-items:flex-start">
+            <input type="checkbox" formControlName="isDefault" style="margin-top:3px" />
+            <span>
+              Make this the default
+              <span class="hint" style="display:block">
+                Where an order goes when nobody says. Promoting this one demotes whichever holds it now.
+              </span>
+            </span>
+          </label>
+        </div>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="warehouseOpen.set(false)">Cancel</button>
+      <button type="submit" form="wh-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : 'Save warehouse' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}
+
+<!-- ------------------------------------------------------------------ -->
+<!-- A movement                                                          -->
+<!-- ------------------------------------------------------------------ -->
+@if (movementOpen()) {
+  <app-modal title="Record a movement" [closeOnBackdrop]="false" (closed)="movementOpen.set(false)">
+    <form id="mv-form" [formGroup]="movementForm" (ngSubmit)="saveMovement()">
+      <div class="form-grid">
+        <div class="field">
+          <label for="mv-wh">Warehouse</label>
+          <select id="mv-wh" class="select" formControlName="warehouseId">
+            <option value="">Choose…</option>
+            @for (warehouse of warehouses(); track warehouse.id) {
+              @if (warehouse.status === 'active') {
+                <option [value]="warehouse.id">{{ warehouse.name }}</option>
+              }
+            }
+          </select>
+          <app-field-error [control]="movementForm.controls.warehouseId" label="Warehouse" />
+        </div>
+
+        <div class="field">
+          <label for="mv-product">Product</label>
+          <select id="mv-product" class="select" formControlName="productId">
+            <option value="">Choose…</option>
+            @for (product of products(); track product.id) {
+              <option [value]="product.id">{{ product.name }}</option>
+            }
+          </select>
+          <app-field-error [control]="movementForm.controls.productId" label="Product" />
+          @if (!products().length) {
+            <span class="hint">
+              You have no published products yet &mdash; there is nothing to count in until the catalogue
+              has something in it.
+            </span>
+          }
+        </div>
+      </div>
+
+      <!-- No direction field. It comes from the reason — a delivery goes in, a
+           breakage goes out — and asking for both is asking somebody to
+           contradict themselves. -->
+      <div class="field">
+        <label for="mv-reason">What happened</label>
+        <select id="mv-reason" class="select" formControlName="reason">
+          @for (reason of writableReasons(); track reason.key) {
+            <option [value]="reason.key">{{ reason.name }}</option>
+          }
+        </select>
+        <span class="hint">
+          Sales and transfers are not on this list &mdash; those are recorded for you when you dispatch an
+          order or move stock between warehouses.
+        </span>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="mv-qty">Quantity</label>
+          <!-- `min` follows the reason: a receipt of nothing is not a movement and
+               the API refuses it, but a stock count of zero says the shelf is
+               empty, which is a fact worth recording. -->
+          <input
+            id="mv-qty"
+            class="input"
+            type="number"
+            [attr.min]="quantityMin()"
+            formControlName="quantity"
+          />
+          <app-field-error [control]="movementForm.controls.quantity" label="Quantity" />
+        </div>
+
+        <div class="field">
+          <label for="mv-cost">Cost each</label>
+          <input id="mv-cost" class="input" type="number" min="0" step="0.01" formControlName="unitCost" />
+          <span class="hint">
+            What you paid, not what you sell it for. It is what makes &ldquo;money tied up&rdquo; a real figure.
+          </span>
+        </div>
+      </div>
+
+      <!-- The one genuinely confusing thing about stock control, said where the
+           number is typed. -->
+      <p class="qty-note">{{ quantityNote() }}</p>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="mv-ref">Reference</label>
+          <input id="mv-ref" class="input" formControlName="reference" maxlength="120" placeholder="Invoice or delivery note" />
+        </div>
+        <div class="field">
+          <label for="mv-note">Note</label>
+          <input id="mv-note" class="input" formControlName="note" maxlength="500" />
+        </div>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="movementOpen.set(false)">Cancel</button>
+      <button type="submit" form="mv-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Recording…' : 'Record it' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}
+
+<!-- ------------------------------------------------------------------ -->
+<!-- A transfer                                                          -->
+<!-- ------------------------------------------------------------------ -->
+@if (transferOpen()) {
+  <app-modal title="Move stock between warehouses" [closeOnBackdrop]="false" (closed)="transferOpen.set(false)">
+    <form id="tr-form" [formGroup]="transferForm" (ngSubmit)="saveTransfer()">
+      <div class="form-grid">
+        <div class="field">
+          <label for="tr-from">From</label>
+          <select id="tr-from" class="select" formControlName="fromWarehouseId">
+            <option value="">Choose…</option>
+            @for (warehouse of warehouses(); track warehouse.id) {
+              <option [value]="warehouse.id">{{ warehouse.name }}</option>
+            }
+          </select>
+          <app-field-error [control]="transferForm.controls.fromWarehouseId" label="From" />
+        </div>
+        <div class="field">
+          <label for="tr-to">To</label>
+          <select id="tr-to" class="select" formControlName="toWarehouseId">
+            <option value="">Choose…</option>
+            @for (warehouse of warehouses(); track warehouse.id) {
+              @if (warehouse.status === 'active') {
+                <option [value]="warehouse.id">{{ warehouse.name }}</option>
+              }
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="tr-product">Product</label>
+          <select id="tr-product" class="select" formControlName="productId">
+            <option value="">Choose…</option>
+            @for (product of products(); track product.id) {
+              <option [value]="product.id">{{ product.name }}</option>
+            }
+          </select>
+          <app-field-error [control]="transferForm.controls.productId" label="Product" />
+        </div>
+        <div class="field">
+          <label for="tr-qty">How many</label>
+          <input id="tr-qty" class="input" type="number" min="1" formControlName="quantity" />
+          <app-field-error [control]="transferForm.controls.quantity" label="Quantity" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="tr-note">Note</label>
+        <input id="tr-note" class="input" formControlName="note" maxlength="500" />
+      </div>
+
+      <p class="qty-note">
+        Recorded as two movements, out of one and into the other, at the same moment &mdash; so a transfer
+        can never leave you having lost stock or invented it.
+      </p>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="transferOpen.set(false)">Cancel</button>
+      <button type="submit" form="tr-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Moving…' : 'Move it' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}
+
+<!-- ------------------------------------------------------------------ -->
+<!-- Where it is kept, and when to warn                                  -->
+<!-- ------------------------------------------------------------------ -->
+@if (settingsOpen() && editingLevel(); as level) {
+  <app-modal
+    [title]="level.product?.name ?? 'Stock settings'"
+    [subtitle]="level.warehouse?.name ?? ''"
+    size="sm"
+    (closed)="settingsOpen.set(false)"
+  >
+    <form id="set-form" [formGroup]="settingsForm" (ngSubmit)="saveSettings()">
+      <div class="field">
+        <label for="set-reorder">Warn me under</label>
+        <input id="set-reorder" class="input" type="number" min="0" formControlName="reorderLevel" />
+        <span class="hint">
+          Counted against what is <strong>available</strong>, not what is on the shelf &mdash; stock already
+          promised to an order is not stock you can sell. Zero means never warn me.
+        </span>
+      </div>
+
+      <div class="field">
+        <label for="set-bin">Where it is kept</label>
+        <input id="set-bin" class="input" formControlName="binLocation" maxlength="60" placeholder="Aisle 3, bay B" />
+      </div>
+
+      <p class="qty-note">
+        Neither of these changes how many there are, so neither goes in the ledger.
+      </p>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="settingsOpen.set(false)">Cancel</button>
+      <button type="submit" form="set-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : 'Save' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

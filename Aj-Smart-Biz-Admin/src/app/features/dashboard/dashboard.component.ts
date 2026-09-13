@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -13,32 +13,44 @@ import { initials } from '../../shared/utils';
 @Component({
   selector: 'app-dashboard',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, DatePipe, PageHeaderComponent, PlanTimerComponent, StatusBadgeComponent, CanDirective],
+  imports: [RouterLink, DatePipe, DecimalPipe, PageHeaderComponent, PlanTimerComponent, StatusBadgeComponent, CanDirective],
   templateUrl: './dashboard.component.html',
-  styles: [
-    `
-      .tile {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 18px;
-        box-shadow: var(--shadow-sm);
-      }
-      .tile-top { display: flex; align-items: center; gap: 10px; }
-      .tile-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; font-size: 16px; }
-      .tile-label { font-size: 12.5px; font-weight: 600; color: var(--text-2); }
-      .tile-value { font-size: 27px; font-weight: 700; letter-spacing: -0.02em; margin: 12px 0 10px; }
-      .tile-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-      .meter { height: 7px; margin-top: 6px; background: var(--surface-3); border-radius: 99px; overflow: hidden; }
-      .meter-fill { height: 100%; background: var(--brand-600); border-radius: 99px; }
-    `,
-  ],
+  /*
+   * No `styles:` block.
+   *
+   * `.tile`, `.stat` and `.meter` used to live here, which is why the four other
+   * screens marked up with those same classes rendered their figures unstyled —
+   * Angular scopes a component's CSS, so nothing outside this file could see
+   * them. They are design-system primitives now; see `styles.scss`. This page is
+   * the plainest consumer of them and should need no CSS of its own.
+   */
 })
 export class DashboardComponent {
   private readonly api = inject(ApiService);
   readonly auth = inject(AuthService);
 
   readonly data = signal<AdminDashboard | null>(null);
+
+  /**
+   * Money, in the tenant's own currency.
+   *
+   * The dashboard has no order rows to read a currency off, so it uses the
+   * platform's default — which is what every figure on it is denominated in
+   * today. When multi-currency tenants exist this reads it from the company
+   * profile instead, and nothing else on the page changes.
+   */
+  money(value: number | null | undefined): string {
+    if (value === null || value === undefined) return '—';
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 0,
+      }).format(value);
+    } catch {
+      return String(value);
+    }
+  }
   readonly loading = signal(false);
 
   constructor() {

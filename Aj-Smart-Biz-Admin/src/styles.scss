@@ -31,6 +31,21 @@
   --info: #0891b2;
   --info-bg: #cffafe;
 
+  /*
+   * One spacing scale, so a gap is chosen from a list rather than typed from
+   * memory. Every inline `margin-top:20px` on a page was somebody picking a
+   * number that looked right next to the last one, which is how a dashboard
+   * ends up with 18px between two cards and nothing at all between the next
+   * two. `--space-5` is the gap between sections; see `.stack`.
+   */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+
   --radius: 10px;
   --radius-sm: 7px;
   --radius-lg: 16px;
@@ -95,6 +110,23 @@ a:hover { text-decoration: underline; }
 .text-right { text-align: right; }
 .nowrap { white-space: nowrap; }
 
+/*
+ * Vertical rhythm for a page of sections.
+ *
+ * The gap goes *between* children and never on the outside, so a page does not
+ * have to know whether it is the last thing on the screen, and a section that is
+ * conditionally absent takes its gap with it. This is the fix for a column of
+ * cards where each one carried its own `margin-top` and the ones somebody forgot
+ * sat flush against their neighbour.
+ *
+ * Angular's `@if` leaves comment anchors rather than elements in the DOM, so the
+ * adjacent-sibling selector pairs the visible sections with each other and an
+ * absent block costs nothing.
+ */
+.stack > * + * { margin-top: var(--space-5); }
+.stack-sm > * + * { margin-top: var(--space-3); }
+.stack-lg > * + * { margin-top: var(--space-6); }
+
 .grid { display: grid; gap: 16px; }
 .grid-2 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .grid-3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
@@ -117,8 +149,107 @@ a:hover { text-decoration: underline; }
   flex-wrap: wrap;
 }
 .card-head h3 { font-size: 15px; }
-.card-body { padding: 20px; }
+.card-body { padding: var(--space-5); }
 .card-body.tight { padding: 0; }
+
+/* ------------------------------ tiles & stats -----------------------------
+   The two figure primitives the console counts things in, and the reason they
+   are here rather than in a component: `my-plan`, `lead-list`, `lead-analytics`
+   and `figures-manager` all mark up `.tile` and `.stat` already. Angular scopes
+   component styles, so while these lived in the dashboard's own `styles:` block
+   every one of those pages rendered its figures as bare stacked text. A
+   primitive used by five screens belongs to the design system.
+
+   A tile is the headline figure — one number, its own surface, top of a page.
+   A stat is one of four inside a card, and is quieter on purpose: same
+   information, a third of the emphasis, so a page of both still has a hierarchy.
+   ------------------------------------------------------------------------- */
+.tile {
+  /* A column with the footer pinned to the bottom, so tiles in a row line their
+     badges up with each other however tall the tallest one's value makes it. */
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.tile-top { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.tile-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius);
+  font-size: 17px;
+  /* A tile with no modifier still gets a legible chip rather than a bare glyph. */
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+.tile-icon-brand   { background: var(--brand-100);  color: var(--brand-700); }
+.tile-icon-info    { background: var(--info-bg);    color: var(--info); }
+.tile-icon-success { background: var(--success-bg); color: var(--success); }
+.tile-icon-warning { background: var(--warning-bg); color: var(--warning); }
+.tile-icon-danger  { background: var(--danger-bg);  color: var(--danger); }
+.tile-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-2);
+  /* Long labels shorten rather than shoving the icon out of the tile. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tile-value {
+  margin: var(--space-4) 0 var(--space-3);
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  /* Figures that do not shuffle sideways as they tick over. */
+  font-variant-numeric: tabular-nums;
+}
+/* A tile whose value is words, not a number — a plan name, a status. */
+.tile-value-sm { font-size: 19px; letter-spacing: -0.01em; }
+/* Anything sitting between the value and the footer: a meter, a countdown. */
+.tile-sub { margin-bottom: var(--space-3); }
+.tile-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+.meter { height: 7px; margin-top: var(--space-2); background: var(--surface-3); border-radius: 99px; overflow: hidden; }
+.meter-fill { height: 100%; background: var(--brand-600); border-radius: 99px; transition: width .25s ease; }
+
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); }
+.stat {
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.stat-label { display: block; font-size: 11.5px; font-weight: 600; color: var(--text-3); }
+.stat-value {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.stat-note { display: block; margin-top: 2px; font-size: 11.5px; line-height: 1.4; color: var(--text-3); }
+/* Something to act on this week, and something to act on today. */
+.stat-warn .stat-value { color: var(--warning); }
+.stat-bad .stat-value { color: var(--danger); }
 
 /* ------------------------------- buttons --------------------------------- */
 .btn {

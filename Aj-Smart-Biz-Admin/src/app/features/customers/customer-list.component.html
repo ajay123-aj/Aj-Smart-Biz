@@ -1,0 +1,230 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:380px"></div>
+  } @else {
+    @if (summary(); as s) {
+      <div class="kpis">
+        <div class="kpi">
+          <div class="kpi-label">Accounts</div>
+          <div class="kpi-value">{{ s.total | number }}</div>
+          <div class="kpi-note">{{ s.active | number }} can sign in</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Have ordered</div>
+          <div class="kpi-value">{{ s.withOrders | number }}</div>
+          <!-- The gap between this and the total is the number worth watching:
+               accounts that registered and never ordered are a checkout somebody
+               abandoned. -->
+          <div class="kpi-note">{{ s.total - s.withOrders | number }} signed up but never bought</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Joined this month</div>
+          <div class="kpi-value">{{ s.joinedLast30 | number }}</div>
+          <div class="kpi-note">in the last 30 days</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Barred</div>
+          <div class="kpi-value">{{ s.inactive | number }}</div>
+          <div class="kpi-note">cannot sign in</div>
+        </div>
+      </div>
+    }
+
+    <p class="tiny muted" style="margin:0 0 14px;max-width:70ch">
+      People who have signed in to your website. <strong>You cannot add one here</strong> &mdash; an account
+      is made by the person it belongs to, with their own mobile number. There is no password to reset
+      either: they sign in with a code we send them.
+    </p>
+
+    <div class="filters">
+      <input
+        class="input grow"
+        type="search"
+        placeholder="Name, mobile number or email"
+        [value]="search()"
+        (change)="onSearch(inputValue($event))"
+      />
+
+      <select class="select" style="width:auto" (change)="onStatus(selectValue($event))">
+        <option value="">Everyone</option>
+        <option value="active">Can sign in</option>
+        <option value="inactive">Barred</option>
+      </select>
+    </div>
+
+    @if (listing()) {
+      <div class="skeleton" style="height:240px"></div>
+    } @else if (!items().length) {
+      <p class="empty-note">
+        @if (search()) {
+          Nobody matches that.
+        } @else {
+          Nobody has signed in yet. Accounts appear here as people register on your website.
+        }
+      </p>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Mobile</th>
+              <th class="num-cell">Orders</th>
+              <th class="num-cell">Spent</th>
+              <th>Last order</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of items(); track row.id) {
+              <tr>
+                <td>
+                  <span class="strong">{{ row.name }}</span>
+                  @if (row.email) {
+                    <div class="muted-sm">{{ row.email }}</div>
+                  }
+                </td>
+                <td class="mono">
+                  {{ row.phone }}
+                  <!-- Whether the number has ever been proved. An account that
+                       registered and never finished is a customer to chase, not
+                       a gap. -->
+                  @if (!row.phoneVerified) {
+                    <div class="muted-sm">not verified</div>
+                  }
+                </td>
+                <td class="num-cell">{{ row.orders | number }}</td>
+                <td class="num-cell">
+                  {{ money(row.spent) }}
+                  <!-- Cancellations are not counted, so nobody reads this as
+                       everything they ever put in a basket. -->
+                  <div class="muted-sm">cancellations excluded</div>
+                </td>
+                <td class="muted-sm">
+                  {{ row.lastOrderAt ? (row.lastOrderAt | date: 'd MMM y') : '—' }}
+                </td>
+                <td><app-status-badge [value]="row.status" /></td>
+                <td>
+                  <button type="button" class="btn btn-sm btn-ghost" (click)="open(row)">Open</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pager [meta]="meta()" (pageChange)="onPage($event)" />
+    }
+  }
+</div>
+
+<!-- ------------------------------------------------------------------ -->
+<!-- One customer: who they are, where they are, and what they have had  -->
+<!-- ------------------------------------------------------------------ -->
+@if (detailOpen() && current(); as detail) {
+  <app-modal
+    [title]="detail.customer.name"
+    [subtitle]="detail.customer.phone + ' · ' + (detail.customer.orders | number) + ' order(s)'"
+    size="lg"
+    [closeOnBackdrop]="false"
+    (closed)="detailOpen.set(false)"
+  >
+    @if (canEdit()) {
+      <form id="cust-form" [formGroup]="form" (ngSubmit)="save()">
+        <div class="detail-grid">
+          <div class="field">
+            <label for="cust-name">Name</label>
+            <input id="cust-name" class="input" formControlName="name" maxlength="120" />
+          </div>
+
+          <div class="field">
+            <label for="cust-email">Email</label>
+            <input id="cust-email" class="input" type="email" formControlName="email" maxlength="160" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="cust-notes">Your notes</label>
+          <textarea id="cust-notes" class="textarea" formControlName="notes" maxlength="1000"></textarea>
+          <span class="hint">Never shown to the customer.</span>
+        </div>
+
+        <!-- Explained rather than merely absent: a missing field with no reason
+             beside it is the one people ring up about. -->
+        <p class="note-box">
+          Their mobile number is how they sign in and how their orders are filed, so it cannot be
+          changed here. If they have a new number, they sign in with it and we start a fresh account.
+        </p>
+
+        <div class="row-end" style="gap:8px">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="toggle(detail.customer)">
+            {{ detail.customer.status === 'active' ? 'Bar this customer' : 'Let them sign in again' }}
+          </button>
+          <button type="submit" class="btn btn-primary btn-sm" [disabled]="saving()">
+            {{ saving() ? 'Saving…' : 'Save' }}
+          </button>
+        </div>
+      </form>
+    }
+
+    <h4 style="margin:20px 0 8px">Their addresses</h4>
+    @if (!detail.addresses.length) {
+      <p class="tiny muted" style="margin:0">They have not saved one yet.</p>
+    } @else {
+      <ul class="addresses">
+        @for (address of detail.addresses; track address.id) {
+          <li class="address">
+            <span class="tag">{{ address.label }}</span>
+            @if (address.isDefault) {
+              <span class="tag">Default</span>
+            }
+            <!-- Printed as the API formatted it, so this reads identically to the
+                 address copied onto an order. -->
+            {{ address.formatted }}
+            @if (address.contactName || address.contactPhone) {
+              <div class="muted-sm">
+                For {{ address.contactName || 'someone else' }}{{ address.contactPhone ? ' · ' + address.contactPhone : '' }}
+              </div>
+            }
+          </li>
+        }
+      </ul>
+    }
+
+    <h4 style="margin:20px 0 8px">What they have ordered</h4>
+    @if (!detail.orders.length) {
+      <p class="tiny muted" style="margin:0">Nothing yet.</p>
+    } @else {
+      <table class="orders">
+        <thead>
+          <tr>
+            <th>Order</th>
+            <th>When</th>
+            <th>Status</th>
+            <th>Payment</th>
+            <th class="n">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (order of detail.orders; track order.id) {
+            <tr>
+              <td class="mono">{{ order.orderNo }}</td>
+              <td class="muted-sm">{{ order.createdAt | date: 'd MMM y' }}</td>
+              <td>{{ order.status }}</td>
+              <td>{{ order.paymentStatus }}</td>
+              <td class="n">{{ money(order.total) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+
+    <ng-container footer>
+      @if (canEdit()) {
+        <button type="button" class="btn btn-ghost" (click)="remove(detail.customer)">Remove</button>
+      }
+      <button type="button" class="btn btn-ghost" (click)="detailOpen.set(false)">Close</button>
+    </ng-container>
+  </app-modal>
+}

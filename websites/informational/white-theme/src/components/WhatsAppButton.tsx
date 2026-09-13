@@ -26,6 +26,16 @@ interface Props {
   /** Overrides the label; otherwise the company's own is used. */
   label?: string;
   variant?: 'solid' | 'outline' | 'plain';
+  /**
+   * Render the mark alone, with the label carried by `aria-label` and `title`
+   * instead of printed beside it.
+   *
+   * For the header, where three labelled actions beside a menu would be four
+   * competing calls to action in one bar. Nothing about what the button *means*
+   * is lost — only the words a sighted person does not need next to a glyph
+   * this recognisable.
+   */
+  iconOnly?: boolean;
   className?: string;
   /**
    * Render only when the company set a number for this exact type, instead of
@@ -49,11 +59,15 @@ export default function WhatsAppButton({
   type,
   label,
   variant = 'solid',
+  iconOnly = false,
   className,
   exact = false,
 }: Props) {
   const number = exact ? whatsappSetFor(company, type) : whatsappFor(company, type);
   if (!number) return null;
+
+  /* The company's own wording for this desk, unless the caller overrode it. */
+  const text = label ?? number.label;
 
   return (
     <a
@@ -61,9 +75,13 @@ export default function WhatsAppButton({
       href={number.href}
       target="_blank"
       rel="noopener noreferrer"
+      /* On the icon-only variant the words move here rather than disappearing:
+         the label is what a screen reader announces and what a hover tooltip
+         shows, so the meaning survives losing the text. */
+      {...(iconOnly ? { 'aria-label': text, title: text } : {})}
     >
       <WhatsAppMark className={styles.mark} />
-      {label ?? number.label}
+      {iconOnly ? null : text}
     </a>
   );
 }

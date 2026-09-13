@@ -102,6 +102,229 @@ Table plans {
   deleted_at datetime
 }
 
+Table company_orders {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  branch_id int [ref: > branches.id, note: 'the branch whose site took it; NULL on a company-wide host. Stamped from the HOST, never from the body, so an order raised on the Surat site belongs to Surat. SET NULL on branch delete — an order is money that changed hands, and closing a shop does not un-sell it.']
+  customer_id int [ref: > customers.id, note: 'the account that placed it, where one was signed in. NULLABLE and always will be: a tenant without customer accounts takes every order from a stranger, and a tenant with them still takes orders from people who did not sign in — refusing those would be turning away money to tidy a foreign key. SET NULL on delete, because removing an account must not remove the sale. The name, phone and address are copied onto the order regardless: they are what the order WAS, and a customer who later moves house has not changed what was delivered where.']
+  order_no varchar(30) [not null, note: 'ORD-00001, unique within the tenant and never reused. What the customer reads back down the phone, so it is short and sequential PER COMPANY — a shop’s third order should be 3, and one tenant must not be able to infer another’s volume from its own numbers. Allocated from the tenant’s own highest rather than COUNT(*), which would repeat a number already printed on somebody’s invoice after a delete.']
+  status enum_order_status [not null, default: 'pending', note: 'where it has got to. Forward or cancelled, NEVER backward: an order that has been dispatched has left the building, and letting somebody put it back to packed would leave the stock ledger and the order list telling different stories about the same box. A mistake is fixed by cancelling and re-entering. See ORDER_TRANSITIONS.']
+  payment_status enum_order_payment_status [not null, default: 'unpaid', note: 'tracked APART from status because the two genuinely move independently: cash on delivery dispatches unpaid every day of the week, and UPI up front pays for an order nobody has packed. Folding them into one list would force every business into one of those two shapes.']
+  payment_reference varchar(120) [note: 'the UPI reference or receipt number, typed in by whoever checked.']
+  mode enum_order_mode [note: 'the orders mode AT THE TIME, snapshotted the way a subscription snapshots its plan. A shop that switches from WhatsApp to card payments next month must not have last month’s orders silently re-labelled.']
+  customer_name varchar(120)
+  customer_phone varchar(30)
+  customer_address varchar(500)
+  customer_note varchar(1000) [note: 'whatever they typed in the notes box. Theirs, not the shop’s — see internal_note.']
+  item_count int [not null, default: 0, note: 'how many things, counting quantities. Denormalised because every list shows it.']
+  unpriced_items int [not null, default: 0, note: 'how many lines carried NO price at all. A catalogue may price in words (From ₹4,999, On request) and those lines are real parts of a real order that cannot be added up. This is what stops subtotal from being read as the whole order: every screen can say "₹18,400 plus 2 items to be quoted" instead of printing a total that quietly under-counts. Nothing anywhere treats a missing price as zero.']
+  subtotal decimal(12,2) [not null, default: 0, note: 'the sum of the lines that HAD a number. Never taken from the request body — every figure is read off the tenant’s own products at the moment the order is placed, because a body that could name its own price is a shop that can be bought from at a price the customer chose.']
+  adjustment decimal(12,2) [not null, default: 0, note: 'delivery, a discount given on the phone, a rounding — one SIGNED figure rather than a column each, because the platform cannot know which of those a given business uses and a form with four boxes on it is a form where three are always empty. adjustment_note says what it was.']
+  adjustment_note varchar(120)
+  total decimal(12,2) [not null, default: 0, note: 'subtotal + adjustment, recomputed by the API and never by a client.']
+  currency varchar(10) [not null, default: 'INR', note: 'the tenant’s currency at the time, so an old order still reads right.']
+  warehouse_id int [ref: > company_warehouses.id, note: 'which unit is filling it. NULL until somebody says, and NULL forever on a tenant without the warehouse feature. Confirming picks the default when none was chosen. SET NULL on delete: deleting a warehouse must not delete the orders it was going to fill.']
+  stock_reserved boolean [not null, default: false, note: 'whether this order currently HOLDS a reservation. A flag rather than something derived, and it is what makes the arithmetic safe to run twice: without it a double-clicked Confirm reserves the same box twice and the shelf is wrong until somebody counts it.']
+  stock_issued boolean [not null, default: false, note: 'whether the stock has actually left. Same guard, same reason.']
+  sent_to_whatsapp boolean [not null, default: false]
+  source_url varchar(500)
+  submitted_ip varchar(64)
+  internal_note varchar(1000) [note: 'the shop’s own notes. Never shown to the customer.']
+  cancel_reason varchar(300) [note: 'asked for at the moment somebody cancels. A cancelled order with no reason is the one somebody asks about six weeks later.']
+  confirmed_at datetime
+  packed_at datetime
+  dispatched_at datetime
+  delivered_at datetime
+  cancelled_at datetime
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    branch_id
+    warehouse_id
+    order_no
+    status
+    payment_status
+    (company_id, created_at)
+  }
+  Note: 'One order, as the thing that actually happened. The cart shipped WITHOUT this table, deliberately — an order was composed into a WhatsApp message and nothing was kept, on the same bargain the service enquiry form makes. That bargain holds until somebody asks how many they sold last month, and then it does not hold at all: a chat thread cannot be counted, filtered, or reconciled against a shelf. So an order is now always recorded and the mode decides only what happens NEXT. The record is the record; the message is the notification. Note there is no active/inactive status column: an order is CANCELLED, and a second switch would give a console two ways to make one go away.'
+}
+
+Table company_order_items {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id, note: 'carried on the line as well as on its order. Redundant through order_id and worth it: every analytics query here is "this tenant’s best sellers", and without this column each needs a join to company_orders purely to find out whose line it is.']
+  order_id int [not null, ref: > company_orders.id]
+  product_id int [ref: > company_products.id, note: 'nullable, SET NULL, no cascade. "What else did this product sell" is a real question worth being able to ask — but a product deleted next year must not take the record of having sold it away, and nothing on screen depends on this resolving.']
+  product_name varchar(200) [not null, note: 'COPIED, not joined. An order is a historical fact and a catalogue is not: a line showing today’s price against last March’s sale would be wrong in the one place a business cannot afford it.']
+  product_sku varchar(60)
+  product_slug varchar(160) [note: 'so the console can still link to the product page where it is published.']
+  quantity int [not null, default: 1]
+  unit_price decimal(12,2) [note: 'what ONE cost on the day — the offer price where there was one, because that is what the customer saw and paid. NULLABLE, and a null is not a zero: it is a line priced in words that cannot be added up. See company_orders.unpriced_items.']
+  list_price decimal(12,2) [note: 'the normal price, where the line was bought on offer. For the record.']
+  price_label varchar(60) [note: 'what the card printed instead of a number, where it printed one.']
+  line_total decimal(12,2) [note: 'unit_price * quantity, STORED rather than computed on the way out: it is read far more often than written, it is what every analytics sum adds up, and storing it means a report and an order screen cannot round differently. Null wherever unit_price is.']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    order_id
+    company_id
+    product_id
+  }
+  Note: 'One line of one order — a product, a quantity, and what it cost that day.'
+}
+
+Table company_warehouses {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  branch_id int [ref: > branches.id, note: 'the branch this store SERVES, where that is true; NULL is company-wide and is the ordinary case. SET NULL on delete — a branch closing leaves the unit standing, and the stock in it still has to be counted.']
+  name varchar(150) [not null]
+  code varchar(30) [not null, note: 'the tenant’s own short reference — MAIN, WH-2. Unique within the company and upper-cased on the way in, because it goes on a printed pick list and gets said out loud; two warehouses called "main" in different cases is a conversation nobody wants.']
+  address_line varchar(300)
+  city varchar(120)
+  state_id int [ref: > states.id]
+  pincode varchar(20)
+  contact_name varchar(120)
+  contact_phone varchar(30)
+  is_default boolean [not null, default: false, note: 'where an order goes when nobody says. EXACTLY ONE per company, held by the controller rather than a constraint (a partial unique index is not portable across the three dialects this runs on). The first warehouse created becomes it whether or not the tenant asked: confirming an order has to reserve stock somewhere, and a company with one unit should never be asked a question with one answer.']
+  notes varchar(500)
+  sequence int [not null, default: 0]
+  status enum_status [not null, default: 'active', note: 'switched off means STOP SENDING THINGS HERE — left out of the pickers, unusable for a new order. It keeps its stock and its ledger: a unit being wound down still has things on its shelves and the count has to stay right until they have been moved out.']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    branch_id
+    code
+    status
+    sequence
+  }
+  Note: 'Somewhere stock physically IS. Not a branch — a branch is a place the business trades from, with a website and an address on the Contact page; a warehouse is a place things are kept, and the two are not the same cardinality: a company can run three shops out of one central store, or one shop with a stockroom and an overflow unit across town. Modelling the store as a branch would put it on the website; modelling the branch as a warehouse would lose everything else a branch is.'
+}
+
+Table company_stock {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  warehouse_id int [not null, ref: > company_warehouses.id]
+  product_id int [not null, ref: > company_products.id]
+  quantity int [not null, default: 0, note: 'what is physically there, reservations included.']
+  reserved int [not null, default: 0, note: 'the part of it already promised to CONFIRMED orders that have not gone out yet. AVAILABLE is quantity - reserved, and that is what the website asks about: a box that is physically present and already sold to somebody else is not one a stranger can buy. Reserving does not move stock, which is why it is a column here and not a movement — nothing has left the building, and a ledger that recorded intentions alongside facts would stop being a record of what happened.']
+  reorder_level int [not null, default: 0, note: 'below this the product is reported low. PER WAREHOUSE rather than per product, because the level you want in the shop and the level you want in the overflow unit are different numbers about the same thing. Zero means DO NOT WARN ME, which is the honest default: the platform has no idea how fast anything sells until it has watched for a while. Compared against AVAILABLE, never quantity.']
+  bin_location varchar(60)
+  last_movement_at datetime [note: 'denormalised from the ledger so the stock screen can sort by what moved recently without joining a table that grows forever.']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+
+  Indexes {
+    (warehouse_id, product_id) [unique]
+    company_id
+    warehouse_id
+    product_id
+  }
+  Note: 'How many of one product are in one warehouse, right now. The RUNNING TOTAL of company_stock_movements — keeping both is a deliberate redundancy: summing the ledger would be correct and would get slower every week, on the one query the platform runs most (is this in stock, asked once per product per page load by a public website). The level is written in the SAME TRANSACTION as the movement that changes it, always, and balance_after on each movement records what this said at the time, which makes a drift between the two locatable to the movement where it started. NOT PARANOID, for the reason company_functionalities is not: a soft-deleted row would occupy the unique slot invisibly. The composite unique is declared only on MySQL — SQLite re-emits it as a unique on warehouse_id alone across its emulated ALTER, which rejects the second product ever counted into a warehouse; findOrCreate in levelFor() holds the invariant on both.'
+}
+
+Table company_stock_movements {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  warehouse_id int [not null, ref: > company_warehouses.id]
+  product_id int [not null, note: 'no FK: a product deleted next year must not take the record of what moved with it.']
+  type enum_stock_movement_type [not null, note: 'in | out | adjust. The DIRECTION, never the reason. Three and not six: a purchase and a customer return are both stock arriving, and what tells them apart is the reason — keeping the two apart is what lets a report answer "everything that came in this month" without enumerating every reason it might have.']
+  reason enum_stock_reason [not null, note: 'the REASON, never the direction. sale and transfer are refused from the manual endpoint (STOCK_MANUAL_REASONS): both are written in pairs alongside something else that has to be true at the same moment — an order that was dispatched, a unit that received what another sent — and a ledger that lets them be typed in on their own ends up holding a sale against no order.']
+  quantity int [not null, note: 'ALWAYS POSITIVE; type carries the direction. A signed column looks tidier right up until somebody has to write SUM(CASE WHEN...) in every report, or explain why a receipt of minus four is in the table.']
+  balance_after int [not null, default: 0, note: 'what company_stock.quantity read once this had been applied, written in the same transaction. Makes the ledger readable without re-summing from the beginning.']
+  unit_cost decimal(12,2) [note: 'what one unit was worth on the way in. The COST, not the selling price, and only ever filled in on a receipt — which is why it is nullable and why nothing is inferred when it is missing. It is what lets a stock valuation be the money actually tied up rather than the money the shop hopes to make; the analytics report cost_coverage alongside it so nobody reads a partial valuation as complete.']
+  order_id int [ref: > company_orders.id, note: 'the order this went out against, where it went out against one.']
+  counter_warehouse_id int [note: 'the other half of a transfer. A transfer is two movements and this is what pairs them.']
+  reference varchar(120)
+  note varchar(500)
+  created_by int [note: 'who did it — the one audit column here that is not a formality, because "who wrote off four of these" is the first question asked of a discrepancy. Filled in even on the movements the platform writes, since a person still caused them.']
+  updated_by int
+  created_at datetime
+  updated_at datetime
+
+  Indexes {
+    company_id
+    warehouse_id
+    product_id
+    order_id
+    type
+    reason
+    (company_id, created_at)
+  }
+  Note: 'Everything that has ever moved, and why. THE LEDGER, and the only table on the platform that is genuinely append-only: no update route and no delete route, not because nobody asked but because a stock record whose history can be edited answers no question worth asking. A mistake is corrected by a `correction` movement that says a count disagreed, which leaves both the error and the fix visible — the whole difference between a stock system and a number in a spreadsheet. Not paranoid either: a ledger with invisible rows is not a ledger.'
+}
+
+Table customers {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  name varchar(120) [not null]
+  phone varchar(20) [not null, note: 'THE IDENTITY. Digits only, normalised on the way in so +91 98250 11223 and 09825011223 are one customer rather than three — a shop with three accounts for one person has a list that cannot be counted and a sign-in that sometimes finds the wrong history. Unique per COMPANY, held by the controller rather than an index: this table is paranoid, so a deleted customer would occupy their own number forever and the same person could never come back. findByPhone() searches past deleted_at and restores instead of inserting.']
+  email varchar(160) [note: 'optional, and it stays optional: plenty of customers of this kind of shop do not have one, and demanding it costs the account rather than gains an address.']
+  otp_hash varchar(255) [note: 'the live one-time code, HASHED — even though it is six digits and lives ten minutes, because a plain code in a column is a code in a backup, a log line and a screen-share. There is deliberately NO PASSWORD COLUMN on this table: a password is a thing to forget, to reset over email, to store safely and to be blamed for when it leaks, and the whole value of the account is remembering an address and an order history.']
+  otp_expires_at datetime
+  otp_attempts int [not null, default: 0, note: 'wrong guesses against the live code; cleared when a new one is sent. Five is generous for somebody typing six digits and far too few to guess a million of them. Exceeding it burns the code rather than leaving it to be guessed at leisure.']
+  phone_verified boolean [not null, default: false, note: 'whether the number has ever been proved. A registration nobody finished leaves this false — a customer the shop can see and chase, rather than a gap.']
+  last_login_at datetime
+  notes varchar(1000) [note: "the shop's own note about them. Deliberately absent from publicCustomer(), which is what the customer's own profile page reads: it is the shop's private opinion, and a profile that printed it is a support ticket a week later."]
+  status enum_status [not null, default: 'active', note: 'switched off, they cannot sign in and cannot order. THEIR ORDERS STAY EXACTLY WHERE THEY ARE — barring somebody is not the same as pretending they never bought anything, and the sales figures must not move because a shop fell out with a customer.']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    phone
+    email
+    status
+  }
+  Note: 'Somebody who buys from one tenant and can sign in to say so. Unique per COMPANY rather than per platform: the same person buying from two shops here is two customers, which is right rather than a duplication — they are two businesses, and one has no business knowing what the other sold. It also means a tenant leaving the platform takes its own customer list with it.'
+}
+
+Table customer_addresses {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id, note: 'carried alongside customer_id so every query is pinned to one tenant without a join — the rule every child table here follows.']
+  customer_id int [not null, ref: > customers.id]
+  label varchar(30) [not null, default: 'Home', note: 'Home | Work | Other. One word, so a checkout picker can show it.']
+  contact_name varchar(120) [note: 'who is receiving it, where that is not the account holder — a parent, an office reception, a gift. Falls back to the customer when empty, so the ordinary case is still three fields.']
+  contact_phone varchar(20)
+  line1 varchar(200) [not null, note: 'two lines rather than one box and rather than five: one box loses the shape a courier reads, five is a form people abandon.']
+  line2 varchar(200)
+  landmark varchar(150) [note: '"Opposite the petrol pump" — the line that actually gets things found in this market.']
+  city varchar(120) [not null]
+  state_id int [ref: > states.id]
+  pincode varchar(20)
+  is_default boolean [not null, default: false, note: 'the one the checkout starts on. Exactly one per customer, held by the controller: the first address saved becomes it, and promoting another demotes the incumbent in the same transaction. There is no way to send false — un-defaulting the only one would open the checkout on nothing.']
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    customer_id
+    status
+  }
+  Note: 'One place a customer wants things delivered. Several per customer, because people have several — and the whole point of the account is not typing it again, which only pays off if all of them are kept. IT IS COPIED ONTO THE ORDER, NOT REFERENCED BY IT: company_orders.customer_address is text written when the order is placed, so editing or deleting an address later cannot rewrite where a delivered order went. Which also makes deleting one safe and needing no cascade guard.'
+}
+
 // ------------------------------ platform users ------------------------------
 
 Table super_admins {
@@ -392,6 +615,91 @@ Table company_gallery_items {
   Note: 'Images in the website Gallery section, in the order the company arranged them.'
 }
 
+// One article on a tenant's blog.
+//
+// The only content table on the platform whose rows are DATED rather than
+// ORDERED, and that one difference shapes all of it. A service, a benefit card
+// and a product sit in a list the tenant arranges by hand, so they carry a
+// `sequence`; a blog is a stack in the order things happened, so this carries
+// `published_at` and has no `sequence` at all. Giving it one would invite a
+// tenant to drag last March's article to the top, which is the one thing a blog
+// must not let them do.
+//
+// A post is live when it is active AND its date has passed. That pair is the
+// whole of the scheduling feature - see published_at - and it is decided in one
+// place, functionalityService.publishedWhere(), which the website, the archive
+// endpoint, the menu and the console's `state` all read.
+Table company_blog_posts {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  branch_id int [ref: > branches.id, note: 'branch these posts are for; NULL = the whole company. Branch-first with a company-wide fallback, exactly as every other content table resolves.']
+  slug varchar(160) [not null, note: "the half of the URL a person reads - /blog/how-we-fit-a-kitchen. Generated from the title, unique within the tenant, and DELIBERATELY NOT rewritten when the title changes: an article's address is what other people have linked to and what a search engine indexed, and a rename that silently breaks both is the most expensive thing a blog can do."]
+  title varchar(200) [not null]
+  excerpt varchar(400) [note: 'the standfirst under the title, and the line on the card. Optional - the website falls back to the opening of the body rather than showing a card with a hole in it.']
+  body longtext [not null, note: 'the article, as PLAIN TEXT with a blank line between paragraphs. Not HTML and never stored as HTML: the website splits it and prints the text, so nothing a tenant pastes in - a tracking pixel, a stray iframe from a word processor - can execute on their own domain or on a page a stranger is reading.']
+  cover_image varchar(255) [note: 'relative upload path. Optional; a post without one gets a short tinted band rather than an empty frame.']
+  author varchar(80) [note: "who wrote it, as a name typed by hand rather than a link to an admin account. Deliberately not a foreign key: the writer is often not the person who typed it in, guest posts exist, and an article whose byline vanishes when a staff account is deleted is worse than one carrying a name the platform cannot verify. Whether it is PRINTED is the company-wide show_author setting on the functionality's blob."]
+  tags json [note: 'what this is filed under, as a short list of free-text labels. JSON rather than a table, for the reason a service\'s highlights are: never queried apart from one LIKE on the archive filter, never ordered, never edited apart from their article. Capped by BLOG_TAGS_MAX.']
+  published_at datetime [note: 'when it goes live, AND the date printed on it. Two jobs in one column on purpose: a row dated next Monday is saved, complete and invisible until Monday - scheduling, with no scheduler and nothing to run. NULL is a draft: written, never published, shown to nobody.']
+  featured boolean [not null, default: false, note: 'pins this one above the dates WITHOUT changing its date - for the article a business wants read first, which would otherwise sink a little further every week. The only exception to the stack order.']
+  status enum_status [not null, default: 'active', note: "not the same question as published_at. That is WHEN this is meant to be read; this is whether it is on the site at all - how a tenant takes a post down without losing it and without rewriting the day it was published."]
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    branch_id
+    slug
+    status
+    published_at
+  }
+}
+
+// How a business sorts the work it sells - `Hair`, `Skin`, `Bridal`.
+//
+// The same shape as company_categories and deliberately a SECOND TABLE rather
+// than a `kind` column on the first. They are sold separately (a salon has
+// services and no catalogue; a furniture shop has a catalogue and two
+// services), so one table would mean every read on either had to remember to
+// filter - and the one that forgot would show a shop's product categories on
+// its services page. A shared unique slug would collide across them too:
+// /products/bridal and /services/bridal are different pages on one site.
+//
+// The tree LOGIC is shared rather than duplicated: the depth, cycle and nesting
+// arithmetic lives in catalogue.controller and is imported by the service
+// category controller, so a tree is a tree in exactly one place.
+Table company_service_categories {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  branch_id int [ref: > branches.id, note: 'branch this is for; NULL = the whole company, with the branch-first fallback every content table uses.']
+  parent_id int [ref: > company_service_categories.id, note: 'NULL is a main category; anything else makes this a subcategory. Capped at CATEGORY_DEPTH_MAX, checked against the rest of the tenant tree in the controller because no schema can see a cycle.']
+  name varchar(150) [not null]
+  slug varchar(160) [not null, note: 'the filter address - /services?category=bridal. Generated from the name, unique within the tenant, and not rewritten when the name changes.']
+  description varchar(600)
+  image varchar(255)
+  icon varchar(40) [not null, default: 'spark', note: 'from FEATURE_ICONS, the same closed library the service and benefit cards draw from - one library so a site drawn from three sections looks like one hand.']
+  featured boolean [not null, default: false]
+  sequence int [not null, default: 0]
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    branch_id
+    parent_id
+    slug
+    status
+    sequence
+  }
+}
+
 Table company_services {
   id int [pk, increment]
   company_id int [not null, ref: > companies.id]
@@ -403,6 +711,15 @@ Table company_services {
   highlights json [note: 'what is included, as a short list of lines. JSON rather than a child table: never queried, never ordered apart from its card, and read by exactly one component. The validator caps the count and each line.']
   cta_label varchar(40) [note: "this service's own button label, overriding the section's. Null on most rows on purpose: falling back rather than copying the section's label into every row means changing it once still changes it everywhere it was not deliberately overridden."]
   price_label varchar(60) [note: 'free text, never a number — "From ₹4,999", "On request", "£60/hour". A decimal column would have to invent a currency and a period, and would be wrong for anyone who prices per job or does not publish prices.']
+  price decimal(12,2) [note: 'the same price as a NUMBER, added beside price_label rather than instead of it. A surveyor quotes per job and can honestly only write "From ₹4,999"; a salon charges ₹300 for a haircut and has always known it - and forcing the second into free text means its prices cannot be added up, discounted or put on a bill. Read in one order by one function: price_label wins, then the offer pair, then this.']
+  offer_price decimal(12,2) [note: "today's price when it is lower. The website strikes through the old one; the badge and the percentage come from the same isOnOffer/discountPercent the catalogue uses, so a service and a product cannot disagree about what an offer is."]
+  on_offer boolean [not null, default: false, note: 'on offer said by hand - the only way a service priced in words can run one at all, and the only way to express an offer that is not a reduction ("free consultation this month").']
+  category_id int [ref: > company_service_categories.id, note: 'nullable, and most tenants leave it so: a builder with five services has no use for a taxonomy. It is for the salon with forty, where an unsorted list is unreadable.']
+  slug varchar(160) [not null, note: "the service's own page - /services/bridal-makeup. Generated from the title and NOT rewritten when the title changes: it is what other people have linked to."]
+  description text [note: 'the long copy for that page, as PLAIN TEXT with blank lines between paragraphs. Never HTML, for the reason a blog post body is not: nothing a tenant pastes in can become live markup on a page a stranger is reading.']
+  duration_minutes int [note: 'how long it takes. Null where the business genuinely cannot say - a kitchen fitting is four days and a leak is however long the leak takes. When the company takes bookings this is also what decides how much of the diary one appointment occupies.']
+  bookable boolean [not null, default: false, note: 'whether a visitor may pick a TIME for this, rather than only ask about it. Per service and not only per company, because one business has both: a salon takes appointments for a haircut and enquiries about a wedding party, and offering a 30-minute slot for the second is a promise nobody meant to make.']
+  slot_capacity int [note: 'how many people can hold the same slot for THIS service. NULL means "use the company limit" (booking.slotCapacity on the services settings blob), which is the ordinary case: a salon has three chairs and says so once rather than on all forty treatments. A number here is an override for the service whose constraint is the work rather than the business - one colourist, one van, one treatment room - and it wins even when it is smaller. Resolved by capacityFor().']
   featured boolean [not null, default: false, note: 'read this one first; the website gives it the wide cell. sequence still decides the order.']
   sequence int [not null, default: 0]
   status enum_status [not null, default: 'active']
@@ -419,6 +736,79 @@ Table company_services {
     sequence
   }
   Note: 'The services a business sells, behind the `services` functionality. Distinct from the benefit cards: a benefit is a reason to choose the business, a service is a thing it sells, and only one of the two has a price. The section heading and the name the Services page carries in the website menu live on the functionality settings blob, not here.'
+}
+
+Table company_categories {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  branch_id int [ref: > branches.id, note: 'branch these categories are for; NULL = the whole company. Same branch-first fallback every content table follows — a branch carrying a different range genuinely has different categories.']
+  parent_id int [note: 'the category above this one; NULL makes it a main category. Deliberately NO database foreign key: sequelize.sync() cannot order a table against itself, the same reason company_subscriptions.previous_subscription_id declares constraints:false. The controller holds the invariant instead — it refuses a parent from another tenant, refuses a cycle, and caps the depth at CATEGORY_DEPTH_MAX (3) on re-parenting as well as on create.']
+  name varchar(150) [not null]
+  slug varchar(160) [not null, note: 'the readable half of a URL. Generated from the name, made unique within the tenant, and NOT rewritten when the name changes — renaming a category must not silently break every link shared to it.']
+  description varchar(600)
+  image varchar(255) [note: 'relative upload path. Optional — a category without one falls back to its icon rather than to an empty frame.']
+  icon varchar(40) [not null, default: 'spark', note: 'a key from FEATURE_ICONS, the same library the services and benefit cards draw from, so a page carrying several sections looks drawn by one hand.']
+  featured boolean [not null, default: false, note: 'leads the band on the home page; sequence still decides the order within that.']
+  sequence int [not null, default: 0]
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    branch_id
+    parent_id
+    slug
+    status
+    sequence
+  }
+  Note: 'How a company sorts what it sells, behind the `products` functionality. ONE table, not two: "main category" and "subcategory" are the same thing at different heights, and a business that starts with two levels asks for a third the week it takes on a second supplier. Deleting a category deletes only the category — its children are promoted to where it was and its products fall back to uncategorised, done by hand in one transaction because a paranoid delete is an UPDATE and never fires ON DELETE SET NULL. A category with nothing at or below it is pruned from the public payload entirely.'
+}
+
+Table company_products {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  branch_id int [ref: > branches.id, note: 'branch this product is stocked by; NULL = the whole company.']
+  category_id int [ref: > company_categories.id, note: 'the DEEPEST category it is filed in, not the main one. A visitor browsing "Furniture" still finds it because the API walks the ancestry and sends each product its finished path. Nullable on purpose: a company with nine products and no wish to sort them should not have to invent a category first.']
+  name varchar(200) [not null]
+  slug varchar(160) [not null, note: '/products/solid-oak-dining-table. Unique per tenant; see company_categories.slug for why it is stored rather than derived.']
+  sku varchar(60) [note: "the tenant's own reference, shown on the product page."]
+  summary varchar(600) [note: 'one or two lines, printed on the card.']
+  description text [note: 'the full description, printed on the detail page.']
+  images json [note: 'ordered upload paths, and the FIRST is the card image everywhere in the catalogue — so this is a list, not a set, and the order is a decision the tenant makes. JSON rather than a child table for the reason company_services.highlights gives: never queried, never ordered apart from its product, read by exactly one gallery. Capped at PRODUCT_IMAGES_MAX.']
+  highlights json [note: 'what is included, as a short tick list. Capped in both directions by the validator.']
+  specs json [note: '[{label, value}] — the comparison table on the detail page. A table rather than a paragraph, because it is the part people compare between two products rather than read.']
+  price decimal(12,2) [note: 'what it normally costs. Null on a product priced only in words.']
+  offer_price decimal(12,2) [note: "what it costs today, when that is less than price. The discount is COMPUTED from the pair, never typed, so a card cannot advertise a percentage its two numbers disagree with. An offer price at or above the price is refused — on create by the validator, and on update by the controller, which is the half Joi cannot see because the body may carry only one of the pair."]
+  price_label varchar(60) [note: 'free text that OVERRIDES the numbers entirely — "From ₹24,999", "₹1,200/metre", "On request". The escape hatch for a business that cannot publish one number: it keeps the catalogue and gives up the arithmetic.']
+  on_offer boolean [not null, default: false, note: 'puts the product on the offers page with no offer_price to derive from. The only way a tenant pricing in free text can run an offer at all, and the only way to express one that is not a reduction ("free fitting this month"). isOnOffer() in functionality.service is the single place that reads this and offer_price together — the badge, the offers band, the /offers page and the console tab all ask it.']
+  offer_label varchar(60) [note: 'what the badge says, overriding the computed -25%. Free text, because "2 for 1" is an offer no percentage can express.']
+  stock_status enum_product_stock [not null, default: 'in_stock', note: 'in_stock | out_of_stock | made_to_order. Never a COUNT: the platform is not a warehouse system, and a number it cannot keep true is worse on a website than no number. What a visitor needs to know is whether to ring up.']
+  cta_label varchar(40) [note: "this product's own button label, overriding the section's. Null on most rows, for the reason company_services.cta_label gives."]
+  featured boolean [not null, default: false, note: 'leads the product band on the home page.']
+  orderable boolean [not null, default: true, note: 'whether this one may go in a basket, when the tenant is taking orders at all. Defaults to true so switching the cart on puts a button on everything rather than on nothing; it is the EXCEPTION that is worth setting — the made-to-measure item, the thing priced On request, the display piece that is not for sale. Never the whole answer: an out_of_stock product is not orderable whatever this says, and none of it applies unless the orders functionality is live. publicProduct() resolves the pair into one boolean so no template can check one and forget the other.']
+  track_inventory boolean [not null, default: false, note: 'whether the WAREHOUSE decides this product’s availability rather than the stock_status flag above it. Off by default, and that default is the design: stock_status is a flag somebody remembers to set, and switching this on hands the answer to the ledger instead — the website then says out of stock the moment the last one leaves the building with nobody having to remember anything. Per product because a catalogue is rarely uniform: the shop counts its lamps and does not count its made-to-order tables. Means nothing unless the warehouse functionality is live; availabilityOf() in stock.service is the one place that reads this and the levels together.']
+  sequence int [not null, default: 0]
+  status enum_status [not null, default: 'active']
+  created_by int
+  updated_by int
+  created_at datetime
+  updated_at datetime
+  deleted_at datetime
+
+  Indexes {
+    company_id
+    branch_id
+    category_id
+    slug
+    status
+    featured
+    sequence
+  }
+  Note: 'What the business sells, behind the `products` functionality. Distinct from company_services and deliberately so: a service is work, priced in words because a joiner quotes per job; a product is a thing, and the number on it is what lets the platform say honestly what a visitor is saving. Everything about offers follows from that one difference. The three bands of section copy and the name the Products page carries in the website menu live on the functionality settings blob, not here.'
 }
 
 Table service_leads {
@@ -439,6 +829,19 @@ Table service_leads {
   created_at datetime
   updated_at datetime
   deleted_at datetime
+
+  // ---- the appointment, on rows that asked for a TIME ----------------------
+  // A different act from asking a question: an enquiry says "ring me about
+  // this", a booking says "I will be there on Thursday at ten". Most of this
+  // table is the first kind and every column here is null on those rows. They
+  // live here rather than in a table of their own because a booking IS an
+  // enquiry - same person, same service, same queue - and splitting them would
+  // give a company two inboxes to check and two places to lose somebody.
+  booking_date date [note: 'the day asked for. A date, not a timestamp: a slot is local to the shop, and turning it into an instant would move every existing appointment the day the country changed its clocks.']
+  booking_time varchar(5) [note: 'the slot, as HH:mm in the company own working day.']
+  booking_minutes int [note: 'how long the service was said to take AT THE TIME OF BOOKING, copied rather than joined - the same rule the title and the price label follow. A salon that changes a treatment from 30 minutes to 45 must not silently rewrite what yesterday diary said.']
+  booking_status enum_booking_status [note: 'where the appointment has got to, as the CUSTOMER reads it. Deliberately not `stage`: those five words are a sales pipeline a company works through in private, and "qualified" is not something to show somebody waiting to hear whether they have a slot. NULL means this row is not a booking at all. requested and accepted HOLD the slot; declining or cancelling gives the time back to the website immediately.']
+  booking_response varchar(300) [note: 'what the company said back - the only field on this table a customer reads that the company wrote. The difference between "declined" and "declined, we are closed that Thursday, any chance of the Friday?".']
 
   Indexes {
     company_id
@@ -703,7 +1106,73 @@ Enum enum_super_admin_role { super_admin staff }
 Enum enum_billing_cycle { monthly quarterly half_yearly yearly lifetime }
 // Optional functionality. A plan grants it, a company switches it on, and the
 // plan must still be served before it reaches the public website.
-Enum enum_functionality { whatsapp share_link about_us team gallery contact_page }
+Enum enum_functionality {
+  whatsapp share_link services products about_us figures
+  team gallery contact_page testimonials features_benefits
+  // The cart, sold on top of `products` and never instead of it: the catalogue
+  // is the shop window, this is the counter. Its settings blob carries where an
+  // order goes (see enum_order_mode), the cart's wording, and the tenant's own
+  // UPI id or payment link. The public payload withholds it whenever the
+  // catalogue is absent — a cart with nothing to put in it is a button to an
+  // empty basket.
+  orders
+  // The stockroom behind the counter, sold on top of `orders` for the same
+  // reason `orders` sits on top of `products`: a shop can take orders all day and
+  // count its stock on a clipboard, and plenty do. It is also the only thing that
+  // can make a website's availability TRUE rather than remembered — see
+  // company_products.track_inventory.
+  warehouse
+  // Accounts for the people who buy — the first functionality that gives THE
+  // PUBLIC something to sign in to, which is why it is sold apart from the cart:
+  // plenty of shops want an order button and no wish to run a membership list,
+  // and every account is a name and a phone number the tenant is then
+  // responsible for. What it buys is memory: a returning customer keeps their
+  // addresses and can see what they ordered last time.
+  customers
+  // The part of the website that CHANGES. Every other key here is a business
+  // describing what it is - its services, its range, its people - written once
+  // and touched when something changes. This is a business saying what it has
+  // been DOING, and the only thing on the platform a tenant is expected to come
+  // back and add to. Sold apart from about_us for that reason: a company that
+  // will never write a second post should not be handed an empty archive.
+  blog
+  // The enquiry button and the diary, each sold on top of `services` rather than
+  // hidden inside it. A price list is a legitimate product - the cheapest thing a
+  // platform can sell here - and each button is something a tenant buys. Both are
+  // enforced twice: the template paints nothing without them, and the public
+  // write route refuses an enquiry or a booking sent anyway.
+  service_enquiry
+  service_booking
+}
+// What pressing the order button does. `none` is a real setting rather than
+// "switch the feature off": a tenant pausing orders for a fortnight keeps its
+// labels, its number and its payment details and turns them back on without
+// setting any of it up again. `whatsapp` needs a published number and `payment`
+// needs a UPI id or a link — without them publicOrders() withholds the whole
+// block rather than painting a button that leads nowhere.
+Enum enum_order_mode { whatsapp payment none }
+// Where an order has got to. A queue a person works down, not a state machine a
+// system drives — every step is something somebody DID. `packed` earns its place
+// between confirmed and dispatched because it is the step that takes the time and
+// the one a customer rings up about.
+Enum enum_order_status { pending confirmed packed dispatched delivered cancelled }
+// Whether the money has arrived, tracked apart from where the order is because
+// the two genuinely move independently.
+Enum enum_order_payment_status { unpaid paid refunded }
+// Where an appointment has got to, as the customer reads it. requested and
+// accepted hold the slot against the diary; declined, completed and cancelled
+// give it back. declined and completed are ENDS - a company that refused a slot
+// and changed its mind books it again rather than reviving a refusal the
+// customer has already been told about.
+Enum enum_booking_status { requested accepted declined completed cancelled }
+// Which way stock moved. The direction, never the reason.
+Enum enum_stock_movement_type { in out adjust }
+// Why it moved. The reason, never the direction. Free text would make every
+// report useless, so it is a list.
+Enum enum_stock_reason { opening purchase sale return damage correction transfer }
+// Whether a product can be had today. Never a stock COUNT — the platform is not
+// a warehouse system, and a number it cannot keep true is worse than no number.
+Enum enum_product_stock { in_stock out_of_stock made_to_order }
 // How a stat card produces its figure: typed by the company, or counted
 // from a date at render time so it can never go stale.
 Enum enum_stat_mode { fixed since_date }

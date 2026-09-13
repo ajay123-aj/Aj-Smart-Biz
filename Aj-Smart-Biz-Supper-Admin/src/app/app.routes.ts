@@ -44,6 +44,21 @@ export const routes: Routes = [
        * Lead management across every tenant. `analytics` is declared before
        * `:id`, or the router would match it as a lead id.
        */
+      /**
+       * Every customer on the platform, across every tenant.
+       *
+       * Read only, and deliberately: the operator needs to answer "does this
+       * account exist and whose is it" for support, and "is this feature being
+       * used" for the product. Barring somebody is the tenant's own decision.
+       */
+      {
+        path: 'customers',
+        title: 'Customers · Aj Smart Biz',
+        loadComponent: () =>
+          import('./features/customers/platform-customer-list.component').then(
+            (m) => m.PlatformCustomerListComponent
+          ),
+      },
       {
         path: 'leads',
         title: 'Lead Management · Aj Smart Biz',

@@ -9,7 +9,9 @@
     "start:dev": "cross-env NODE_ENV=development node src/server.js",
     "dev": "cross-env NODE_ENV=development nodemon src/server.js",
     "db:sync": "cross-env NODE_ENV=development node src/scripts/sync.js",
-    "db:seed": "cross-env NODE_ENV=development node src/scripts/seed.js"
+    "db:seed": "cross-env NODE_ENV=development node src/scripts/seed.js",
+    "db:seed:catalogue": "cross-env NODE_ENV=development node src/scripts/seedCatalogue.js",
+    "db:seed:blog": "cross-env NODE_ENV=development node src/scripts/seedBlog.js"
   },
   "keywords": [
     "saas",

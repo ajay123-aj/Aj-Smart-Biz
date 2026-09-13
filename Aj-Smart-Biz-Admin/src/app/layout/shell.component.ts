@@ -24,6 +24,8 @@ const ICONS: Record<string, string> = {
   'company-functionality': '🎛️',
   // Distinct from Gallery's frame: these are the hero slides.
   'slider-management': '🎞️',
+  'company-service-categories': '🗂️',
+  'company-blog': '📝',
   'company-about': '📄',
   'company-team': '👤',
   'company-gallery': '🖼️',

@@ -1,0 +1,253 @@
+/*
+ * One product, as a card.
+ *
+ * Shared by every band and every page in the catalogue — the home page, the
+ * products page, a category, the offers page — so the card a visitor sees is the
+ * same object wherever they meet it. That is not tidiness: a product that looks
+ * different on the home page and on the listing reads as two products.
+ */
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+
+/* The whole card is the link. The anchor covers it rather than wrapping it, so
+   the markup stays a list of articles and the price is not inside a link. */
+.hit {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+}
+
+.hit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* --------------------------------- picture -------------------------------- */
+
+.frame {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.card:hover .photo {
+  transform: scale(1.03);
+}
+
+/*
+ * A product with no photograph.
+ *
+ * Deliberately not an empty frame, which reads as an image that failed to load.
+ * It is a tinted panel carrying the product's initial — quiet, obviously
+ * intentional, and the same height as a real picture so a grid of mixed cards
+ * does not stagger.
+ */
+.noPhoto {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(140deg, var(--surface-sunken), var(--brand-soft));
+  color: var(--text-faint);
+}
+
+.initial {
+  font-size: clamp(2rem, 6vw, 3rem);
+  font-weight: 300;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--brand) 28%, transparent);
+}
+
+/* The offer badge. Top-left, over the picture, in the accent rather than a
+   shouting red — this is a considered shop, not a clearance bin. */
+.badge {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 1;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: var(--brand-strong);
+  color: var(--brand-contrast);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+}
+
+/* How many photographs there are, so a visitor knows the card is a doorway. */
+.shots {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 1;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-strong) 72%, transparent);
+  color: var(--brand-contrast);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Availability, only when it is worth saying — "in stock" is the ordinary case
+   and a badge on every card for it is noise. */
+.stock {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 1;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+/* ---------------------------------- body ---------------------------------- */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 1.05rem 1.15rem 1.2rem;
+  flex: 1;
+}
+
+/* The category above the name, quiet and small — it is context, not the point. */
+.crumb {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.name {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.summary {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/*
+ * The price, on a line of its own with a rule beside it — the same device the
+ * services cards use, so a site carrying both reads as one hand. It is the thing
+ * a visitor scans down a column for, and a badge that moves with the length of
+ * the title above it cannot be scanned.
+ */
+.prices {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 0.7rem;
+}
+
+.now {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.was {
+  font-size: 0.85rem;
+  color: var(--text-faint);
+  text-decoration: line-through;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The tenant's free-text price. Same weight as a number so the two read alike. */
+.words {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.saving {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+
+/* The button. Not a real button — the card is the link — so it is a cue,
+   styled to look pressable and marked aria-hidden. */
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  transition: gap 0.18s ease, color 0.18s ease;
+}
+
+.card:hover .cta {
+  gap: 0.6rem;
+  color: var(--accent);
+}
+
+/* ------------------------------- compact ---------------------------------- */
+
+/*
+ * The narrow variant, used where a card sits beside a lot of other content —
+ * the offers rail on the home page. Same object, less of it.
+ */
+.compact .frame {
+  aspect-ratio: 1 / 1;
+}
+
+.compact .body {
+  padding: 0.85rem 0.95rem 1rem;
+}
+
+.compact .name {
+  font-size: 0.94rem;
+}
+
+.compact .summary {
+  display: none;
+}

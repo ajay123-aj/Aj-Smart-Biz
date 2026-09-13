@@ -21,6 +21,7 @@ const subscriptionRoutes = require('../../routes/subscription.routes');
 const planRequestRoutes = require('../../routes/planRequest.routes');
 const superAdminRoutes = require('../../routes/superAdmin.routes');
 const leadRoutes = require('../../routes/lead.routes');
+const insights = require('../../controllers/platformInsight.controller');
 
 /** Platform-wide counts: tenants, subscriptions, revenue, expiries. */
 router.get('/dashboard', dashboard.superAdminDashboard);
@@ -39,5 +40,22 @@ router.use('/super-admins', superAdminRoutes);
  * so mounting it here is what makes it platform-wide.
  */
 router.use('/leads', leadRoutes.superAdmin);
+
+/**
+ * Across every tenant: who is buying, and how each company is doing.
+ *
+ * Their own controller rather than an optional parameter on the tenant
+ * endpoints — a cross-tenant read is a different question, and bolting it onto
+ * handlers that are otherwise pinned to one company would leave every one of
+ * them a missing check away from serving the wrong data.
+ *
+ * `/companies/:id/insights` is two segments, which the company CRUD router above
+ * has no route for — it falls through to here rather than being read as a
+ * company id of "insights". Declared after it anyway, so the ordering is a fact
+ * about this file rather than a thing to be preserved by accident.
+ */
+router.get('/customers/summary', insights.customerSummary);
+router.get('/customers', insights.customers);
+router.get('/companies/:id/insights', insights.companyInsights);
 
 module.exports = router;

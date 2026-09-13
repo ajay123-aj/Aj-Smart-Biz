@@ -8,7 +8,26 @@
 <!-- The counters describe the whole queue, never the open filter, and each one
      is also the filter for it. The number waiting on somebody is the reason to
      open this screen, so it is the first thing on it. -->
-@if (counts(); as c) {
+<!-- ================================================================== -->
+<!-- Two jobs, two tabs                                                    -->
+<!--                                                                      -->
+<!-- The queue is worked on a Monday morning and the figures are read on a -->
+<!-- Friday afternoon. On one page the analysis pushed the first unanswered-->
+<!-- enquiry below the fold, which is the one row this screen exists for.  -->
+<!-- ================================================================== -->
+<div class="tabs" style="margin-bottom:16px">
+  <button type="button" [class.active]="tab() === 'queue'" (click)="openTab('queue')">
+    Enquiries
+    @if (counts(); as c) {
+      <span class="tab-count">{{ c.total }}</span>
+    }
+  </button>
+  <button type="button" [class.active]="tab() === 'analysis'" (click)="openTab('analysis')">
+    Analysis
+  </button>
+</div>
+
+@if (tab() === 'queue' && counts(); as c) {
   <div class="counts">
     <button type="button" class="count" [class.count-on]="activeStage() === null" (click)="filterStage(null)">
       <span class="count-n">{{ c.total }}</span> All
@@ -19,111 +38,450 @@
         <app-lead-stage-badge [value]="stage" />
       </button>
     }
+
+    <!--
+      The appointments, beside the stages rather than among them.
+
+      A booking's status and an enquiry's stage are different axes - a confirmed
+      appointment can still be `new` in the company's own pipeline - so they are
+      counted separately and filter independently. Shown only once this tenant
+      actually takes bookings, so a shop that does not keeps the row it had.
+    -->
+    @if (anyBookings()) {
+      <span class="count-sep" aria-hidden="true"></span>
+
+      <button
+        type="button"
+        class="count count-await"
+        [class.count-on]="activeBooking() === 'requested'"
+        (click)="filterBooking('requested')"
+      >
+        <span class="count-n">{{ awaiting() }}</span> Waiting to confirm
+      </button>
+
+      <button
+        type="button"
+        class="count"
+        [class.count-on]="activeBooking() === 'accepted'"
+        (click)="filterBooking('accepted')"
+      >
+        <span class="count-n">{{ confirmed() }}</span> Confirmed
+      </button>
+    }
   </div>
 }
 
-<section class="card">
-  <div class="card-head">
-    <div class="filters">
-      <input
-        class="input"
-        style="width:auto;min-width:220px"
-        type="search"
-        placeholder="Search a name, number or service…"
-        (input)="apply({ search: inputValue($event) })"
+@if (tab() === 'queue') {
+  <section class="card">
+    <div class="card-head">
+      <div class="filters">
+        <input
+          class="input"
+          style="width:auto;min-width:220px"
+          type="search"
+          placeholder="Search a name, number or service…"
+          (input)="apply({ search: inputValue($event) })"
+        />
+
+        @if (services().length > 0) {
+          <select class="select" style="width:auto" (change)="apply({ serviceId: selectValue($event) || undefined })">
+            <option value="">All services</option>
+            @for (service of services(); track service.id) {
+              <option [value]="service.id">
+                {{ service.title }}{{ service.status === 'active' ? '' : ' (hidden)' }}
+              </option>
+            }
+          </select>
+        }
+      </div>
+    </div>
+
+    <div class="card-body tight">
+      <app-table-state
+        [loading]="store.loading()"
+        [empty]="!store.loading() && store.items().length === 0"
+        icon="📥"
+        title="No enquiries yet"
+        message="Enquiries appear here as soon as someone fills in the form on a service card. Check Company Details → Services is switched on and that enquiries are set to reach the admin."
       />
 
-      @if (services().length > 0) {
-        <select class="select" style="width:auto" (change)="apply({ serviceId: selectValue($event) || undefined })">
-          <option value="">All services</option>
-          @for (service of services(); track service.id) {
-            <option [value]="service.id">
-              {{ service.title }}{{ service.status === 'active' ? '' : ' (hidden)' }}
-            </option>
-          }
-        </select>
+      @if (!store.loading() && store.items().length > 0) {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th class="sortable" (click)="store.toggleSort('name')">Who{{ store.sortIcon('name') }}</th>
+                <th>Asked about</th>
+                <th>Appointment</th>
+                <th class="sortable" (click)="store.toggleSort('stage')">Stage{{ store.sortIcon('stage') }}</th>
+                <th style="text-align:right">Amount</th>
+                <th>Payment</th>
+                <th>Note</th>
+                <th class="sortable" (click)="store.toggleSort('created_at')">
+                  Received{{ store.sortIcon('created_at') }}
+                </th>
+                <th style="text-align:right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of store.items(); track row.id) {
+                <tr>
+                  <td>
+                    <div class="who">
+                      <span class="who-name">{{ row.name }}</span>
+                      <!-- A number on a screen somebody is working through should
+                           be one tap on a phone, not something to copy out. -->
+                      <span class="phone"><a [href]="telHref(row.phone)">{{ row.phone }}</a></span>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div class="svc">
+                      <span>{{ row.serviceTitle || '—' }}</span>
+                      @if (row.serviceTitle && !row.service) {
+                        <!-- The row keeps its own copy of the title, so a deleted
+                             service leaves the enquiry saying what it was about. -->
+                        <span class="svc-gone">service since removed</span>
+                      }
+                      @if (row.branch) {
+                        <span class="badge badge-info">{{ row.branch.name }}</span>
+                      }
+                    </div>
+                  </td>
+
+                  <!--
+                    The appointment, and the answer to it.
+
+                    Its own column rather than a line under the service, because it
+                    is the thing somebody opens this screen in the morning to deal
+                    with: a person picked a time and is waiting to hear.
+                  -->
+                  <td style="white-space:nowrap">
+                    @if (bookingLabel(row); as when) {
+                      <div class="booking-when">{{ when }}</div>
+                      <div class="booking-row">
+                        <span class="badge"
+                              [class.badge-success]="row.bookingStatus === 'accepted'"
+                              [class.badge-warn]="row.bookingStatus === 'requested'"
+                              [class.badge-danger]="row.bookingStatus === 'declined' || row.bookingStatus === 'cancelled'">
+                          {{ row.bookingStatus }}
+                        </span>
+
+                        @if (row.bookingStatus === 'requested') {
+                          <button type="button" class="btn btn-xs btn-primary" (click)="openDecision(row, 'accepted')">
+                            Confirm
+                          </button>
+                          <button type="button" class="btn btn-xs btn-ghost" (click)="openDecision(row, 'declined')">
+                            Decline
+                          </button>
+                        } @else if (row.bookingStatus === 'accepted') {
+                          <button type="button" class="btn btn-xs btn-ghost" (click)="openDecision(row, 'completed')">
+                            Done
+                          </button>
+                          <button type="button" class="btn btn-xs btn-ghost" (click)="openDecision(row, 'cancelled')">
+                            Cancel
+                          </button>
+                        }
+                      </div>
+                    } @else {
+                      <span class="muted">&mdash;</span>
+                    }
+                  </td>
+
+                  <td>
+                    <app-lead-stage-badge [value]="row.stage" />
+                    @if (row.sentToWhatsapp) {
+                      <!-- They may well have messaged already, and a screen that
+                           showed every enquiry as untouched would have somebody
+                           ringing people who wrote in ten minutes ago. -->
+                      <div class="wa">also sent on WhatsApp</div>
+                    }
+                  </td>
+
+                  <td style="text-align:right;white-space:nowrap">
+                    {{ money(row.amount) }}
+                    <!-- What the card said when they asked, where the shop has not
+                         yet put its own figure on the job. -->
+                    @if (row.amount === null || row.amount === undefined) {
+                      @if (row.servicePriceLabel) {
+                        <div class="tiny muted">was {{ row.servicePriceLabel }}</div>
+                      }
+                    }
+                  </td>
+                  <td>
+                    <span class="badge" [class.badge-success]="row.paymentStatus === 'paid'"
+                          [class.badge-warn]="row.paymentStatus === 'unpaid'"
+                          [class.badge-danger]="row.paymentStatus === 'refunded'">
+                      {{ row.paymentStatus || 'unpaid' }}
+                    </span>
+                  </td>
+                  <td><span class="note-cell" [title]="row.note || ''">{{ row.note || '—' }}</span></td>
+
+                  <td>{{ row.createdAt | date: 'd MMM y, h:mm a' }}</td>
+
+                  <td style="text-align:right;white-space:nowrap">
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="open(row)">Update</button>
+                    <button type="button" class="btn btn-sm btn-danger" (click)="remove(row)">Delete</button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <app-pager [meta]="store.meta()" (pageChange)="store.setPage($event)" (limitChange)="store.setLimit($event)" />
       }
     </div>
-  </div>
+  </section>
+}
 
-  <div class="card-body tight">
-    <app-table-state
-      [loading]="store.loading()"
-      [empty]="!store.loading() && store.items().length === 0"
-      icon="📥"
-      title="No enquiries yet"
-      message="Enquiries appear here as soon as someone fills in the form on a service card. Check Company Details → Services is switched on and that enquiries are set to reach the admin."
-    />
+@if (tab() === 'analysis') {
+  <!-- The figures are two requests, made when this tab is first opened rather
+       than on every visit to the queue. Until they land there is something to
+       look at rather than a blank panel. -->
+  @if (loadingAnalytics() && !analytics()) {
+    <div class="skeleton" style="height:220px;margin-bottom:16px"></div>
+  }
 
-    @if (!store.loading() && store.items().length > 0) {
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th class="sortable" (click)="store.toggleSort('name')">Who{{ store.sortIcon('name') }}</th>
-              <th>Asked about</th>
-              <th class="sortable" (click)="store.toggleSort('stage')">Stage{{ store.sortIcon('stage') }}</th>
-              <th>Note</th>
-              <th class="sortable" (click)="store.toggleSort('created_at')">
-                Received{{ store.sortIcon('created_at') }}
-              </th>
-              <th style="text-align:right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (row of store.items(); track row.id) {
-              <tr>
-                <td>
-                  <div class="who">
-                    <span class="who-name">{{ row.name }}</span>
-                    <!-- A number on a screen somebody is working through should
-                         be one tap on a phone, not something to copy out. -->
-                    <span class="phone"><a [href]="telHref(row.phone)">{{ row.phone }}</a></span>
-                  </div>
-                </td>
+<!-- ================================================================== -->
+<!-- What the services are earning                                        -->
+<!--                                                                      -->
+<!-- Three numbers, because one would be a lie: an enquiry becomes a sale  -->
+<!-- somewhere between arriving and being paid for, and a single figure    -->
+<!-- would have to pick a moment and pretend the others do not exist.      -->
+<!-- ================================================================== -->
+@if (revenue(); as r) {
+  <div class="rev-strip">
+    <div class="rev-days">
+      @for (range of [7, 30, 90, 365]; track range) {
+        <button
+          type="button"
+          class="rev-tab"
+          [class.rev-tab-on]="revenueDays() === range"
+          (click)="setRevenueDays(range)"
+        >
+          {{ range === 365 ? 'Year' : range + 'd' }}
+        </button>
+      }
+    </div>
 
-                <td>
-                  <div class="svc">
-                    <span>{{ row.serviceTitle || '—' }}</span>
-                    @if (row.serviceTitle && !row.service) {
-                      <!-- The row keeps its own copy of the title, so a deleted
-                           service leaves the enquiry saying what it was about. -->
-                      <span class="svc-gone">service since removed</span>
-                    }
-                    @if (row.branch) {
-                      <span class="badge badge-info">{{ row.branch.name }}</span>
-                    }
-                  </div>
-                </td>
-
-                <td>
-                  <app-lead-stage-badge [value]="row.stage" />
-                  @if (row.sentToWhatsapp) {
-                    <!-- They may well have messaged already, and a screen that
-                         showed every enquiry as untouched would have somebody
-                         ringing people who wrote in ten minutes ago. -->
-                    <div class="wa">also sent on WhatsApp</div>
-                  }
-                </td>
-
-                <td><span class="note-cell" [title]="row.note || ''">{{ row.note || '—' }}</span></td>
-
-                <td>{{ row.createdAt | date: 'd MMM y, h:mm a' }}</td>
-
-                <td style="text-align:right;white-space:nowrap">
-                  <button type="button" class="btn btn-sm btn-ghost" (click)="open(row)">Update</button>
-                  <button type="button" class="btn btn-sm btn-danger" (click)="remove(row)">Delete</button>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
+    <div class="rev-grid">
+      <div class="rev">
+        <span class="rev-label">Quoted</span>
+        <span class="rev-value">{{ money(r.quoted.total) }}</span>
+        <span class="rev-note">{{ r.quoted.count }} enquiries priced</span>
       </div>
+      <div class="rev">
+        <span class="rev-label">Won</span>
+        <span class="rev-value">{{ money(r.won.total) }}</span>
+        <span class="rev-note">quoted and converted</span>
+      </div>
+      <div class="rev">
+        <span class="rev-label">Collected</span>
+        <span class="rev-value">{{ money(r.collected.total) }}</span>
+        <span class="rev-note">money in</span>
+      </div>
+      <!-- The gap between won and collected: the invoice nobody has chased,
+           and the most useful number on this strip. -->
+      <div class="rev" [class.rev-warn]="r.outstanding > 0">
+        <span class="rev-label">Owed to you</span>
+        <span class="rev-value">{{ money(r.outstanding) }}</span>
+        <span class="rev-note">won, not yet paid</span>
+      </div>
+    </div>
 
-      <app-pager [meta]="store.meta()" (pageChange)="store.setPage($event)" (limitChange)="store.setLimit($event)" />
+    <!-- Said out loud rather than left to drag the average quietly towards
+         zero: most enquiries have no figure for most of their life. -->
+    @if (r.unquoted > 0) {
+      <p class="tiny muted" style="margin:8px 0 0">
+        {{ r.unquoted }} enquiry(s) in this window have no price on them yet, so they are not in any
+        of the figures above. Average of the ones that do: <strong>{{ money(r.averageQuote) }}</strong>.
+      </p>
     }
   </div>
-</section>
+}
+
+<!-- ================================================================== -->
+<!-- What is happening, as opposed to what it earned                       -->
+<!--                                                                      -->
+<!-- The strip above answers "what are the services worth"; this answers   -->
+<!-- "is the work coming in, and are we converting it". Same window picker -->
+<!-- as the money, because reading two figures over two different          -->
+<!-- fortnights is how a screen comes to lie.                              -->
+<!-- ================================================================== -->
+@if (analytics(); as a) {
+  <section class="card" style="margin-bottom:18px">
+    <div class="card-body">
+      <div class="row-between" style="align-items:flex-start;gap:12px;margin-bottom:14px">
+        <div>
+          <h4 style="margin:0 0 2px">Demand and conversion</h4>
+          <p class="tiny muted" style="margin:0">
+            Last {{ a.range.days === 365 ? 'year' : a.range.days + ' days' }}.
+            @if (a.lifetime.enquiries) {
+              {{ a.lifetime.enquiries }} enquiries in total since you started.
+            }
+          </p>
+        </div>
+      </div>
+
+      <div class="an-grid">
+        <div class="an">
+          <span class="an-label">Enquiries</span>
+          <span class="an-value">{{ a.totals.enquiries }}</span>
+          <span class="an-note">{{ byStage()['new'] }} not answered yet</span>
+        </div>
+
+        <!-- The number a service business actually manages. Over every
+             enquiry, not just the priced ones - a shop that never quotes half
+             of what it is asked about has a conversion problem, and leaving
+             those out of the denominator would hide it. -->
+        <div class="an">
+          <span class="an-label">Converted</span>
+          <span class="an-value">{{ a.totals.conversion }}%</span>
+          <span class="an-note">{{ a.byStage['converted'] }} of {{ a.totals.enquiries }} became work</span>
+        </div>
+
+        <div class="an">
+          <span class="an-label">Average quote</span>
+          <span class="an-value">{{ money(a.totals.averageQuote) }}</span>
+          <span class="an-note">of the ones you have priced</span>
+        </div>
+
+        @if (hasBookings()) {
+          <div class="an">
+            <span class="an-label">Slots confirmed</span>
+            <span class="an-value">{{ a.bookingAcceptance }}%</span>
+            <span class="an-note">{{ a.totals.bookings }} asked for a time</span>
+          </div>
+        }
+      </div>
+
+      <div class="an-charts">
+        <div class="panel">
+          <app-mini-chart [points]="enquirySeries()" [title]="'Enquiries per day'" />
+        </div>
+
+        <!-- Two different questions, two different series. The one above is
+             when people asked; this is when they want to come in - which is
+             what a shop reads to decide what to staff. -->
+        @if (hasBookings()) {
+          <div class="panel">
+            <app-mini-chart [points]="bookingSeries()" [title]="'Appointments booked, by day'" />
+          </div>
+        }
+      </div>
+
+      <div class="an-lists">
+        <div class="panel">
+          <h5 class="panel-title">Most asked about</h5>
+          @if (a.topServices.length) {
+            <ul class="rank">
+              @for (row of a.topServices; track row.title) {
+                <li>
+                  <span class="rank-name">{{ row.title }}</span>
+                  <span class="rank-num">{{ row.enquiries }}</span>
+                  @if (row.amount) {
+                    <span class="rank-sub">{{ money(row.amount) }}</span>
+                  }
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="tiny muted" style="margin:0">Nothing in this window.</p>
+          }
+        </div>
+
+        @if (hasBookings()) {
+          <div class="panel">
+            <h5 class="panel-title">Appointments</h5>
+            <ul class="rank">
+              <li>
+                <span class="rank-name">Waiting for you</span>
+                <span class="rank-num">{{ a.byBooking['requested'] }}</span>
+              </li>
+              <li>
+                <span class="rank-name">Confirmed</span>
+                <span class="rank-num">{{ a.byBooking['accepted'] }}</span>
+              </li>
+              <li>
+                <span class="rank-name">Completed</span>
+                <span class="rank-num">{{ a.byBooking['completed'] }}</span>
+              </li>
+              <!-- Declined and cancelled together: from the diary's point of
+                   view they are the same event - a time that went back on the
+                   website - and a shop reads them as one number. -->
+              <li>
+                <span class="rank-name">Declined or cancelled</span>
+                <span class="rank-num">{{ a.byBooking['declined'] + a.byBooking['cancelled'] }}</span>
+              </li>
+            </ul>
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+}
+}
+
+<!--
+  Answering somebody who asked for a time.
+
+  A dialog of its own rather than a field on the enquiry editor, because it is a
+  different act with a different audience: the editor is the company's private
+  pipeline, and this is a sentence the customer will read on their own page.
+-->
+@if (decisionOpen()) {
+  <app-modal
+    [title]="decisionForm.controls.status.value === 'accepted' ? 'Confirm the appointment' : 'Answer the booking'"
+    size="sm"
+    [closeOnBackdrop]="false"
+    (closed)="decisionOpen.set(false)"
+  >
+    <form [formGroup]="decisionForm" (ngSubmit)="decide()" id="booking-form">
+      @if (deciding(); as row) {
+        <p class="tiny muted" style="margin:0 0 14px">
+          <strong>{{ row.name }}</strong> asked for
+          <strong>{{ bookingLabel(row) }}</strong>
+          @if (row.serviceTitle) { &mdash; {{ row.serviceTitle }} }
+        </p>
+      }
+
+      <div class="field">
+        <label for="bk-status">Answer</label>
+        <select id="bk-status" class="select" formControlName="status">
+          @if (deciding()?.bookingStatus === 'requested') {
+            <option value="accepted">Confirm it</option>
+            <option value="declined">Cannot do it</option>
+            <option value="cancelled">Cancel it</option>
+          } @else {
+            <option value="completed">Mark as done</option>
+            <option value="cancelled">Cancel it</option>
+          }
+        </select>
+        <span class="hint">
+          Declining or cancelling puts the time back on your website straight away.
+        </span>
+      </div>
+
+      <div class="field">
+        <label for="bk-response">What they should read</label>
+        <textarea id="bk-response" class="textarea" formControlName="response" maxlength="300"
+                  placeholder="See you at nine — please come ten minutes early."></textarea>
+        <span class="hint">
+          Shown on their account beside the answer. The difference between
+          &ldquo;not available&rdquo; and &ldquo;not available, any chance of the Friday?&rdquo;
+        </span>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="decisionOpen.set(false)">Cancel</button>
+      <button type="submit" form="booking-form" class="btn btn-primary" [disabled]="decisionSaving()">
+        {{ decisionSaving() ? 'Saving…' : 'Send answer' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}
 
 @if (modalOpen()) {
   <app-modal title="Update enquiry" size="sm" [closeOnBackdrop]="false" (closed)="modalOpen.set(false)">
@@ -139,7 +497,7 @@
         <label for="sl-stage">Stage</label>
         <select id="sl-stage" class="select" formControlName="stage">
           @for (stage of stages(); track stage) {
-            <option [value]="stage">{{ stage }}</option>
+            <option [value]="stage">{{ stageLabel(stage) }}</option>
           }
         </select>
         <span class="hint">The same stages Lead Management uses.</span>
@@ -155,6 +513,42 @@
           placeholder="Rang at 4pm — wants a quote for two frames."
         ></textarea>
         <span class="hint">Yours, not theirs. What they typed is a record and cannot be edited.</span>
+      </div>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- What the job is worth                                               -->
+      <!--                                                                     -->
+      <!-- A service is priced in words on the website because it cannot be     -->
+      <!-- priced in advance. This is the figure that exists once somebody has  -->
+      <!-- looked at the job — and until it is written down, "what are our      -->
+      <!-- services earning" has no answer at all.                              -->
+      <!-- ------------------------------------------------------------------ -->
+      <div class="field">
+        <label for="sl-amount">Amount</label>
+        <input id="sl-amount" class="input" type="number" min="0" step="0.01" formControlName="amount" />
+        <span class="hint">
+          What you quoted, once you have. Leave it empty while nobody has priced the job &mdash; empty is
+          &ldquo;not quoted yet&rdquo;, which is not the same as zero.
+        </span>
+      </div>
+
+      <div class="field">
+        <label for="sl-payment">Payment</label>
+        <select id="sl-payment" class="select" formControlName="paymentStatus">
+          <option value="unpaid">Unpaid</option>
+          <option value="paid">Paid</option>
+          <option value="refunded">Refunded</option>
+        </select>
+        <span class="hint">
+          Tracked apart from the stage, because the two move independently &mdash; work is delivered and
+          invoiced later, and deposits are taken before anybody starts.
+        </span>
+      </div>
+
+      <div class="field">
+        <label for="sl-ref">Payment reference</label>
+        <input id="sl-ref" class="input" formControlName="paymentReference" maxlength="120"
+               placeholder="UPI reference or receipt number" />
       </div>
     </form>
 

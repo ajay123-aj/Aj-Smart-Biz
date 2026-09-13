@@ -1,0 +1,516 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:340px"></div>
+  } @else {
+    <app-feature-gate [feature]="feature()" />
+
+    <!-- The wording for the catalogue band and the offers band, plus the name
+         the Products page carries in the website's menu. Saved merged with the
+         stored blob, so the Categories screen's wording survives. -->
+    <form class="section-form" [formGroup]="copyForm" (ngSubmit)="saveCopy()">
+      <h4 style="margin:0 0 4px">How the catalogue reads</h4>
+      <p class="tiny muted" style="margin:0 0 14px;max-width:64ch">
+        The heading above your products, on the home page and on your Products page. Leave a field
+        empty to use the standard wording &mdash; <code>&#123;company&#125;</code> is replaced with
+        your company name. The categories band&rsquo;s wording is on the
+        <strong>Categories</strong> screen.
+      </p>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="prd-nav">Menu name</label>
+          <input id="prd-nav" class="input" formControlName="navLabel" placeholder="Products" maxlength="40" />
+          <span class="hint">What this page is called in your website&rsquo;s menu. Blank keeps &ldquo;Products&rdquo;.</span>
+        </div>
+
+        <div class="field">
+          <label for="prd-eyebrow">Eyebrow</label>
+          <input id="prd-eyebrow" class="input" formControlName="eyebrow" placeholder="What we sell" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="prd-title">Heading</label>
+        <input id="prd-title" class="input" formControlName="title"
+               placeholder="The {{ '{company}' }} range" />
+      </div>
+
+      <div class="field">
+        <label for="prd-lead">Introduction</label>
+        <textarea id="prd-lead" class="textarea" formControlName="lead"
+                  placeholder="Everything we stock, with what it costs."></textarea>
+      </div>
+
+      <div class="field" style="max-width:280px">
+        <label for="prd-cta">Button label</label>
+        <input id="prd-cta" class="input" formControlName="ctaLabel" placeholder="View details" />
+        <span class="hint">On every product card, unless a card sets its own.</span>
+      </div>
+
+      <h4 style="margin:22px 0 4px">How the offers band reads</h4>
+      <p class="tiny muted" style="margin:0 0 14px;max-width:64ch">
+        Its own heading, because it makes its own argument: the products band says
+        <em>here is what we sell</em> and this one says <em>here is why to buy today</em>.
+      </p>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="prd-off-eyebrow">Eyebrow</label>
+          <input id="prd-off-eyebrow" class="input" formControlName="offersEyebrow" placeholder="On offer" />
+        </div>
+
+        <div class="field">
+          <label for="prd-off-title">Heading</label>
+          <input id="prd-off-title" class="input" formControlName="offersTitle" placeholder="Reduced right now" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="prd-off-lead">Introduction</label>
+        <textarea id="prd-off-lead" class="textarea" formControlName="offersLead"
+                  placeholder="Current reductions. Prices go back up when the offer ends."></textarea>
+      </div>
+
+      @if (writable()) {
+        <div class="row-end" style="gap:8px">
+          <button type="button" class="btn btn-ghost" [disabled]="savingCopy()" (click)="resetCopy()">Reset</button>
+          <button type="submit" class="btn btn-primary" [disabled]="savingCopy()">
+            {{ savingCopy() ? 'Saving…' : 'Save wording' }}
+          </button>
+        </div>
+      }
+    </form>
+
+    <div class="row-between" style="align-items:flex-start;gap:12px">
+      <div>
+        <h4 style="margin:0 0 4px">Your products</h4>
+        <p class="tiny muted" style="margin:0 0 14px;max-width:70ch">
+          Everything you sell. A product on offer &mdash; one with an offer price below its normal
+          price, or one you tick by hand &mdash; is highlighted on your home page and gets a page of
+          its own under <em>Offers</em>.
+        </p>
+      </div>
+      @if (writable()) {
+        <button type="button" class="btn btn-sm btn-primary" (click)="open(null)">＋ Add product</button>
+      }
+    </div>
+
+    @if (!feature()?.granted) {
+      <div class="empty-note">Products are not part of your plan.</div>
+    } @else {
+      <!-- Tabs are filters, not a separate list: Offers is `onOffer=true` and
+           Hidden is `status=inactive`, both answered by the same endpoint. -->
+      <div class="tabs">
+        <button type="button" class="tab" [class.tab-on]="tab() === 'all'" (click)="setTab('all')">All</button>
+        <button type="button" class="tab" [class.tab-on]="tab() === 'offers'" (click)="setTab('offers')">On offer</button>
+        <button type="button" class="tab" [class.tab-on]="tab() === 'featured'" (click)="setTab('featured')">Featured</button>
+        <button type="button" class="tab" [class.tab-on]="tab() === 'hidden'" (click)="setTab('hidden')">Hidden</button>
+      </div>
+
+      <div class="filters">
+        <input class="input grow" type="search" placeholder="Search by name, description or SKU…"
+               [value]="search()" (change)="onSearch(inputValue($event))" />
+
+        <select class="select" style="width:auto" (change)="onCategoryFilter(selectValue($event))">
+          <option value="">All categories</option>
+          <option value="none">Uncategorised</option>
+          @for (option of categories(); track option.id) {
+            <option [value]="option.id">{{ option.label }}</option>
+          }
+        </select>
+
+        @if (branches().length > 0) {
+          <select class="select" style="width:auto" (change)="onBranchFilter(selectValue($event))">
+            <option value="">All branches</option>
+            <option value="none">Company-wide only</option>
+            @for (branch of branches(); track branch.id) {
+              <option [value]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+        }
+      </div>
+
+      @if (listing()) {
+        <div class="skeleton" style="height:220px"></div>
+      } @else if (items().length === 0) {
+        <div class="empty-note">
+          @if (tab() === 'offers') {
+            Nothing is on offer. Give a product an offer price below its normal price, or tick
+            <em>On offer</em> on it.
+          } @else if (search() || categoryFilter() || branchFilter()) {
+            No products match that.
+          } @else {
+            No products yet &mdash; your catalogue, its pages and its menu entry stay off your
+            website until you add one.
+          }
+        </div>
+      } @else {
+        <div class="grid-cards">
+          @for (row of items(); track row.id; let first = $first; let last = $last) {
+            <article class="prod" [class.prod-inactive]="row.status !== 'active'"
+                     [class.prod-featured]="row.featured">
+              <div class="prod-photo">
+                @if (coverOf(row); as photo) {
+                  <img [src]="photo" [alt]="row.name" loading="lazy" />
+                } @else {
+                  <div class="none">No photograph</div>
+                }
+
+                @if (offerBadge(row); as badge) {
+                  <span class="offer-flag">{{ badge }}</span>
+                }
+                @if ((row.images?.length ?? 0) > 1) {
+                  <span class="shots">{{ row.images?.length }} photos</span>
+                }
+              </div>
+
+              <div class="prod-body">
+                <div class="prod-name">
+                  {{ row.name }}
+                  @if (row.featured) {
+                    <span class="badge badge-warning">Featured</span>
+                  }
+                </div>
+
+                @if (row.sku) {
+                  <div class="prod-sku">{{ row.sku }}</div>
+                }
+
+                @if (row.summary) {
+                  <p class="prod-text">{{ row.summary }}</p>
+                }
+
+                <!-- Priced exactly as the website prints it: the free-text label
+                     wins, then the offer pair, then the plain number. -->
+                <div class="prices">
+                  @if (row.priceLabel) {
+                    <span class="price-words">{{ row.priceLabel }}</span>
+                  } @else if (priceNow(row) !== null) {
+                    <span class="price-now">{{ priceNow(row) }}</span>
+                    @if (priceWas(row) !== null) {
+                      <span class="price-was">{{ priceWas(row) }}</span>
+                    }
+                  } @else {
+                    <span class="price-words muted">No price</span>
+                  }
+                </div>
+
+                <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">
+                  <app-status-badge [value]="row.status" />
+                  @if (row.category) {
+                    <span class="badge">{{ row.category.name }}</span>
+                  } @else {
+                    <span class="badge badge-warning">Uncategorised</span>
+                  }
+                  @if (row.stockStatus !== 'in_stock') {
+                    <span class="badge badge-info">{{ stockLabel(row.stockStatus) }}</span>
+                  }
+                  @if (row.branch) {
+                    <span class="badge badge-info">{{ row.branch.name }}</span>
+                  }
+                </div>
+              </div>
+
+              @if (writable()) {
+                <div class="prod-foot">
+                  <span class="seq-num">{{ row.sequence }}</span>
+                  <button type="button" class="btn btn-sm btn-ghost" title="Move up"
+                          [disabled]="first || reordering()" (click)="move(row, -1)">↑</button>
+                  <button type="button" class="btn btn-sm btn-ghost" title="Move down"
+                          [disabled]="last || reordering()" (click)="move(row, 1)">↓</button>
+                  <span class="spacer"></span>
+                  <button type="button" class="btn btn-sm btn-ghost" (click)="toggle(row)">
+                    {{ row.status === 'active' ? 'Hide' : 'Show' }}
+                  </button>
+                  <button type="button" class="btn btn-sm btn-ghost" (click)="open(row)">Edit</button>
+                  <button type="button" class="btn btn-sm btn-danger" (click)="remove(row)">Delete</button>
+                </div>
+              }
+            </article>
+          }
+        </div>
+
+        <app-pager [meta]="meta()" (pageChange)="onPage($event)" (limitChange)="onLimit($event)" />
+
+        <p class="tiny muted" style="margin:14px 0 0">
+          Only active products appear on the website, in the order shown here.
+        </p>
+      }
+    }
+  }
+</div>
+
+@if (modalOpen()) {
+  <app-modal
+    [title]="editing() ? 'Edit product' : 'Add product'"
+    size="lg"
+    [closeOnBackdrop]="false"
+    (closed)="modalOpen.set(false)"
+  >
+    <form [formGroup]="form" (ngSubmit)="save()" id="product-form">
+      <div class="form-grid">
+        <div class="field">
+          <label for="prd-branch">Shows on</label>
+          <select id="prd-branch" class="select" formControlName="branchId">
+            <option value="">All branches (company-wide)</option>
+            @for (branch of branches(); track branch.id) {
+              <option [value]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+          <p class="tiny muted mb-0">
+            A branch site shows its own. If it has none, it falls back to the company-wide ones.
+          </p>
+        </div>
+
+        <div class="field">
+          <label for="prd-category">Category</label>
+          <select id="prd-category" class="select" formControlName="categoryId">
+            <option value="">Uncategorised</option>
+            @for (option of categories(); track option.id) {
+              <option [value]="option.id">{{ option.label }}</option>
+            }
+          </select>
+          <p class="tiny muted mb-0">
+            Pick the most specific one. Somebody browsing the category above it still finds this.
+          </p>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="prd-name">Product <span class="req">*</span></label>
+          <input id="prd-name" class="input" formControlName="name" placeholder="Solid oak dining table"
+                 maxlength="200" />
+          <app-field-error [control]="form.controls.name" label="Product" />
+        </div>
+
+        <div class="field">
+          <label for="prd-sku">Your reference</label>
+          <input id="prd-sku" class="input" formControlName="sku" placeholder="OAK-DT-180" maxlength="60" />
+          <span class="hint">Optional &mdash; your own code, shown on the product page.</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="prd-slug">Web address</label>
+        <input id="prd-slug" class="input" formControlName="slug" placeholder="solid-oak-dining-table"
+               maxlength="160" />
+        <span class="hint">
+          @if (editing()) {
+            Changing this breaks any link already shared to this product. Leave it alone unless you
+            mean to.
+          } @else {
+            Optional &mdash; made from the name if you leave it empty.
+          }
+        </span>
+      </div>
+
+      <div class="field">
+        <label for="prd-summary">Short description</label>
+        <textarea id="prd-summary" class="textarea" formControlName="summary"
+                  placeholder="Seats eight. Finished in natural oil, made to order in six weeks."></textarea>
+        <span class="hint">One or two lines &mdash; this is what the card shows.</span>
+      </div>
+
+      <div class="field">
+        <label for="prd-description">Full description</label>
+        <textarea id="prd-description" class="textarea" rows="5" formControlName="description"
+                  placeholder="Everything worth saying about it, on the product's own page."></textarea>
+      </div>
+
+      <!-- Several photographs, ordered. The first is the card image everywhere,
+           which the control says on the tile rather than leaving to be found. -->
+      <div class="field">
+        <label>Photographs</label>
+        <app-image-gallery-upload
+          formControlName="images"
+          folder="product"
+          [max]="imagesMax"
+          hint="Landscape or square, 1200px or wider · PNG, JPG or WEBP"
+        />
+      </div>
+
+      <!-- Pricing. Three fields, read in order, with the card's own wording
+           shown live underneath — the one number on this form nobody can work
+           out at a glance. -->
+      <h4 style="margin:20px 0 4px">Price</h4>
+      <div class="form-grid-3">
+        <div class="field">
+          <label for="prd-price">Normal price</label>
+          <input id="prd-price" class="input" type="number" min="0" step="0.01" formControlName="price"
+                 placeholder="24999" (input)="onPriceInput()" />
+        </div>
+
+        <div class="field">
+          <label for="prd-offer">Offer price</label>
+          <input id="prd-offer" class="input" type="number" min="0" step="0.01" formControlName="offerPrice"
+                 placeholder="19999" (input)="onPriceInput()" />
+          <span class="hint">Lower than the normal price, or it is not an offer.</span>
+        </div>
+
+        <div class="field">
+          <label for="prd-price-label">Price in words</label>
+          <input id="prd-price-label" class="input" formControlName="priceLabel" placeholder="From ₹24,999"
+                 maxlength="60" (input)="onPriceInput()" />
+          <span class="hint">Overrides both numbers when set.</span>
+        </div>
+      </div>
+
+      @switch (livePricing().kind) {
+        @case ('words') {
+          <p class="discount-note">
+            The card will show <strong>{{ livePricing().text }}</strong> and no numbers. Clear this
+            field to go back to showing the price.
+          </p>
+        }
+        @case ('offer') {
+          <p class="discount-note">
+            The card will show the offer price with the normal one struck through, badged
+            <strong>&minus;{{ livePricing().percent }}%</strong> &mdash; a saving of
+            {{ livePricing().saved }}.
+          </p>
+        }
+        @case ('bad') {
+          <p class="discount-note">
+            That offer price is not below the normal price, so it is not an offer &mdash; saving will
+            be refused.
+          </p>
+        }
+        @default {
+          <p class="discount-note">
+            @if (livePricing().price === null) {
+              No price yet. A product without one still appears; it just shows no figure.
+            } @else {
+              The card will show this price with no offer badge.
+            }
+          </p>
+        }
+      }
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="prd-on-offer">Mark as on offer</label>
+          <select id="prd-on-offer" class="select" formControlName="onOffer">
+            <option [value]="false">No</option>
+            <option [value]="true">Yes — put it on the Offers page</option>
+          </select>
+          <span class="hint">
+            You do not need this if you set an offer price &mdash; that already counts. Use it for an
+            offer that is not a reduction, or when you price in words.
+          </span>
+        </div>
+
+        <div class="field">
+          <label for="prd-offer-label">Offer badge</label>
+          <input id="prd-offer-label" class="input" formControlName="offerLabel" placeholder="2 for 1"
+                 maxlength="60" />
+          <span class="hint">Overrides the percentage on the badge. Leave empty for &minus;25% and the like.</span>
+        </div>
+      </div>
+
+      <!-- What's included. A row each, so the tenant sees the list the way the
+           website prints it rather than typing separators into one box. -->
+      <div class="field">
+        <label>What&rsquo;s included</label>
+        <div class="rows" formArrayName="highlights">
+          @for (control of highlights.controls; track $index) {
+            <div class="row-line">
+              <input class="input" [formControlName]="$index" placeholder="Delivered and assembled"
+                     maxlength="120" />
+              <button type="button" class="btn btn-sm btn-ghost" title="Remove"
+                      (click)="removeHighlight($index)">✕</button>
+            </div>
+          }
+        </div>
+        @if (highlights.length < highlightsMax) {
+          <button type="button" class="btn btn-sm btn-ghost" style="margin-top:8px"
+                  (click)="addHighlight()">＋ Add a line</button>
+        }
+        <span class="hint">Up to {{ highlightsMax }} short lines, printed as a tick list.</span>
+      </div>
+
+      <!-- Specifications: the part people compare rather than read, so it is a
+           table of pairs rather than a paragraph. -->
+      <div class="field">
+        <label>Specifications</label>
+        <div class="rows" formArrayName="specs">
+          @for (group of specs.controls; track $index) {
+            <div class="row-line" [formGroupName]="$index">
+              <input class="input input-label" formControlName="label" placeholder="Material" maxlength="60" />
+              <input class="input" formControlName="value" placeholder="Solid European oak" maxlength="200" />
+              <button type="button" class="btn btn-sm btn-ghost" title="Remove"
+                      (click)="removeSpec($index)">✕</button>
+            </div>
+          }
+        </div>
+        @if (specs.length < specsMax) {
+          <button type="button" class="btn btn-sm btn-ghost" style="margin-top:8px"
+                  (click)="addSpec()">＋ Add a specification</button>
+        }
+        <span class="hint">
+          Printed as a table on the product page. Rows missing a label or a value are dropped.
+        </span>
+      </div>
+
+      <div class="form-grid-3">
+        <div class="field">
+          <label for="prd-stock">Availability</label>
+          <select id="prd-stock" class="select" formControlName="stockStatus">
+            <option value="in_stock">In stock</option>
+            <option value="made_to_order">Made to order</option>
+            <option value="out_of_stock">Out of stock</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="prd-featured">Feature this product</label>
+          <select id="prd-featured" class="select" formControlName="featured">
+            <option [value]="false">No</option>
+            <option [value]="true">Yes — show it on the home page</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="prd-status">Status</label>
+          <select id="prd-status" class="select" formControlName="status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Only means anything where the company is taking orders at all, which
+           is the Cart &amp; orders screen's business rather than this one's. It
+           lives here because it is a fact about this product: the
+           made-to-measure item and the display piece are listed and are not for
+           sale, and hiding them is the alternative this avoids. -->
+      <div class="field">
+        <label for="prd-orderable">Can be ordered online</label>
+        <select id="prd-orderable" class="select" formControlName="orderable">
+          <option [value]="true">Yes — show the Add to cart button</option>
+          <option [value]="false">No — enquiries only</option>
+        </select>
+        <span class="hint">
+          Only applies while <strong>Cart &amp; orders</strong> is switched on. A product that is out of
+          stock is never orderable whatever this says.
+        </span>
+      </div>
+
+      <div class="field">
+        <label for="prd-card-cta">Button label</label>
+        <input id="prd-card-cta" class="input" formControlName="ctaLabel" placeholder="View details"
+               maxlength="40" />
+        <span class="hint">
+          Just for this product. Leave it empty to use the catalogue&rsquo;s label above.
+        </span>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
+      <button type="submit" form="product-form" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Add product' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

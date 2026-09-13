@@ -262,6 +262,47 @@ export const SERVICES_COPY = {
   /** Above the tick list on a card. */
   includesLabel: 'Includes',
 
+  /* ------------------------- the other two bands ------------------------- */
+  /*
+   * The categories band and the offers band, each with its own wording, for the
+   * reason the catalogue has three sets: "what kinds of work we do" and "what is
+   * reduced this month" are different sentences, and one heading cannot make
+   * both arguments.
+   */
+  categoriesEyebrow: 'What we do',
+  categoriesTitle: 'Find what you came for',
+  categoriesLede: 'The kinds of work we take on. Pick one to see everything in it.',
+  offersEyebrow: 'This month',
+  offersTitle: 'On offer right now',
+  offersLede: 'Reduced for a while. Prices go back up when the offer ends.',
+  /** The link out of a shortened band. */
+  moreOffers: 'See every offer',
+  /** On a card that can be booked, where "Enquire" is the wrong promise. */
+  book: 'Book a time',
+  /** The filter row above the list, and the way out of a filtered view. */
+  allCategories: 'Everything',
+
+  /* ---------------------------- the booking ------------------------------ */
+  /*
+   * The furniture around the diary. The heading, the note and the button's
+   * label are the tenant's - they come from the API - and everything here is
+   * what no company needs to rewrite.
+   */
+  bookHeading: 'Pick a time',
+  bookDate: 'Day',
+  bookNoSlots: 'Nothing left on that day.',
+  bookClosed: 'We are closed that day.',
+  bookChoose: 'Choose a time',
+  bookConfirm: 'Request this time',
+  bookSending: 'Requesting…',
+  bookSignIn: 'Sign in to book',
+  bookSignInWhy: 'Appointments are kept on your account, so you can see what you have booked.',
+  bookRequested: 'Requested — we will confirm it shortly',
+  bookAs: 'Booking as',
+  bookWhatNext: 'We will confirm it shortly. You can see the answer on your account.',
+  /** Beside a price on a card that has a duration. */
+  durationLabel: 'Takes',
+
   /* ----------------------------- the enquiry ----------------------------- */
   /*
    * The dialog's own furniture. Its heading and its introduction are the
@@ -289,6 +330,266 @@ export const SERVICES_COPY = {
  * into a price list.
  */
 export const SERVICES_HOME_LIMIT = 4;
+
+/**
+ * The other two service bands on the home page.
+ *
+ * Kept beside `SERVICES_HOME_LIMIT` rather than folded into it, because the
+ * three bands are three arguments and are shortened for different reasons: the
+ * services band is a sample of the price list, the offers band is everything a
+ * shop is actually promoting (there are rarely more than a few), and the
+ * categories band is a map that stops being one past about six headings.
+ *
+ * The API applies its own caps over these, so lowering a number here shortens a
+ * band and raising it past the platform's ceiling changes nothing - which is the
+ * right way round, since the payload is the thing worth keeping small.
+ */
+export const SERVICE_HOME_LIMITS = { categories: 6, offers: 3 } as const;
+
+/* ------------------------------------------------------------------ *
+ * The blog
+ * ------------------------------------------------------------------ */
+
+/**
+ * The blog's wording of last resort, and the labels around it.
+ *
+ * The same standing `SERVICES_COPY` has: the API fills the heading, the lede and
+ * the button from its own defaults already, so these apply only to a block that
+ * arrived with something blank. What is genuinely this file's, and is never the
+ * tenant's, is the furniture — the word "read", the breadcrumb, the labels on
+ * the links to the next article. No company needs to rewrite those, and every
+ * one of them that became a setting would be a field somebody has to fill in.
+ *
+ * There is deliberately no fallback **content** anywhere near this section. The
+ * platform knows nothing about what a business has been doing, and an invented
+ * article is a company publishing something it never wrote.
+ */
+export const BLOG_COPY = {
+  eyebrow: 'Latest',
+  title: 'News from {company}',
+  lede: 'What we have been working on, and anything worth knowing before you get in touch.',
+  /** Under each card. */
+  cta: 'Read more',
+
+  /** The page's browser title. The heading on it is the tenant's. */
+  metaTitle: 'Blog',
+  /** The link out of the home band when it is showing only part of the list. */
+  more: 'Read everything',
+  /** Beside the date on a card. `{n}` is the estimate. */
+  readTime: '{n} min read',
+  /** Above the byline on an article. */
+  byLine: 'By {name}',
+  /** The two links at the foot of an article. */
+  previous: 'Previous post',
+  next: 'Next post',
+  backToBlog: 'All posts',
+  /** The tag filter's heading on the archive, and the way out of it. */
+  taggedWith: 'Tagged {tag}',
+  clearTag: 'Show everything',
+  /** The pager. */
+  newer: 'Newer',
+  older: 'Older',
+  /** What the archive says when a tag matches nothing — a stale shared link. */
+  emptyTag: 'Nothing is filed under that.',
+} as const;
+
+/**
+ * How many posts the home page shows before it stops and links to the archive.
+ *
+ * Three rather than the six the payload carries: the home band is an invitation
+ * to read, not the archive. The API's own cap is the ceiling over this one, so
+ * lowering it here shortens the band and raising it past six changes nothing
+ * — which is the right way round, since the payload is the thing worth
+ * keeping small.
+ */
+export const BLOG_HOME_LIMIT = 3;
+
+/** The archive's page size. Matches the API's default, which is the real one. */
+export const BLOG_PAGE_SIZE = 9;
+
+/* ------------------------------------------------------------------ *
+ * Products, categories and offers
+ * ------------------------------------------------------------------ */
+
+/**
+ * The catalogue's wording of last resort, and the labels around it.
+ *
+ * The same standing `SERVICES_COPY` has, and for the same reason: the API fills
+ * every heading from the tenant's own settings, so these apply only to a block
+ * that arrived with a field blank. There are no fallback *products* for the
+ * reason there are no fallback services, only more so — an invented service is
+ * work a business may not do, and an invented product with a price on it is a
+ * customer arriving with money for something that does not exist.
+ *
+ * Everything below the copy is the template's own chrome: labels, not the
+ * tenant's words, and nothing a company needs to rewrite.
+ */
+export const PRODUCTS_COPY = {
+  eyebrow: 'What we sell',
+  title: 'The {company} range',
+  lede: 'Everything we stock, with what it costs.',
+  /** The button on each card, where the card has none of its own. */
+  cta: 'View details',
+
+  categoriesEyebrow: 'Browse',
+  categoriesTitle: 'Shop by category',
+  categoriesLede: 'Start with the kind of thing you are after.',
+
+  offersEyebrow: 'On offer',
+  offersTitle: 'Reduced right now',
+  offersLede: 'Current reductions.',
+
+  /* ------------------------------ the pages ------------------------------ */
+  metaTitle: 'Products',
+  categoriesMetaTitle: 'Categories',
+  offersMetaTitle: 'Offers',
+
+  /** The links out of the three home bands, each saying where it goes. */
+  moreProducts: 'See the whole range',
+  moreCategories: 'See all categories',
+  moreOffers: 'See every offer',
+
+  /* ------------------------------- the cards ------------------------------ */
+  includesLabel: 'Includes',
+  specsLabel: 'Specifications',
+  skuLabel: 'Ref',
+  /** Above the strip of thumbnails on a product page. */
+  galleryLabel: 'More photographs',
+  /** A product with no photograph at all. Rendered as text, never as a broken frame. */
+  noImage: 'No photograph',
+
+  /** Availability, in the words a visitor needs rather than the API's keys. */
+  inStock: 'In stock',
+  outOfStock: 'Out of stock',
+  madeToOrder: 'Made to order',
+
+  /** On a card with nothing filed against it, and on the uncategorised group. */
+  uncategorised: 'Everything else',
+  /** The count under a category tile — `{n}` is the number. */
+  categoryCount: '{n} products',
+  categoryCountOne: '1 product',
+
+  /* ------------------------------- filtering ------------------------------ */
+  allProducts: 'Everything',
+  filterLabel: 'Category',
+  /** When a category filter matches nothing — only reachable from a stale link. */
+  noMatches: 'Nothing here yet.',
+  backToProducts: 'Back to everything',
+
+  /** The badge on an offer card when the tenant wrote no wording and the
+      platform could not compute a percentage — see `ProductItem.onOffer`. */
+  offerBadge: 'Offer',
+} as const;
+
+/**
+ * The cart's wording that is **not** the tenant's to write.
+ *
+ * The labels a business chooses — what the button says, what the basket is
+ * called, what it promises about delivery — all come from the API, because they
+ * are the parts a shop has opinions about. What is left here is the machinery:
+ * the word for a quantity stepper, the line that says a basket is empty, the
+ * error shown when somebody presses Send with no phone number in the box. A
+ * tenant has no view on those and should not be asked for one.
+ */
+export const ORDERS_COPY = {
+  /** The header button, and its label for screen readers. */
+  cartLabel: 'Basket',
+  cartOpen: 'Open your basket',
+  /** `{n}` is the number of items. Announced, not printed. */
+  cartCount: '{n} items in your basket',
+  cartCountOne: '1 item in your basket',
+
+  empty: 'Your basket is empty.',
+  emptyHint: 'Add something from the catalogue and it will appear here.',
+  close: 'Close',
+
+  /* -------------------------------- lines -------------------------------- */
+  remove: 'Remove',
+  removeOne: 'Remove {name}',
+  increase: 'One more',
+  decrease: 'One fewer',
+  quantity: 'Quantity',
+  /** On a line whose product is priced in words, so it has no number to total. */
+  priceOnRequest: 'Price on request',
+
+  /* -------------------------------- totals ------------------------------- */
+  subtotal: 'Total',
+  /**
+   * The line under the total whenever anything in the basket is priced in
+   * words. The total is then genuinely incomplete, and saying so is the only
+   * honest thing to print beside it.
+   */
+  totalPartial: 'Some items are priced on request and are not in this total.',
+  /** `{amount}` is the tenant's minimum, formatted in their own currency. */
+  belowMinimum: 'Orders start at {amount}. Add a little more to send this one.',
+
+  /* ------------------------------- the form ------------------------------ */
+  detailsTitle: 'Your details',
+  name: 'Your name',
+  phone: 'Phone number',
+  address: 'Delivery address',
+  /** Above the saved-address picker, for a signed-in customer. */
+  deliverTo: 'Deliver to',
+  /** The last option in it: a one-off delivery somewhere not on the list. */
+  addressElsewhere: 'Somewhere else — I will type it',
+
+  /* ------------------------- signed in, or not ------------------------- */
+  /** `{name}` is the account holder. Said once instead of two disabled boxes. */
+  orderingAs: 'Ordering as {name}.',
+  notYou: 'Not you?',
+  /** On a shop that takes orders only from account holders. */
+  signInToOrder: 'Sign in to place this order',
+  signInWhy: 'Your basket will be waiting when you come back.',
+  notes: 'Anything else we should know',
+  notesHint: 'Optional',
+  required: 'Required',
+  /** Shown under a phone box holding something that is not a phone number. */
+  phoneInvalid: 'That does not look like a phone number.',
+
+  /* ------------------------------- sending ------------------------------- */
+  /** While the order is being written down. It is a round trip, so it is said. */
+  placing: 'Placing your order…',
+  sendHint: 'We will write this down and then open WhatsApp so you can send it.',
+  payHint: 'We will write this down and then open your payment app.',
+
+  /**
+   * The confirmation. It says **placed**, not sent, and the difference is the
+   * whole of it: the order is recorded in the shop's own order book whether or
+   * not the message that follows is ever sent.
+   */
+  placed: 'Your order is placed.',
+  placedHint: 'Send us the message below so we can confirm it straight away.',
+  /**
+   * In `whatsapp` mode, where WhatsApp has been opened for them.
+   *
+   * It names the button as well as the tab, because the tab is the one part of
+   * this that a browser is allowed to refuse - and somebody reading "it is open"
+   * with nothing open in front of them is worse served than by one extra line.
+   */
+  placedHintOpened: 'WhatsApp should be open with your order — press send there. If it did not open, use the button below.',
+  /** When the shop publishes no number, so there is no message to send. */
+  placedHintQuiet: 'We have it, and we will be in touch to confirm.',
+  /** The step after payment, in `payment` mode with a number published. */
+  sendAfterPay: 'Send the order on WhatsApp',
+  payNow: 'Pay now',
+  startAnother: 'Start another order',
+
+  /* -------------------------------- buttons ------------------------------ */
+  /** Replaces the tenant's Add-to-cart label once the thing is in the basket. */
+  added: 'In your basket',
+  /** On a product the tenant has marked not orderable, or that is out of stock. */
+  unavailable: 'Not available to order',
+} as const;
+
+/**
+ * How many of each the home page shows before its *View all* link takes over.
+ *
+ * These are the template's own ceilings on top of the API's. The API already
+ * slices `home` to its own limits; these clamp again so a theme that wants a
+ * tighter home page can have one without the platform changing for everybody.
+ * Whichever is smaller wins, which is the safe direction.
+ */
+export const CATALOGUE_HOME_LIMITS = { categories: 6, products: 8, offers: 4 } as const;
 
 /* ------------------------------------------------------------------ *
  * Features / Benefits

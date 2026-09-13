@@ -16,6 +16,7 @@
 const express = require('express');
 const controller = require('../controllers/functionality.controller');
 const content = require('../controllers/websiteContent.controller');
+const serviceCategoryController = require('../controllers/serviceCategory.controller');
 const validate = require('../middlewares/validate');
 const schema = require('../validators/functionality.validator');
 const master = require('../validators/master.validator');
@@ -44,6 +45,8 @@ functionalities.patch('/:key/status', validate(schema.toggle), controller.toggle
  *       | `services` | Heading, lede, the button label, and the name the Services page carries in the website's menu. The services themselves are their own rows. |
  *       | `testimonials` | The static/dynamic mode, the headings, and the wording of the review form. |
  *       | `share_link` | Headline, message and which channels to offer. |
+ *       | `products` | The three blocks of copy over the catalogue, the offers band and the categories band, plus the name the Products page carries in the menu. The products and categories are their own rows. |
+ *       | `orders` | Where an order goes — `whatsapp`, `payment` or `none` — plus the cart's labels, what the customer is asked for, any minimum, and the UPI id or payment link. See `OrdersSettings`. |
  *       | `whatsapp`, `about_us`, `contact_page` | Nothing — their configuration lives elsewhere. A body is refused. |
  *
  *       **Blank means "use the platform's wording".** Every copy field is
@@ -60,7 +63,7 @@ functionalities.patch('/:key/status', validate(schema.toggle), controller.toggle
  *         required: true
  *         schema:
  *           type: string
- *           enum: [whatsapp, share_link, services, about_us, figures, team, gallery, contact_page, testimonials, features_benefits]
+ *           enum: [whatsapp, share_link, services, about_us, figures, team, gallery, contact_page, testimonials, features_benefits, products, orders]
  *     requestBody:
  *       required: true
  *       content:
@@ -71,6 +74,8 @@ functionalities.patch('/:key/status', validate(schema.toggle), controller.toggle
  *               - $ref: '#/components/schemas/GallerySectionCopy'
  *               - $ref: '#/components/schemas/TestimonialsSettings'
  *               - $ref: '#/components/schemas/ShareLinkSettings'
+ *               - $ref: '#/components/schemas/ProductsSettings'
+ *               - $ref: '#/components/schemas/OrdersSettings'
  *           examples:
  *             team:
  *               summary: Rename the Team section
@@ -78,6 +83,15 @@ functionalities.patch('/:key/status', validate(schema.toggle), controller.toggle
  *             gallery:
  *               summary: Rename the Gallery
  *               value: { eyebrow: 'Our work', title: 'A few jobs we are proud of' }
+ *             orders:
+ *               summary: Take orders on WhatsApp, with a minimum
+ *               value: { mode: 'whatsapp', cart: true, whatsappType: 'orders', minOrderAmount: 500, requirePhone: true }
+ *             ordersPayment:
+ *               summary: Take payment directly, one product at a time
+ *               value: { mode: 'payment', cart: false, upiId: 'yourshop@okaxis', payeeName: 'Your Shop' }
+ *             ordersOff:
+ *               summary: Switch ordering off and keep the setup
+ *               value: { mode: 'none' }
  *     responses:
  *       200:
  *         description: Saved. Returns the functionality with its settings resolved.
@@ -168,11 +182,30 @@ const features = cardRouter(content.features, schema.featureCreate, schema.featu
 const services = cardRouter(content.services, schema.serviceCreate, schema.serviceUpdate);
 
 /**
+ * Service categories.
+ *
+ * Not `cardRouter`, because a tree is not a list: the write routes go through
+ * `serviceCategory.controller` for the three checks a schema cannot make - a
+ * parent from another company, a cycle, and a tree pushed past its depth - and
+ * its delete promotes the children rather than taking them with it.
+ *
+ * `/reorder` before `/:id`, or Express reads "reorder" as an id.
+ */
+const serviceCategories = express.Router({ mergeParams: true });
+serviceCategories.get('/', validate(schema.serviceCategoryListQuery), serviceCategoryController.list);
+serviceCategories.patch('/reorder', validate(schema.reorder), serviceCategoryController.reorder);
+serviceCategories.post('/', validate(schema.serviceCategoryCreate), serviceCategoryController.create);
+serviceCategories.put('/:id', validate(schema.serviceCategoryUpdate), serviceCategoryController.update);
+serviceCategories.patch('/:id/status', validate(master.statusBody), serviceCategoryController.toggleStatus);
+serviceCategories.delete('/:id', validate(master.idParam), serviceCategoryController.remove);
+
+/**
  * Exported as separate routers rather than one: the caller mounts each under
  * its own path with its own guards, and an Express middleware attached to a
  * pathless `use` would otherwise run on every request to the parent router.
  */
 module.exports = {
+  serviceCategories,
   functionalities,
   whatsapp,
   about,

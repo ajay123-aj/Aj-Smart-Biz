@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { SERVICES_COPY } from '@/config/site';
 import { hasSection, toFileUrl, type CompanyDetails, type ServiceItem } from '@/lib/company';
-import { resolveServices, type ResolvedServices } from '@/lib/services';
+import { durationLabel, resolveServices, servicePrice, type ResolvedServices } from '@/lib/services';
 import Glyph from './Glyph';
 import ServiceEnquiryButton from './ServiceEnquiryButton';
 import styles from './ServicesSection.module.css';
@@ -31,12 +31,25 @@ import styles from './ServicesSection.module.css';
 export default function ServicesSection({
   company,
   limit,
+  variant = 'all',
+  category,
   showHead = true,
   className,
 }: {
   company: CompanyDetails;
   /** Shortens the list. The home page passes one; `/services` does not. */
   limit?: number;
+  /**
+   * Which list this is.
+   *
+   * `offers` renders the same cards from the same source, under the tenant's own
+   * offers wording - a **subset**, not a second list, so a service cannot be on
+   * the offers band and missing from the price list. The home page shows both
+   * bands; the services page shows only the first.
+   */
+  variant?: 'all' | 'offers';
+  /** Narrows to one category and everything under it. The services page's filter. */
+  category?: string | null;
   /**
    * Whether to print the heading block.
    *
@@ -50,10 +63,16 @@ export default function ServicesSection({
   /** For the caller's spacing and nothing else. */
   className?: string;
 }) {
-  const section = resolveServices(company, limit);
+  const section = resolveServices(company, limit, { variant, category });
   if (!section) return null;
 
-  const { eyebrow, title, lede, cta, enquiry, items, truncated } = section;
+  const { cta, enquiry, items, truncated, booking } = section;
+
+  /* The offers band says its own thing. Same cards, different argument: the
+     services band is *what we do* and this one is *why book now*. */
+  const eyebrow = variant === 'offers' ? section.offersEyebrow : section.eyebrow;
+  const title = variant === 'offers' ? section.offersTitle : section.title;
+  const lede = variant === 'offers' ? section.offersLede : section.lede;
 
   /**
    * The card's button now opens an enquiry form rather than walking the reader
@@ -67,7 +86,10 @@ export default function ServicesSection({
   const cards = arrange(items);
 
   return (
-    <section className={`section ${styles.section} ${className ?? ''}`} id="services">
+    <section
+      className={`section ${styles.section} ${className ?? ''}`}
+      id={variant === 'offers' ? 'service-offers' : 'services'}
+    >
       <div className="container">
         {showHead ? (
           <div className="section-head">
@@ -86,7 +108,8 @@ export default function ServicesSection({
               wide={wide}
               cta={cta}
               enquiry={enquiry}
-              companyName={company.name}
+              company={company}
+              bookLabel={booking?.label ?? SERVICES_COPY.book}
             />
           ))}
         </ul>
@@ -99,7 +122,7 @@ export default function ServicesSection({
         {truncated && servicesHref ? (
           <div className={styles.more}>
             <Link className="btn btn--ghost" href={servicesHref}>
-              {SERVICES_COPY.more} →
+              {variant === 'offers' ? SERVICES_COPY.moreOffers : SERVICES_COPY.more} →
             </Link>
           </div>
         ) : null}
@@ -156,16 +179,32 @@ function ServiceCard({
   wide,
   cta,
   enquiry,
-  companyName,
+  company,
+  bookLabel,
 }: {
   item: ServiceItem;
   index: number;
   wide: boolean;
   cta: string;
   enquiry: ResolvedServices['enquiry'];
-  companyName: string;
+  company: CompanyDetails;
+  /** The word on a bookable card. The tenant's, through the API. */
+  bookLabel: string;
 }) {
   const image = toFileUrl(item.image);
+  const price = servicePrice(item, company);
+  const duration = durationLabel(item.durationMinutes);
+
+  /**
+   * A service with no address gets no link.
+   *
+   * It should not happen - the API fills one in on create and backfills the rows
+   * that predate the column - but `/services/` is a valid URL that leads back to
+   * the list, so getting this wrong sends somebody who clicked a service to the
+   * page they clicked it from. An unlinked title is a worse card; a card that
+   * silently goes nowhere is a broken site.
+   */
+  const href = item.slug ? `/services/${item.slug}` : null;
 
   return (
     <li
@@ -194,10 +233,34 @@ function ServiceCard({
         <span className={styles.number} aria-hidden="true">
           {String(index).padStart(2, '0')}
         </span>
+
+        {/* On offer, said on the card the way the catalogue says it — a badge
+            rather than a colour, because a colour is not a fact. */}
+        {item.onOffer ? (
+          <span className={styles.offerFlag}>
+            {item.discountPercent ? `−${item.discountPercent}%` : 'Offer'}
+          </span>
+        ) : null}
       </div>
 
       <div className={styles.body}>
-        <h3 className={styles.title}>{item.title}</h3>
+        {/*
+          The title is the link to the service's own page.
+
+          The whole card is not one, unlike a post card: a service card carries a
+          button of its own that does something different - booking a time, or
+          opening an enquiry - and nesting that inside a link is invalid markup
+          and an ambiguous target.
+        */}
+        <h3 className={styles.title}>
+          {href ? (
+            <Link className={styles.titleLink} href={href}>
+              {item.title}
+            </Link>
+          ) : (
+            item.title
+          )}
+        </h3>
 
         {/*
           The price on a line of its own, marked with a short rule rather than
@@ -205,10 +268,34 @@ function ServiceCard({
           accent colour in the same place on every card is far easier to run an
           eye down than a badge that moves with the length of the title above it.
         */}
-        {item.priceLabel ? (
+        {price ? (
           <p className={styles.price}>
             <span className={styles.priceRule} aria-hidden="true" />
-            {item.priceLabel}
+            <span className={styles.priceNow}>{price.now}</span>
+            {/* The old price beside the new one, struck through — the same shape
+                the catalogue uses, so an offer reads identically wherever it is. */}
+            {price.was ? <span className={styles.priceWas}>{price.was}</span> : null}
+          </p>
+        ) : null}
+
+        {/*
+          How long it takes, and what it is filed under.
+
+          Chips on a line of their own rather than more text on the price line.
+          They are facts of a different kind — the price is what a visitor is
+          weighing, and these are what they are weighing it against — and hanging
+          them off the figure made a line that grew ragged as soon as a service
+          had both.
+        */}
+        {duration || item.category ? (
+          <p className={styles.meta}>
+            {duration ? (
+              <span className={styles.chip}>
+                <ClockIcon />
+                {duration}
+              </span>
+            ) : null}
+            {item.category ? <span className={styles.chipQuiet}>{item.category.name}</span> : null}
           </p>
         ) : null}
 
@@ -237,20 +324,124 @@ function ServiceCard({
           pointed at WhatsApp with no number published — and it is the API's
           answer, not a rule this component keeps.
         */}
-        {enquiry ? (
-          <ServiceEnquiryButton
-            service={{ id: item.id, title: item.title }}
-            companyName={companyName}
-            enquiry={enquiry}
-            label={item.ctaLabel || cta}
-            /* The card's own hook. The button brings its appearance; this is
-               what lets a wide card reposition it and a hovered card light it
-               up, neither of which the button can know about. */
-            className={styles.cta}
-          />
-        ) : null}
+        {/*
+          The action bar.
+
+          One row, pinned to the bottom of the card by `margin-top: auto`, so a
+          grid of cards carrying different amounts of copy still has its buttons
+          on one line. Two things sit in it, and they are deliberately different
+          weights:
+
+            the **primary** action, which is what this card is for — booking a
+            time where the service takes one, and opening the enquiry where it
+            does not
+
+            **Details**, a quiet text link to the service's own page, on every
+            card that has one. It is the way to the full description, the
+            inclusions and the diary, and it must not compete with the button
+            beside it.
+        */}
+        <div className={styles.foot}>
+          {item.bookable && href ? (
+            /*
+              A service somebody can take a time for sends them to its own page,
+              where the diary is. Deliberately not a dialog: picking a day and a
+              slot is a real decision that deserves an address of its own, and
+              one a person can come back to.
+            */
+            <Link className={styles.book} href={href}>
+              {bookLabel}
+              <ArrowIcon />
+            </Link>
+          ) : enquiry ? (
+            <ServiceEnquiryButton
+              service={{ id: item.id, title: item.title }}
+              companyName={company.name}
+              enquiry={enquiry}
+              label={item.ctaLabel || cta}
+              /* The button brings its own appearance; the card decides only that
+                 hovering anywhere on it lights the button up. */
+              className={styles.cta}
+            />
+          ) : (
+            /*
+              **No button at all.**
+              
+              The tenant has switched the enquiry off and takes no bookings for
+              this service, which is a real choice: a price list that says what
+              the work is and leaves the phone number in the header to do the
+              rest. A card that invented an action here would be the template
+              overriding a decision the shop made deliberately.
+
+              The title above is still a link to the service's own page, so
+              nothing becomes unreachable — a heading that goes somewhere is not
+              a call to action.
+            */
+            <span />
+          )}
+
+          {/*
+            Only where the primary action is **not** already the page.
+
+            A bookable card's button goes to the service's own page, where the
+            diary is; a second link beside it pointing at the same address is two
+            things to choose between that do the same thing. The enquiry button
+            opens a dialog and goes nowhere, so that is the one case where the
+            way to the full description has to be offered separately.
+          */}
+          {href && !item.bookable && enquiry ? (
+            <Link className={styles.details} href={href}>
+              Details
+            </Link>
+          ) : null}
+        </div>
       </div>
     </li>
+  );
+}
+
+/**
+ * The two marks the card draws itself.
+ *
+ * Inline rather than from `Glyph`, which is the tenant's closed library of
+ * section icons — these are furniture, not content: an arrow that means "this
+ * goes somewhere" and a clock that means "this takes time". A tenant choosing
+ * either of them would be choosing something about the template.
+ */
+function ArrowIcon() {
+  return (
+    <svg
+      className={styles.arrow}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      focusable="false"
+      aria-hidden="true"
+    >
+      <path d="M5 12h13M13 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg
+      className={styles.chipIcon}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      focusable="false"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5.2l3.2 2" />
+    </svg>
   );
 }
 
