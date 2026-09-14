@@ -1,0 +1,44 @@
+# What never reaches the build context.
+#
+# Two jobs. Most of this is about size and cache hits — a local `node_modules`
+# copied in would be both the largest thing in the context and the reason every
+# build invalidates its own layers. The `.env.*` lines are about something else
+# entirely, and are the important ones.
+
+# Installed in the image by `npm ci`, from the lockfile. A host copy would be
+# the wrong platform's binaries as often as not.
+node_modules
+npm-debug.log*
+
+# ---------------------------------------------------------------- secrets --
+# `.env.production` and `.env.development` are tracked in this repository and
+# carry a database password, both JWT secrets and the super admin's password.
+# The image is pushed to a public registry, where `docker history` and a single
+# `docker run --entrypoint cat` would read any of them straight back out.
+#
+# The API does not need them: `src/config/env.js` loads an env file only when
+# one exists and lets the real process environment win regardless, so the
+# container is configured with `--env-file`, a compose `environment:` block or
+# the orchestrator's own secrets.
+.env
+.env.*
+
+# --------------------------------------------------------------- runtime --
+# Written by the running service, not built into it. Mount volumes instead.
+uploads
+logs
+*.log
+*.sqlite
+
+# ------------------------------------------------------------ not the app --
+.git
+.gitignore
+.github
+Dockerfile
+.dockerignore
+README.md
+coverage
+dist
+.vscode
+.idea
+.DS_Store
