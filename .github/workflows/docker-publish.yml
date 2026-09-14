@@ -42,9 +42,14 @@
 #   * Docker installed, and the runner's user in the `docker` group — the job
 #     never uses `sudo`, so `docker ps` has to work as that user.
 #   * `/opt/aj-smart-biz/backend.env` — the real production environment,
-#     database password and JWT secrets included. It lives on the server and
-#     not in this repository or in the image; the container is configured from
-#     it with `--env-file`.
+#     the JWT secrets included. It lives on the server and not in this
+#     repository or in the image; the container is configured from it with
+#     `--env-file`.
+#   * **A MySQL the server already runs**, reachable on 3306. This job does not
+#     install or manage one: the database outlives every deploy, and a pipeline
+#     that could create it is a pipeline that could recreate it over the top of
+#     every tenant on the box. Point the variables below at whatever is already
+#     there.
 #   * Nothing else. The job does not check the repository out on the server —
 #     it only pulls an image and restarts a container.
 #
@@ -54,6 +59,15 @@
 #   BACKEND_ENV_FILE    /opt/aj-smart-biz/backend.env
 #   BACKEND_APP_PORT    4000   the port the API listens on inside the container
 #   BACKEND_HOST_PORT   4000   the port it is published on, on the server
+#   DB_HOST             host.docker.internal   where MySQL is; see below
+#   DB_PORT             3306
+#   DB_NAME             aj_smart_biz
+#   DB_USER             root
+#   DB_NETWORK          (unset)  only when MySQL is itself a container
+#
+# and one secret:
+#
+#   DB_PASSWORD         the MySQL password. Set it — there is no default.
 # ------------------------------------------------------------------ #
 
 name: Docker image
@@ -219,26 +233,28 @@ jobs:
 
       # ---------------------------- the database ---------------------------- #
       #
-      # A private bridge network for the two containers. It is what lets the API
-      # reach the database as `aj-smart-biz-mysql:3306` — Docker resolves a
-      # container name on a user-defined network, and does not on the default
-      # bridge. Without it the API would have to go back out through the host,
-      # and `127.0.0.1` inside a container is the container itself, which is the
-      # single most common way this deployment fails.
-      NETWORK: aj-smart-biz
-      DB_CONTAINER: aj-smart-biz-mysql
-      DB_VOLUME: aj-smart-biz-mysql-data
-      DB_IMAGE: ${{ vars.MYSQL_IMAGE || 'mysql:8.4' }}
-      # Published on the host for Workbench and `mysql -h 127.0.0.1 -P 3307`.
-      # 3307 rather than 3306 so it cannot collide with a MySQL already
-      # installed on the server.
-      DB_HOST_PORT: ${{ vars.MYSQL_HOST_PORT || '3307' }}
-      DB_NAME: ${{ vars.MYSQL_DATABASE || 'aj_smart_biz' }}
-      DB_USER: ${{ vars.MYSQL_USER || 'root' }}
-      # Set the MYSQL_ROOT_PASSWORD repository *secret* to override this. The
-      # default is here so a fresh server comes up without any setup at all;
-      # anything that is not a throwaway dev box should not be using it.
-      DB_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD || 'aj_smart_biz_123' }}
+      # The MySQL the server already runs. This job connects to it; it never
+      # creates one. See the note in the header for why.
+      #
+      # `host.docker.internal` is the default because that is the usual case: a
+      # MySQL installed on the server, listening on 3306. Inside a container
+      # `127.0.0.1` is the container itself, so the address has to name the
+      # host — which `--add-host=host.docker.internal:host-gateway` below
+      # supplies on Linux, where Docker does not provide it automatically.
+      #
+      # If MySQL is itself a container, set DB_HOST to its *container name* and
+      # DB_NETWORK to the network it is on. Docker resolves container names on
+      # a user-defined network, so the API then reaches it directly, on its
+      # internal 3306, without going back out through the host at all.
+      DB_HOST: ${{ vars.DB_HOST || 'host.docker.internal' }}
+      DB_PORT: ${{ vars.DB_PORT || '3306' }}
+      DB_NAME: ${{ vars.DB_NAME || 'aj_smart_biz' }}
+      DB_USER: ${{ vars.DB_USER || 'root' }}
+      # A secret with no default, deliberately. A password that ships in the
+      # repository is a password on every fork and in every log of this file.
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      # Empty unless MySQL is a container this one has to sit beside.
+      DB_NETWORK: ${{ vars.DB_NETWORK }}
 
     steps:
       # Fails in a second, with a sentence that says what to do, rather than
@@ -251,6 +267,14 @@ jobs:
           fi
           if [ ! -r "$ENV_FILE" ]; then
             echo "::error::$ENV_FILE is missing or unreadable. Copy Aj-Smart-Biz-Backend/.env.production there, fill in the real values, and chmod 600 it."
+            exit 1
+          fi
+          if [ -z "$DB_PASSWORD" ]; then
+            echo "::error::The DB_PASSWORD secret is not set. Settings -> Secrets and variables -> Actions -> New repository secret, named DB_PASSWORD, holding the password for $DB_USER on the server's MySQL."
+            exit 1
+          fi
+          if [ -n "$DB_NETWORK" ] && ! docker network inspect "$DB_NETWORK" >/dev/null 2>&1; then
+            echo "::error::The DB_NETWORK variable names '$DB_NETWORK', which is not a docker network on this server. Run: docker network ls"
             exit 1
           fi
 
@@ -277,77 +301,6 @@ jobs:
       - name: Make sure the uploads volume exists
         run: docker volume create "$UPLOADS_VOLUME" >/dev/null
 
-      # Brings the database up if it is not already, and otherwise leaves it
-      # completely alone.
-      #
-      # The distinction matters more than it looks. The API container is
-      # disposable and is destroyed and recreated on every deploy; the database
-      # is the opposite, and a step that recreated it would throw away every
-      # tenant on the server. So this only ever *creates* a container that is
-      # missing or *starts* one that is stopped — it never replaces a running
-      # one, and the data lives in a named volume that outlives the container
-      # either way.
-      #
-      # Changing MYSQL_ROOT_PASSWORD after first run does NOT change the
-      # password: the image only reads it when it initialises an empty data
-      # directory. The password is a property of the volume from then on.
-      - name: Make sure MySQL is running
-        run: |
-          set -euo pipefail
-
-          docker network create "$NETWORK" >/dev/null 2>&1 || true
-          docker volume create "$DB_VOLUME" >/dev/null
-
-          state=$(docker inspect -f '{{.State.Status}}' "$DB_CONTAINER" 2>/dev/null || echo missing)
-
-          case "$state" in
-            running)
-              echo "MySQL is already running — left untouched."
-              ;;
-            missing)
-              echo "No MySQL container yet — creating one."
-              docker run -d \
-                --name "$DB_CONTAINER" \
-                --restart unless-stopped \
-                --network "$NETWORK" \
-                -e MYSQL_ROOT_PASSWORD="$DB_PASSWORD" \
-                -e MYSQL_DATABASE="$DB_NAME" \
-                -p "$DB_HOST_PORT:3306" \
-                -v "$DB_VOLUME:/var/lib/mysql" \
-                --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p\"$DB_PASSWORD\" --silent" \
-                --health-interval=10s \
-                --health-timeout=5s \
-                --health-start-period=60s \
-                --health-retries=10 \
-                "$DB_IMAGE" >/dev/null
-              ;;
-            *)
-              echo "MySQL container exists but is $state — starting it."
-              docker start "$DB_CONTAINER" >/dev/null
-              ;;
-          esac
-
-          # A container created by an earlier version of this workflow may
-          # predate the network. Joining is a no-op when it is already a member.
-          docker network connect "$NETWORK" "$DB_CONTAINER" >/dev/null 2>&1 || true
-
-          # Wait for it to actually accept connections. The API syncs the schema
-          # on boot, so starting it against a database that is still
-          # initialising is a crash-loop and a failed deploy. Five minutes,
-          # because a first run has to build the data directory.
-          echo "Waiting for MySQL to accept connections..."
-          for _ in $(seq 1 60); do
-            if docker exec "$DB_CONTAINER" mysqladmin ping -h 127.0.0.1 -uroot -p"$DB_PASSWORD" --silent >/dev/null 2>&1; then
-              echo "MySQL is ready."
-              exit 0
-            fi
-            sleep 5
-          done
-
-          echo "::error::MySQL did not become ready. Its last 50 log lines:"
-          docker logs --tail 50 "$DB_CONTAINER" 2>&1 || true
-          exit 1
-
       - name: Replace the running container
         id: rollout
         run: |
@@ -366,26 +319,32 @@ jobs:
           #   PORT       the published port and the port the app listens on are
           #              one setting here; split them and you get a container
           #              that is up and unreachable.
-          #   DB_*       the API talks to the database over the private network
-          #              by container name, on its *internal* 3306 — not the
-          #              3307 published on the host, which is there for people
-          #              rather than for this container. An env file that says
+          #   DB_*       where the server's MySQL is. An env file that says
           #              `127.0.0.1` would be pointing at the API container
-          #              itself.
+          #              itself, which is the single most common way this
+          #              deployment fails, so the workflow settles it.
           #
           # Everything else — JWT secrets, the super admin, CORS, upload limits
           # — still comes from the env file, which is where it belongs.
+          #
+          # `--add-host` gives the container a name for the machine it is
+          # running on. Docker Desktop resolves `host.docker.internal` by
+          # itself; Linux does not, and the server is Linux.
+          net_args=()
+          if [ -n "$DB_NETWORK" ]; then net_args=(--network "$DB_NETWORK"); fi
+
           start() {
             docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
             docker run -d \
               --name "$CONTAINER" \
               --restart unless-stopped \
-              --network "$NETWORK" \
+              "${net_args[@]}" \
+              --add-host=host.docker.internal:host-gateway \
               --env-file "$ENV_FILE" \
               -e PORT="$APP_PORT" \
               -e DB_DIALECT=mysql \
-              -e DB_HOST="$DB_CONTAINER" \
-              -e DB_PORT=3306 \
+              -e DB_HOST="$DB_HOST" \
+              -e DB_PORT="$DB_PORT" \
               -e DB_NAME="$DB_NAME" \
               -e DB_USER="$DB_USER" \
               -e DB_PASSWORD="$DB_PASSWORD" \
@@ -455,6 +414,6 @@ jobs:
             echo "image     $IMAGE@$DIGEST"
             echo "container $CONTAINER"
             echo "port      $HOST_PORT -> $APP_PORT"
-            echo "database  $DB_CONTAINER:3306 (published on $DB_HOST_PORT)"
+            echo "database  $DB_USER@$DB_HOST:$DB_PORT/$DB_NAME"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
