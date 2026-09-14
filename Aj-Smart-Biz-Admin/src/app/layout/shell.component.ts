@@ -21,6 +21,8 @@ const ICONS: Record<string, string> = {
   'company-profile': '🏢',
   'branch-management': '📍',
   'company-domains': '🌐',
+  // The website's colours, not the console's light/dark switch.
+  'company-theme': '🎨',
   'company-functionality': '🎛️',
   // Distinct from Gallery's frame: these are the hero slides.
   'slider-management': '🎞️',

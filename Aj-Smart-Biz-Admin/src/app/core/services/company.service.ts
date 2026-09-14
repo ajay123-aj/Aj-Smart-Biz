@@ -33,6 +33,8 @@ import {
   Transaction,
   WhatsappNumber,
   WhatsappNumberView,
+  WebsiteThemeInput,
+  WebsiteThemeView,
   CompanyOrder,
   OrderSummary,
   SalesAnalytics,
@@ -89,6 +91,18 @@ export class CardClient<T> {
     return this.api.delete<{ id: number }>(`${this.path}/${id}`);
   }
 }
+
+/**
+ * Which theme scope a call is for: a branch id, or the company-wide theme.
+ *
+ * Absent rather than `none` for the company-wide case — the API treats a
+ * missing `branchId` and the literal `none` the same way, and sending nothing
+ * keeps the common call free of a magic string.
+ */
+const themeScope = (branchId?: number | null) => (branchId ? { branchId: String(branchId) } : {});
+
+/** The same thing as a query suffix, for the verbs `ApiService` gives no params. */
+const themeScopeQuery = (branchId?: number | null) => (branchId ? `?branchId=${branchId}` : '');
 
 /**
  * Everything under `/admin/company` is implicitly scoped to the signed-in admin's
@@ -172,6 +186,41 @@ export class CompanyService {
     settings: Record<string, unknown>
   ): Observable<Functionality> {
     return this.api.put<Functionality>(`/admin/company/functionalities/${key}/settings`, settings);
+  }
+
+  /* --------------------------- website theme --------------------------- */
+
+  /**
+   * The colours this company's public website is painted with.
+   *
+   * These three write `companies.theme_config` — the company's **own** values —
+   * and never the platform's shared `themes` catalogue. A dozen tenants can sit
+   * on one preset row, so editing that row here would repaint all of them; the
+   * API lays this company's values over the preset at read time instead.
+   */
+  websiteTheme(branchId?: number | null): Observable<WebsiteThemeView> {
+    return this.api.get<WebsiteThemeView>('/admin/company/theme', themeScope(branchId));
+  }
+
+  /**
+   * A **replace**, not a merge: every field the form holds is sent, and a blank
+   * one clears that colour back to the level below. Sending nothing usable is
+   * the same as a reset, which is what makes "clear every field" behave the way
+   * an admin expects.
+   *
+   * `branchId` names the scope. Omitted it writes the company-wide theme; with
+   * one it writes only that branch, leaving every other site alone.
+   */
+  saveWebsiteTheme(colours: WebsiteThemeInput, branchId?: number | null): Observable<WebsiteThemeView> {
+    return this.api.put<WebsiteThemeView>(`/admin/company/theme${themeScopeQuery(branchId)}`, colours);
+  }
+
+  /**
+   * Drops one scope's own colours so it goes back to inheriting — a branch
+   * falls back to the company's colours, the company falls back to the preset.
+   */
+  resetWebsiteTheme(branchId?: number | null): Observable<WebsiteThemeView> {
+    return this.api.delete<WebsiteThemeView>(`/admin/company/theme${themeScopeQuery(branchId)}`);
   }
 
   /* ------------------------- whatsapp numbers ------------------------- */

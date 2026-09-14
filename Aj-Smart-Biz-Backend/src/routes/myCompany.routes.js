@@ -89,6 +89,24 @@ const websiteSettingsGuard = [
   (req, res, next) => (req.method === 'GET' ? next() : companyAdminOnly(req, res, next)),
 ];
 
+/**
+ * The colours this company paints its own website with.
+ *
+ * Same guard as the rest of the section, and the reasoning is the domain
+ * manager's rather than the catalogue's: this changes what every visitor sees
+ * on the public internet under the company's own name, so writing it is the
+ * main admin's while anyone who can view the company may read it.
+ *
+ * Note what this route does *not* touch. `themes` is the platform's shared
+ * catalogue — a dozen tenants can point at one row — so nothing here writes to
+ * it. The tenant's values go to `companies.theme_config` and are laid over the
+ * preset at read time; see `services/theme.service`. That is the whole reason
+ * this endpoint exists rather than the console being pointed at the master.
+ */
+router.get('/theme', ...websiteSettingsGuard, validate(schema.themeQuery), controller.getMyTheme);
+router.put('/theme', ...websiteSettingsGuard, validate(schema.themeSave), controller.saveMyTheme);
+router.delete('/theme', ...websiteSettingsGuard, validate(schema.themeQuery), controller.resetMyTheme);
+
 router.use('/functionalities', ...websiteSettingsGuard, functionalityRoutes.functionalities);
 router.use('/whatsapp-numbers', ...websiteSettingsGuard, functionalityRoutes.whatsapp);
 /** The About copy, the figures, the Team section and the Gallery — same guard, same reason. */

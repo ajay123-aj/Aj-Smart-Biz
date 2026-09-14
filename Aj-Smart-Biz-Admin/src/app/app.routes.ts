@@ -72,6 +72,21 @@ export const routes: Routes = [
               import('./features/company/company-domains.component').then((m) => m.CompanyDomainsComponent),
           },
           {
+            /*
+             * The colours the company's own website is painted with.
+             *
+             * Beside Domains and Functionality because it is the same kind of
+             * thing: a setting that governs the whole site rather than a page
+             * somebody writes. No permission of its own — the parent's
+             * `company-details` covers it, matching `MENU_INHERITS_PARENT` in
+             * the API's menu seed.
+             */
+            path: 'theme',
+            title: 'Website theme',
+            loadComponent: () =>
+              import('./features/company/theme-manager.component').then((m) => m.ThemeManagerComponent),
+          },
+          {
             path: 'functionality',
             title: 'Functionality',
             loadComponent: () =>

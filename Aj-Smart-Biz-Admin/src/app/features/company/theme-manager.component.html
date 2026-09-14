@@ -1,0 +1,196 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:460px"></div>
+  } @else {
+    <div class="note">
+      <span class="note-icon" aria-hidden="true">🎨</span>
+      <span>
+        These colours are <strong>yours alone</strong>. They apply to your public website only, and
+        changing them here never affects any other business on the platform — even one using the same
+        starting preset. Leave a field empty to follow what is underneath instead of pinning a colour.
+      </span>
+    </div>
+
+    @if (!canEdit()) {
+      <p class="tiny muted" style="margin-top:0">
+        Only the main admin can change how your website looks. You are viewing this read only.
+      </p>
+    }
+
+    <!--
+      Which site is being edited. Only shown once there is more than one site to
+      choose between: a company with a single branch has no scope to pick, and a
+      selector with one option in it is a control that can only be got wrong.
+    -->
+    @if (branches().length > 1) {
+      <div class="scope-bar">
+        <label class="scope-label" for="theme-scope">Editing the colours for</label>
+        <select
+          id="theme-scope"
+          class="select"
+          style="width:auto"
+          [disabled]="saving()"
+          (change)="onScope($any($event.target).value)"
+        >
+          <option value="">All branches (company-wide)</option>
+          @for (branch of branches(); track branch.id) {
+            <option [value]="branch.id" [selected]="scope() === branch.id">{{ branch.name }}</option>
+          }
+        </select>
+
+        @if (scope() && !overridden()) {
+          <span class="scope-note">
+            Following the company colours — saving here gives {{ scopeName() }} its own.
+          </span>
+        } @else if (scope()) {
+          <span class="scope-note scope-note-own">{{ scopeName() }} has its own colours.</span>
+        }
+
+        @if (overridden() && canEdit()) {
+          <button type="button" class="btn btn-sm btn-ghost" [disabled]="saving()" (click)="reset()">
+            {{ scope() ? 'Follow the company again' : 'Reset to the preset' }}
+          </button>
+        }
+      </div>
+
+      @if (scope()) {
+        <p class="tiny muted" style="margin-top:-8px">
+          A branch only shows its own colours on a domain pinned to it. Branches without one are served
+          the company-wide site.
+        </p>
+      }
+    }
+
+    <!-- What the company-wide theme falls back to. Only its own scope has a preset. -->
+    @if (!scope()) {
+      <div class="scope-bar">
+        <span class="scope-label">Starting preset</span>
+        @if (preset(); as p) {
+          <span class="scope-note">{{ p.name || 'Unnamed preset' }}</span>
+        } @else {
+          <span class="scope-note">None — empty fields use the website template's own defaults.</span>
+        }
+
+        @if (overridden()) {
+          <span class="scope-note scope-note-own">You have your own colours.</span>
+          @if (canEdit() && branches().length <= 1) {
+            <button type="button" class="btn btn-sm btn-ghost" [disabled]="saving()" (click)="reset()">
+              Reset to the preset
+            </button>
+          }
+        } @else {
+          <span class="scope-note">Following the preset — saving a colour below gives you your own.</span>
+        }
+      </div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="colors">
+        @for (field of colorFields; track field.key) {
+          <div class="field">
+            <label [for]="field.key">{{ field.label }}</label>
+
+            <div class="color-row">
+              <!-- The picker writes through to the text box, which stays the
+                   source of truth: it is the only one of the two that can hold
+                   "empty", and empty is a meaningful value here. -->
+              <input
+                type="color"
+                [attr.aria-label]="field.label + ' colour picker'"
+                [value]="swatch(field.key)"
+                [disabled]="!canEdit()"
+                (input)="pick(field.key, $event)"
+              />
+              <input
+                type="text"
+                class="input"
+                [id]="field.key"
+                [formControlName]="field.key"
+                placeholder="#2563eb"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              @if (canEdit()) {
+                <button
+                  type="button"
+                  [disabled]="!isOwn(field.key)"
+                  [title]="isOwn(field.key) ? 'Clear, and follow ' + inheritedFrom() : 'Already following ' + inheritedFrom()"
+                  (click)="clearField(field.key)"
+                >
+                  Clear
+                </button>
+              }
+            </div>
+
+            <app-field-error [control]="form.controls[field.key]" [label]="field.label" />
+
+            <div class="field-hint">
+              {{ field.role }}
+              @if (isOwn(field.key)) {
+                <span class="own">· {{ scope() ? scopeName() + '’s own colour.' : 'Your own colour.' }}</span>
+              } @else if (inheritedValue(field.key); as inheritedColour) {
+                <span class="inheriting">· Following {{ inheritedFrom() }} ({{ inheritedColour }}).</span>
+              } @else {
+                <span class="inheriting">· Not set — the website uses its own default.</span>
+              }
+            </div>
+          </div>
+        }
+
+        <div class="field">
+          <label for="mode">Mode</label>
+          <select id="mode" class="select" formControlName="mode">
+            <option value="">Follow {{ inheritedFrom() }}</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+          <div class="field-hint">
+            Tells the site whether it is being read on a light or a dark ground.
+            @if (isOwn('mode')) {
+              <span class="own">· {{ scope() ? scopeName() + '’s own setting.' : 'Your own setting.' }}</span>
+            } @else if (inheritedValue('mode'); as inheritedMode) {
+              <span class="inheriting">· Following {{ inheritedFrom() }} ({{ inheritedMode }}).</span>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!--
+        Not a rendering of the website — a reminder of what each colour is for,
+        so nobody has to publish to find out that "secondary" is the pressed
+        state of a button.
+      -->
+      <div class="preview" [style.background]="swatch('primaryColor') + '0f'">
+        <div class="preview-bar" [style.background]="swatch('primaryColor')">
+          <span>{{ scope() ? scopeName() : ctx.company()?.name || 'Your website' }}</span>
+          <span class="preview-eyebrow" [style.color]="swatch('accentColor')">Accent</span>
+        </div>
+        <div class="preview-body">
+          <span class="preview-eyebrow" [style.color]="swatch('accentColor')">Section eyebrow</span>
+          <span class="preview-title">A heading on your site</span>
+          <div class="preview-actions">
+            <span class="preview-btn" [style.background]="swatch('primaryColor')" style="color:#fff">
+              Primary button
+            </span>
+            <span class="preview-btn" [style.background]="swatch('secondaryColor')" style="color:#fff">
+              Pressed / footer
+            </span>
+            <span class="preview-btn preview-btn-ghost" [style.color]="swatch('primaryColor')">
+              Secondary button
+            </span>
+          </div>
+        </div>
+      </div>
+
+      @if (canEdit()) {
+        <div class="actions">
+          <button type="submit" class="btn btn-primary" [disabled]="saving()">
+            {{ saving() ? 'Saving…' : scope() ? 'Save ' + scopeName() + ' colours' : 'Save website theme' }}
+          </button>
+          <span class="spacer"></span>
+          <span class="tiny muted">Changes appear on your website straight away.</span>
+        </div>
+      }
+    </form>
+  }
+</div>

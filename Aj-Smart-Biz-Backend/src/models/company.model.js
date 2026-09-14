@@ -17,7 +17,32 @@ module.exports = (sequelize) =>
       // Hosts live in `company_domain` — one company can have several, and each
       // may be pinned to a branch. See CompanyDomain.
       businessTypeId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
+      /**
+       * The *preset* this company started from — a row in the shared `themes`
+       * catalogue the platform maintains. Set by the platform, not the tenant.
+       *
+       * It is no longer the last word on what the website looks like. See
+       * `themeConfig` below and `services/theme.service`.
+       */
       themeId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
+      /**
+       * The company's **own** website colours, and the reason a tenant editing
+       * its theme no longer repaints every other tenant on the same preset.
+       *
+       * `themes` is a shared catalogue: a dozen companies can point at one row,
+       * so editing that row changes all of them. This column is per-company by
+       * construction — whatever is in it wins over the preset, key by key, and
+       * anything absent falls through to the preset and then to the template's
+       * own defaults.
+       *
+       * JSON rather than four columns because the shape is the website's, not
+       * the database's: what a template consumes has already changed once and
+       * will change again, and a new token should not cost a migration on the
+       * widest table in the schema. The keys are validated on the way in —
+       * `themeSave` in `validators/company.validator` — so this is not a
+       * free-for-all, it is a small closed set that is cheap to extend.
+       */
+      themeConfig: { type: DataTypes.JSON, allowNull: true },
       stateId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
       email: { type: DataTypes.STRING(160), allowNull: false, validate: { isEmail: true } },
       phone: { type: DataTypes.STRING(20), allowNull: false },

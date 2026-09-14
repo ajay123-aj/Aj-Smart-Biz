@@ -10,15 +10,27 @@ import { NextResponse, type NextRequest } from 'next/server';
  *   1. `?domain=` on the URL — an explicit override, remembered afterwards so it
  *      survives navigation (the admin keeps it in sessionStorage; a cookie is the
  *      server-rendered equivalent).
- *   2. `TENANT_DOMAIN` from the environment — an operator pinning this deployment
- *      to one tenant. Explicit configuration beats a guessed host, which is what
- *      makes it usable behind a dev tunnel, where the host is the tunnel's own
- *      name and names no tenant.
- *   3. `X-Forwarded-Host` — the host the browser really used, behind a proxy,
- *   4. `Host`,
+ *   2. `X-Forwarded-Host` — the host the browser really used, behind a proxy,
+ *   3. `Host`,
+ *   4. `TENANT_DOMAIN` from the environment,
  *   5. the cookie that a `?domain=` override left behind. Last, so a real host
  *      always wins: pointing a new domain at this site must never serve whatever
  *      tenant was previewed in that browser earlier.
+ *
+ * **The real host outranks `TENANT_DOMAIN`, and that ordering is the whole
+ * point of the file.** It used to be the other way round, on the reasoning that
+ * a dev tunnel's host names no tenant so explicit configuration should win.
+ * That reasoning holds only until somebody registers the tunnel host as a
+ * domain — and then the pin silently swallows it: the row is added, the site
+ * keeps serving whatever `TENANT_DOMAIN` says, and nothing anywhere reports a
+ * problem. One deployment serving many domains is the product; a deployment
+ * pinned to one tenant is the local-development convenience. The convenience
+ * cannot outrank the product.
+ *
+ * `TENANT_DOMAIN` still works where it is actually needed, because a bare
+ * `localhost` is in `NEUTRAL` below and never counts as a real host. So
+ * `npm run dev` on localhost:4600 still resolves the tenant it is pinned to,
+ * and the same deployment behind a tunnel or a real domain resolves by host.
  *
  * Middleware is the only place this can happen: a Server Component may read
  * cookies but may not set them, and the override has to stick.
@@ -42,7 +54,7 @@ export function middleware(request: NextRequest) {
 
   const realHost = [forwarded, host].find((value) => value && !NEUTRAL.has(value));
 
-  const domain = override || configured || realHost || remembered || host;
+  const domain = override || realHost || configured || remembered || host;
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-tenant-domain', domain);

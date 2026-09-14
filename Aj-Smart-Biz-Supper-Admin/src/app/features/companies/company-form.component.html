@@ -280,13 +280,20 @@
             </select>
           </div>
           <div class="field">
-            <label for="themeId">Theme</label>
+            <label for="themeId">Theme preset</label>
             <select id="themeId" class="select" formControlName="themeId">
               <option [ngValue]="null">Select…</option>
               @for (option of themes(); track option.id) {
                 <option [ngValue]="option.id">{{ option.name }}</option>
               }
             </select>
+            <!-- The preset is where the company starts, not where it ends up:
+                 it sets its own website colours under Company Details → Website
+                 theme, and those win over whatever is chosen here. -->
+            <p class="tiny muted" style="margin-top:4px">
+              The colours this company starts from. It can override them itself under
+              Company&nbsp;Details → Website&nbsp;theme.
+            </p>
           </div>
           <div class="field">
             <label for="website">Website</label>

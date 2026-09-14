@@ -30,6 +30,30 @@ npm run db:sync        # sync the schema only  (add --force to drop and recreate
 npm run db:seed        # re-run the idempotent seeders
 ```
 
+### Demo content
+
+Four seeders that nobody runs by accident, because what they write is content a
+business would be *claiming*. A product the platform invented is a shop
+advertising stock it does not carry, with a price on it — so these are scripts
+somebody runs on purpose, at a company they name, and none of them is part of
+boot.
+
+```
+npm run db:seed:catalogue        # a demo catalogue into company 1
+npm run db:seed:catalogue -- 3   # ...or into company 3
+npm run db:seed:blog             # demo articles
+npm run db:seed:salon            # Aj Salon — a whole tenant, end to end
+```
+
+`db:seed:salon` is the odd one out: rather than filling in content for a company
+that already exists, it writes **one complete tenant** — the business type, the
+theme, the plan, the company, its domain (`salon.localhost`), its treatment
+menu, its retail shelf, its people, its reviews and its articles. It is the
+company `websites/salon/black-theme` was built against, and it writes through
+the same models and the same `createCompany` service the super-admin console
+does. All four are idempotent, and all four write their images as `seed-*.svg`
+placeholders under `uploads/`.
+
 ### Zero-setup option (no MySQL)
 
 Set `DB_DIALECT=sqlite` and the API runs against a single file, which is handy for a
@@ -155,6 +179,12 @@ Reads are open to any authenticated user; writes are super admin only.
 Deletes are refused while rows are still referenced (a plan with an active
 subscription, a state used by a company, the default theme).
 
+**A theme row is a starting preset, not a company's theme.** It is shared — a
+dozen tenants can point at one row, which is why editing one here reaches every
+one of them. A company sets its own colours through
+`PUT /admin/company/theme`, and those are laid over the preset key by key at
+read time. See [Website theme](#website-theme).
+
 ### Companies — `/super-admin/companies`
 | Method | Route | Notes |
 | --- | --- | --- |
@@ -186,12 +216,51 @@ The root account cannot be deleted, deactivated or demoted, and nobody can delet
 | --- | --- | --- |
 | GET/PUT | `/admin/company` | `company-details` — writes are main-admin only, and `status`/`code`/plan fields are ignored |
 | GET | `/admin/company/subscriptions`, `/admin/company/transactions` | `company-details` |
+| GET/PUT/DELETE | `/admin/company/theme[?branchId=]` | `company-details` — the **own** website colours of one scope: the company, or one branch. Writes are main-admin only; `DELETE` drops that scope back to the level below |
 | * | `/admin/company/branches`, `/admin/company/branches/:branchId/contacts` | `branch-management` |
 | * | `/admin/company/sliders` | `slider-management` — each verb carries its own action right, so view-only roles cannot edit |
 | * | `/admin/roles` | `role-management` |
 | GET/PUT | `/roles/:roleId/permissions` | `menu-permission` — `PUT` replaces the whole matrix |
 | * | `/admin/menus` (+ `/menus/tree`) | `menu-permission` — platform menus are read only for tenants |
 | * | `/admin/admins` (+ `PATCH /admin/admins/:id/reset-password`) | `admin-management` |
+
+### Website theme
+
+Three sources, in descending authority, and they are not equal.
+
+| | Where | Who writes it | Shared? |
+| --- | --- | --- | --- |
+| **The branch's own** | `branches.theme_config` | The tenant, with `?branchId=` | No — one branch only |
+| **The company's own** | `companies.theme_config` | The tenant, under Company Details → Website theme | No — per company |
+| **Preset** | `themes` | Super admin, under Masters | **Yes** — a dozen companies can point at one row |
+
+Each level wins over the one below it **key by key**, so a branch that has only
+ever set an accent colour keeps the company's primary and secondary rather than
+losing them to two nulls. Where a key is set at no level, it comes back `null`
+and the website template uses the design it shipped with.
+
+The branch layer is only ever consulted when the **host resolved to a branch** —
+see `company_domain`, which may pin one. This is the same chain
+`/website/branding` already used for the logo and the favicon (pinned branch →
+company → head office), which is deliberate: a visitor on the Surat domain
+should not get Surat's logo above the company's colours.
+
+That per-key merge is also what makes *reset* a real operation: clearing a field
+puts it back on the level underneath, not on whatever the template happens to
+default to. `DELETE /admin/company/theme?branchId=5` puts that branch back on
+the company's colours; without the scope it puts the company back on its preset.
+
+Only four keys are accepted — `primaryColor`, `secondaryColor`, `accentColor`
+and `mode` — because those are the four a website template actually reads. The
+`themes` table carries text, background, sidebar and font columns as well;
+accepting those here would be storing settings that change nothing. Add one to
+`WEBSITE_THEME_KEYS` in [`services/theme.service.js`](src/services/theme.service.js)
+when a template starts reading it, and to `themeSave` in
+[`validators/company.validator.js`](src/validators/company.validator.js) with it.
+
+Both public endpoints — `/website/branding` and `/website/company-details` —
+return the merged result under `theme`, so a template needs no knowledge of any
+of this.
 
 ### Website — `/website`
 No token. A tenant's own website reads everything it renders from here, and the

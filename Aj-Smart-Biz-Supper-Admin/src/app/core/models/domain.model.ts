@@ -290,7 +290,22 @@ export interface Company extends AuditFields {
   description?: string | null;
   favicon?: string | null;
   businessTypeId?: number | null;
+  /** The shared preset this company starts from. Not the last word — see below. */
   themeId?: number | null;
+  /**
+   * The company's **own** website colours, which win over the preset key by key.
+   *
+   * Present and non-empty means this company has been recoloured by its own
+   * admin, so the preset named beside it is no longer what the website looks
+   * like. Anything reading `theme.primaryColor` to draw a swatch has to check
+   * here first or it will show a colour the site does not use.
+   */
+  themeConfig?: {
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+    accentColor?: string | null;
+    mode?: 'light' | 'dark' | null;
+  } | null;
   stateId?: number | null;
   email: string;
   phone: string;

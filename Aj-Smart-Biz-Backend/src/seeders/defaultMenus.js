@@ -92,18 +92,32 @@ const menus = [
    */
   { name: 'Branches', slug: 'branch-management', icon: 'map-pin', route: '/company/branches', sequence: 22, parent: 'company-details' },
   { name: 'Domains', slug: 'company-domains', icon: 'globe', route: '/company/domains', sequence: 23, parent: 'company-details' },
-  { name: 'Functionality', slug: 'company-functionality', icon: 'toggle-right', route: '/company/functionality', sequence: 24, parent: 'company-details' },
+  /**
+   * The colours the company's public website is painted with.
+   *
+   * Beside Domains and Functionality rather than among the content entries
+   * below, because it is the same kind of thing they are: a setting that
+   * governs the whole site, not a page somebody writes. Which domain it is
+   * served on, what it can do, and what it looks like.
+   *
+   * It edits `companies.theme_config` — the company's **own** colours — and
+   * never the shared `themes` catalogue the platform maintains. That
+   * distinction is the entire reason this screen exists; see
+   * `services/theme.service` in the API.
+   */
+  { name: 'Website theme', slug: 'company-theme', icon: 'palette', route: '/company/theme', sequence: 24, parent: 'company-details' },
+  { name: 'Functionality', slug: 'company-functionality', icon: 'toggle-right', route: '/company/functionality', sequence: 25, parent: 'company-details' },
   /**
    * Hero slides for the company's public website. Branch-aware like the rest of
    * the section, and grantable on its own — same rule as Branches.
    */
-  { name: 'Slider', slug: 'slider-management', icon: 'film', route: '/company/sliders', sequence: 25, parent: 'company-details' },
+  { name: 'Slider', slug: 'slider-management', icon: 'film', route: '/company/sliders', sequence: 26, parent: 'company-details' },
   /**
    * The services the business sells — its own screen because it is its own
    * page on the website, and because a price list is edited by different people
    * and on a different rhythm from the company's story.
    */
-  { name: 'Services', slug: 'company-services', icon: 'briefcase', route: '/company/services', sequence: 26, parent: 'company-details' },
+  { name: 'Services', slug: 'company-services', icon: 'briefcase', route: '/company/services', sequence: 27, parent: 'company-details' },
   /**
    * The catalogue, as two entries rather than one.
    *
@@ -125,9 +139,9 @@ const menus = [
    * carrying both would put a rarely-used tree editor in the way of the thing
    * somebody opens weekly.
    */
-  { name: 'Service categories', slug: 'company-service-categories', icon: 'folder-tree', route: '/company/service-categories', sequence: 27, parent: 'company-details' },
-  { name: 'Categories', slug: 'company-categories', icon: 'folder-tree', route: '/company/categories', sequence: 28, parent: 'company-details' },
-  { name: 'Products', slug: 'company-products', icon: 'package', route: '/company/products', sequence: 29, parent: 'company-details' },
+  { name: 'Service categories', slug: 'company-service-categories', icon: 'folder-tree', route: '/company/service-categories', sequence: 28, parent: 'company-details' },
+  { name: 'Categories', slug: 'company-categories', icon: 'folder-tree', route: '/company/categories', sequence: 29, parent: 'company-details' },
+  { name: 'Products', slug: 'company-products', icon: 'package', route: '/company/products', sequence: 30, parent: 'company-details' },
   /**
    * The counter, under the shop window.
    *
@@ -138,7 +152,7 @@ const menus = [
    * A shop that lists its range and takes orders on the phone has the first and
    * not the second, and must not find the second half-hidden inside it.
    */
-  { name: 'Cart & orders', slug: 'company-orders', icon: 'shopping-cart', route: '/company/orders', sequence: 30, parent: 'company-details' },
+  { name: 'Cart & orders', slug: 'company-orders', icon: 'shopping-cart', route: '/company/orders', sequence: 31, parent: 'company-details' },
   /**
    * The blog.
    *
@@ -153,26 +167,26 @@ const menus = [
    * we have been doing. Everything below it moved down one to make room, which
    * the seeder reconciles on existing installs.
    */
-  { name: 'Blog', slug: 'company-blog', icon: 'newspaper', route: '/company/blog', sequence: 31, parent: 'company-details' },
-  { name: 'About us', slug: 'company-about', icon: 'file-text', route: '/company/about', sequence: 32, parent: 'company-details' },
+  { name: 'Blog', slug: 'company-blog', icon: 'newspaper', route: '/company/blog', sequence: 32, parent: 'company-details' },
+  { name: 'About us', slug: 'company-about', icon: 'file-text', route: '/company/about', sequence: 33, parent: 'company-details' },
   /**
    * The band of figures, and the words above it. Its own entry rather than a
    * block on the About screen: it is its own functionality now, sold and
    * switched on separately, and a tenant whose plan carries one of the two but
    * not the other must not find it half-hidden inside the other's page.
    */
-  { name: 'Figures', slug: 'company-figures', icon: 'bar-chart-3', route: '/company/figures', sequence: 33, parent: 'company-details' },
-  { name: 'Team', slug: 'company-team', icon: 'users', route: '/company/team', sequence: 34, parent: 'company-details' },
-  { name: 'Gallery', slug: 'company-gallery', icon: 'image', route: '/company/gallery', sequence: 35, parent: 'company-details' },
-  { name: 'Contact page', slug: 'company-contact', icon: 'mail', route: '/company/contact', sequence: 36, parent: 'company-details' },
-  { name: 'Features / Benefits', slug: 'company-features', icon: 'sparkles', route: '/company/features', sequence: 37, parent: 'company-details' },
+  { name: 'Figures', slug: 'company-figures', icon: 'bar-chart-3', route: '/company/figures', sequence: 34, parent: 'company-details' },
+  { name: 'Team', slug: 'company-team', icon: 'users', route: '/company/team', sequence: 35, parent: 'company-details' },
+  { name: 'Gallery', slug: 'company-gallery', icon: 'image', route: '/company/gallery', sequence: 36, parent: 'company-details' },
+  { name: 'Contact page', slug: 'company-contact', icon: 'mail', route: '/company/contact', sequence: 37, parent: 'company-details' },
+  { name: 'Features / Benefits', slug: 'company-features', icon: 'sparkles', route: '/company/features', sequence: 38, parent: 'company-details' },
   /**
    * Customer reviews. Unlike the rest of the section this screen is a queue as
    * well as an editor — a review a stranger wrote sits here until someone
    * approves it — which is why it is worth its own entry rather than a tab.
    */
-  { name: 'Testimonials', slug: 'company-testimonials', icon: 'quote', route: '/company/testimonials', sequence: 38, parent: 'company-details' },
-  { name: 'Plan & billing', slug: 'company-subscription', icon: 'credit-card', route: '/company/subscription', sequence: 39, parent: 'company-details' },
+  { name: 'Testimonials', slug: 'company-testimonials', icon: 'quote', route: '/company/testimonials', sequence: 39, parent: 'company-details' },
+  { name: 'Plan & billing', slug: 'company-subscription', icon: 'credit-card', route: '/company/subscription', sequence: 40, parent: 'company-details' },
 ];
 
 /**
@@ -195,6 +209,7 @@ const MENU_INHERITS_PARENT = new Set([
   'company-orders',
   'company-blog',
   'company-domains',
+  'company-theme',
   'company-functionality',
   'company-about',
   'company-figures',

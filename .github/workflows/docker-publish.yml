@@ -1,5 +1,6 @@
 # ------------------------------------------------------------------ #
-# Build the API image and push it to Docker Hub.
+# Build the API image, push it to Docker Hub, then roll it out on the dev
+# server.
 #
 # Runs on every push to `dev_live`, and on demand from the Actions tab.
 #
@@ -12,8 +13,47 @@
 #                        An account password works and should not be used: a
 #                        token can be revoked on its own.
 #
-# The image name below is fixed rather than read from the username secret, so
-# the tag a deployment pulls does not change if the pushing account ever does.
+# ------------------------------ the image ------------------------------ #
+#
+# Everything is pushed to ONE Docker Hub repository, `ajtechhub/ajtechhub`, so
+# the tag is the only thing separating one service's images from another's.
+# That is the whole reason every tag below is prefixed with the service name:
+# in a repository of its own a bare `dev_live` tag is unambiguous, and in a
+# shared one it is a collision waiting for the second service to be added.
+#
+#   ajtechhub/ajtechhub:aj-smart-biz-backend-<run number>   this exact build
+#   ajtechhub/ajtechhub:aj-smart-biz-backend-dev_live       whatever is newest
+#
+# `<run number>` is `github.run_number` — the build number GitHub increments
+# per workflow, the same one shown against the run in the Actions tab. It does
+# NOT change when a run is re-run, so re-running a build overwrites that tag
+# with the image it should have produced the first time, which is the intended
+# behaviour rather than an accident.
+#
+# The repository name is fixed here rather than read from the username secret,
+# so the tag a deployment pulls does not change if the pushing account ever
+# does.
+#
+# ---------------------------- the deploy job ---------------------------- #
+#
+# The second job runs on the self-hosted runner and is what puts the new image
+# in front of users. What the server needs, once:
+#
+#   * Docker installed, and the runner's user in the `docker` group — the job
+#     never uses `sudo`, so `docker ps` has to work as that user.
+#   * `/opt/aj-smart-biz/backend.env` — the real production environment,
+#     database password and JWT secrets included. It lives on the server and
+#     not in this repository or in the image; the container is configured from
+#     it with `--env-file`.
+#   * Nothing else. The job does not check the repository out on the server —
+#     it only pulls an image and restarts a container.
+#
+# Optional repository variables (Settings → Secrets and variables → Actions →
+# Variables), each with the default shown:
+#
+#   BACKEND_ENV_FILE    /opt/aj-smart-biz/backend.env
+#   BACKEND_APP_PORT    4000   the port the API listens on inside the container
+#   BACKEND_HOST_PORT   4000   the port it is published on, on the server
 # ------------------------------------------------------------------ #
 
 name: Docker image
@@ -32,17 +72,20 @@ on:
   # or a re-run after fixing a secret.
   workflow_dispatch:
 
-# A second push while the first is still building makes the first one's image
-# pointless: both would push the same moving `dev_live` tag, and the older run
-# could land last. Newest wins, the older run is cancelled.
-concurrency:
-  group: docker-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   backend:
     name: aj-smart-biz-backend
     runs-on: ubuntu-latest
+
+    # A second push while the first is still building makes the first one's
+    # image pointless: both would push the same moving `dev_live` tag, and the
+    # older run could land last. Newest wins, the older build is cancelled.
+    #
+    # This sits on the job rather than on the workflow so that it can never
+    # cancel a *deploy* that is half-way through replacing the container.
+    concurrency:
+      group: docker-build-${{ github.ref }}
+      cancel-in-progress: true
 
     # The job reads the repository and writes to Docker Hub. It has no reason
     # to be able to write back to GitHub, so it is not given the chance.
@@ -50,7 +93,20 @@ jobs:
       contents: read
 
     env:
-      IMAGE: ajay123-aj/aj-smart-biz-backend
+      # One shared repository for every service on the platform; see the note at
+      # the top of this file for why the service name then has to live in the
+      # tag rather than in the repository.
+      IMAGE: ajtechhub/ajtechhub
+      SERVICE: aj-smart-biz-backend
+
+    outputs:
+      # The digest, not a tag. The moving tag moves, and a deploy that pulled it
+      # could start a different image than the one this run built if another
+      # push landed in between; a digest is the exact bytes.
+      digest: ${{ steps.build.outputs.digest }}
+      # The readable name of what was built, so the deploy summary can say which
+      # build is live without anybody having to match a digest by eye.
+      build_tag: ${{ steps.build_tag.outputs.value }}
 
     steps:
       - name: Check out the repository
@@ -70,12 +126,22 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # The name of this build, worked out once and reused by the tag list, the
+      # image label and the job summary — three places that must agree, and
+      # would drift the moment the expression was written out three times.
+      - name: Work out the build tag
+        id: build_tag
+        run: echo "value=$SERVICE-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
       # Two tags on purpose:
       #
-      #   dev_live      the moving tag a dev environment pulls
-      #   dev_live-sha  the exact commit, so a bad deploy can be rolled back to
-      #                 the one before it rather than to "whatever dev_live was
-      #                 yesterday"
+      #   <service>-<run number>  this exact build, so a bad deploy can be
+      #                           rolled back to a numbered one before it rather
+      #                           than to "whatever was newest yesterday"
+      #   <service>-dev_live      the moving tag a dev environment pulls
+      #
+      # Both carry the service name because the repository is shared — see the
+      # note at the top of this file.
       #
       # No `latest`. This branch is not the release branch, and a `latest` tag
       # pointing at dev builds is how a staging image ends up in production.
@@ -85,13 +151,15 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
           tags: |
-            type=ref,event=branch
-            type=sha,prefix=dev_live-,format=short
+            type=raw,value=${{ steps.build_tag.outputs.value }}
+            type=raw,value=${{ env.SERVICE }}-dev_live
           labels: |
             org.opencontainers.image.title=Aj Smart Biz API
             org.opencontainers.image.description=Multi-tenant SaaS backend (Express + Sequelize)
+            org.opencontainers.image.version=${{ steps.build_tag.outputs.value }}
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v6
         with:
           # The backend directory, not the repository root: the Dockerfile and
@@ -113,4 +181,165 @@ jobs:
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           echo "${{ steps.meta.outputs.tags }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ env.IMAGE }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: deploy to the dev server
+    # Only if the image actually reached Docker Hub. `needs` already implies
+    # it, and it is what makes this a deploy pipeline rather than two jobs that
+    # happen to be in the same file.
+    needs: backend
+    # The labels of the self-hosted runner (ajay-mithapara-HP-ProBook-450-G1).
+    # `runs-on` matches labels, never the runner's name — if a second Linux
+    # runner is ever registered, give this one a unique label under Settings →
+    # Actions → Runners and add that label to this list.
+    runs-on: [self-hosted, Linux, X64]
+
+    # Deploys queue, they do not cancel each other: a cancelled deploy is a
+    # server with the old container removed and the new one not yet started.
+    concurrency:
+      group: docker-deploy-${{ github.ref }}
+      cancel-in-progress: false
+
+    permissions:
+      contents: read
+
+    env:
+      IMAGE: ajtechhub/ajtechhub
+      DIGEST: ${{ needs.backend.outputs.digest }}
+      # What the build job called this image, for the logs and the summary. The
+      # pull below still goes by digest — this is the human-readable half.
+      BUILD_TAG: ${{ needs.backend.outputs.build_tag }}
+      CONTAINER: aj-smart-biz-backend
+      ENV_FILE: ${{ vars.BACKEND_ENV_FILE || '/opt/aj-smart-biz/backend.env' }}
+      APP_PORT: ${{ vars.BACKEND_APP_PORT || '4000' }}
+      HOST_PORT: ${{ vars.BACKEND_HOST_PORT || '4000' }}
+      UPLOADS_VOLUME: aj-smart-biz-uploads
+
+    steps:
+      # Fails in a second, with a sentence that says what to do, rather than
+      # leaving a container crash-looping on a missing database password.
+      - name: Check the server is set up
+        run: |
+          if ! docker info >/dev/null 2>&1; then
+            echo "::error::Docker is not reachable as $(whoami). Run: sudo usermod -aG docker $(whoami), then restart the runner service."
+            exit 1
+          fi
+          if [ ! -r "$ENV_FILE" ]; then
+            echo "::error::$ENV_FILE is missing or unreadable. Copy Aj-Smart-Biz-Backend/.env.production there, fill in the real values, and chmod 600 it."
+            exit 1
+          fi
+
+      # The image is pulled, not built, on the server, so the runner needs read
+      # access to the repository on Docker Hub — which a private repository
+      # would not grant it anonymously.
+      - name: Sign in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # By digest, deliberately, even though the run has a tag of its own: two
+      # pushes can race, and only the digest names the bytes this run produced.
+      # The tag is echoed so the log says which build that digest is.
+      - name: Pull the image this run built
+        run: |
+          echo "Pulling $IMAGE:$BUILD_TAG ($DIGEST)"
+          docker pull "$IMAGE@$DIGEST"
+
+      # Uploads are a volume, not a path in the image: company logos and
+      # favicons have to outlive the container that is about to be thrown away.
+      # A no-op once it exists.
+      - name: Make sure the uploads volume exists
+        run: docker volume create "$UPLOADS_VOLUME" >/dev/null
+
+      - name: Replace the running container
+        id: rollout
+        run: |
+          set -euo pipefail
+
+          # What is serving traffic right now, so a failed roll-out has
+          # something to go back to. Empty on the very first deploy.
+          PREVIOUS=$(docker inspect -f '{{.Image}}' "$CONTAINER" 2>/dev/null || true)
+          echo "Currently running: ${PREVIOUS:-nothing}"
+
+          # `-e PORT` deliberately overrides whatever the env file says: the
+          # published port and the port the app listens on are one setting
+          # here, and they cannot drift apart into a container that is up and
+          # unreachable.
+          start() {
+            docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+            docker run -d \
+              --name "$CONTAINER" \
+              --restart unless-stopped \
+              --env-file "$ENV_FILE" \
+              -e PORT="$APP_PORT" \
+              -p "$HOST_PORT:$APP_PORT" \
+              -v "$UPLOADS_VOLUME:/app/uploads" \
+              "$1" >/dev/null
+          }
+
+          # Waits on the HEALTHCHECK baked into the image — `GET /`, the API's
+          # own liveness route — rather than on `docker run` returning, which
+          # only means a process was spawned. Bounded at three minutes, against
+          # a 40s start period, because the first boot syncs the schema.
+          wait_healthy() {
+            for _ in $(seq 1 60); do
+              state=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$CONTAINER" 2>/dev/null || echo gone)
+              case "$state" in
+                healthy|running) return 0 ;;
+                unhealthy|exited|dead|gone) return 1 ;;
+              esac
+              sleep 3
+            done
+            return 1
+          }
+
+          start "$IMAGE@$DIGEST"
+
+          if wait_healthy; then
+            echo "New container is healthy."
+            exit 0
+          fi
+
+          echo "::error::The new container never became healthy. Its last 100 log lines:"
+          docker logs --tail 100 "$CONTAINER" 2>&1 || true
+
+          if [ -n "$PREVIOUS" ]; then
+            echo "::warning::Rolling back to $PREVIOUS"
+            start "$PREVIOUS"
+            if wait_healthy; then
+              echo "Rolled back — the previous image is serving again."
+            else
+              echo "::error::The rollback did not come up either. The server needs a look."
+            fi
+          fi
+          exit 1
+
+      # Only the layers nothing points at any more. Not `-a`, which would take
+      # the image we might still need to roll back to — on a machine where the
+      # whole point of keeping it is that it is one `docker run` away.
+      - name: Tidy up old layers
+        if: always()
+        run: docker image prune -f >/dev/null || true
+
+      # The runner is a laptop that other jobs share. The credential does not
+      # stay in its docker config after the job that needed it.
+      - name: Sign out of Docker Hub
+        if: always()
+        run: docker logout >/dev/null 2>&1 || true
+
+      - name: Say what is running
+        if: always()
+        run: |
+          {
+            echo "### Deploy — ${{ steps.rollout.outcome == 'success' && 'live' || 'FAILED' }}"
+            echo ''
+            echo '```'
+            echo "build     $IMAGE:$BUILD_TAG"
+            echo "image     $IMAGE@$DIGEST"
+            echo "container $CONTAINER"
+            echo "port      $HOST_PORT -> $APP_PORT"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

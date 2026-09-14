@@ -8,6 +8,7 @@ const { success, created, paginated } = require('../utils/response');
 const { getPagination, buildSearch, getSort, mergeWhere } = require('../utils/query');
 const companyService = require('../services/company.service');
 const subscriptionService = require('../services/subscription.service');
+const themeService = require('../services/theme.service');
 const { activateSubscription } = subscriptionService;
 const { generateInvoiceNo } = require('../services/code.service');
 const { removeUploadedFile } = require('../middlewares/upload');
@@ -370,6 +371,145 @@ const updateMyCompany = asyncHandler(async (req, res) => {
   return success(res, { message: 'Company updated successfully', data: fresh });
 });
 
+/* ------------------------------------------------------------------ *
+ * The tenant's own website theme
+ * ------------------------------------------------------------------ */
+
+/**
+ * `?branchId=` names the scope being edited: absent, `none` or `null` is the
+ * company-wide theme, an id is that branch's own.
+ *
+ * Deliberately explicit, and the same rule the About and Contact editors
+ * follow — an admin editing "Surat" must not silently repaint the company.
+ * The branch is loaded rather than merely validated because every caller below
+ * needs the row itself.
+ */
+const themeScopeOf = async (req, companyId) => {
+  const raw = req.query.branchId ?? req.body?.branchId;
+  if (raw === undefined || raw === null || raw === '' || raw === 'none' || raw === 'null') return null;
+
+  const branchId = Number(raw);
+  if (!Number.isInteger(branchId) || branchId <= 0) throw ApiError.badRequest('A valid branchId is required');
+
+  const branch = await db.Branch.findOne({ where: { id: branchId, companyId } });
+  if (!branch) throw ApiError.badRequest('That branch does not belong to this company');
+  return branch;
+};
+
+/**
+ * Everything the three handlers below need, loaded once.
+ *
+ * The preset is fetched with `status: ACTIVE`: the platform retiring a theme
+ * row should stop it being handed out, and a company sitting on a retired
+ * preset falls back to its own colours — or, with none, to the template's.
+ *
+ * The branch list rides along so the console can render its scope selector
+ * without a second request, which is what the About editor does and for the
+ * same reason.
+ */
+const loadThemeContext = async (req) => {
+  const companyId = req.auth.companyId;
+
+  const company = await db.Company.findByPk(companyId, {
+    attributes: ['id', 'themeId', 'themeConfig'],
+  });
+  if (!company) throw ApiError.notFound('Company not found');
+
+  const [branch, preset, branches] = await Promise.all([
+    themeScopeOf(req, companyId),
+    company.themeId
+      ? db.Theme.findOne({
+        where: { id: company.themeId, status: STATUS.ACTIVE },
+        attributes: ['id', 'name', 'primaryColor', 'secondaryColor', 'accentColor', 'mode'],
+      })
+      : null,
+    db.Branch.findAll({
+      where: { companyId, status: STATUS.ACTIVE },
+      attributes: ['id', 'name', 'code'],
+      order: [['isMain', 'DESC'], ['name', 'ASC']],
+    }),
+  ]);
+
+  return { company, branch, preset, branches };
+};
+
+/** The one response shape all three handlers return. */
+const themePayload = ({ company, branch, preset, branches }) => ({
+  ...themeService.describeTheme({ branch, company, preset }),
+  branches,
+});
+
+/**
+ * GET /my-company/theme[?branchId=]
+ *
+ * Four things, and the console needs all of them: what the website is painted
+ * with for this scope, which of those values the scope set for itself, what it
+ * would fall back to if those were cleared, and the shared preset at the bottom
+ * of the chain.
+ *
+ * A field showing an inherited colour is *inheriting*, not empty, and a screen
+ * that cannot tell the two apart leaves an admin unable to answer "why did my
+ * colour change when I never touched it".
+ */
+const getMyTheme = asyncHandler(async (req, res) => {
+  const context = await loadThemeContext(req);
+  return success(res, { message: 'Website theme fetched successfully', data: themePayload(context) });
+});
+
+/**
+ * PUT /my-company/theme[?branchId=]
+ *
+ * Writes one scope, and only that scope — the shared `themes` row is never
+ * touched here, which is the entire point of the columns behind this.
+ *
+ * A **replace**, not a merge, so the console can clear a single field by
+ * sending it blank; `cleanThemeConfig` strips blanks, and a body with nothing
+ * usable in it stores `null` and puts the scope back on the level below. That
+ * makes "reset" the same operation as "clear every field", which is what an
+ * admin expects from a form.
+ */
+const saveMyTheme = asyncHandler(async (req, res) => {
+  const context = await loadThemeContext(req);
+  const { company, branch } = context;
+
+  const themeConfig = themeService.cleanThemeConfig(req.body);
+  const target = branch ?? company;
+  await target.update({ themeConfig, updatedBy: req.auth?.id ?? null });
+
+  const scope = branch ? branch.name : 'Website';
+  return success(res, {
+    message: themeConfig
+      ? `${scope} theme saved`
+      : `${scope} theme reset to ${branch ? 'the company colours' : 'the preset'}`,
+    data: themePayload(context),
+  });
+});
+
+/**
+ * DELETE /my-company/theme[?branchId=]
+ *
+ * Drops one scope's own colours so it goes back to inheriting: a branch falls
+ * back to the company's, and the company falls back to the preset.
+ *
+ * Its own verb rather than a flag on the save, for the reason the About editor
+ * has one: "put this back how it was" is a different intention from "save these
+ * values", and a console that expresses it as an empty PUT is one refactor away
+ * from wiping a theme it meant to leave alone.
+ */
+const resetMyTheme = asyncHandler(async (req, res) => {
+  const context = await loadThemeContext(req);
+  const { company, branch } = context;
+
+  const target = branch ?? company;
+  await target.update({ themeConfig: null, updatedBy: req.auth?.id ?? null });
+
+  return success(res, {
+    message: branch
+      ? `${branch.name} is following the company colours again`
+      : 'Website theme reset to the preset',
+    data: themePayload(context),
+  });
+});
 module.exports = {
   list,
   getById,
@@ -385,4 +525,7 @@ module.exports = {
   createTransaction,
   getMyCompany,
   updateMyCompany,
+  getMyTheme,
+  saveMyTheme,
+  resetMyTheme,
 };

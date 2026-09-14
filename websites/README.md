@@ -47,6 +47,18 @@ build time who it belongs to:
 5. An unknown or inactive tenant gets platform defaults back rather than an
    error, so the site always renders.
 
+The full order `middleware.ts` applies is `?domain=` → `X-Forwarded-Host` →
+`Host` → `TENANT_DOMAIN` → the cookie a previous `?domain=` left behind.
+
+**`TENANT_DOMAIN` is a fallback, not a pin.** It used to outrank the real host,
+on the reasoning that a dev tunnel's host names no tenant — which holds right up
+until somebody registers that tunnel host as a domain. Then the row is added,
+the site quietly keeps serving whatever `TENANT_DOMAIN` says, and nothing
+reports a problem. One deployment serving many domains is the product; pinning a
+deployment to one tenant is the local-development convenience, and the
+convenience cannot outrank the product. A bare `localhost` is treated as naming
+no tenant, so `npm run dev` still resolves the tenant it is configured for.
+
 One domain, one company, no per-tenant build.
 
 **The API lives in the backend.** `/website/company-details` is defined in
