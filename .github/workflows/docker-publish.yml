@@ -323,6 +323,13 @@ jobs:
           if [ -n "$DB_NETWORK" ]; then net_args=(--network "$DB_NETWORK"); fi
 
           echo "Testing $DB_HOST:$DB_PORT from inside a container..."
+
+          # `|| true` is load-bearing. GitHub runs every `run:` block with
+          # `bash -e` whatever this script sets, and this command is *meant* to
+          # fail when the database is unreachable — that failure is the entire
+          # measurement. Without it errexit kills the step here, and the run
+          # ends having printed the line above and nothing else, which is
+          # exactly as useless as the crash-loop this step replaced.
           result=$(docker run --rm \
             "${net_args[@]}" \
             --add-host=host.docker.internal:host-gateway \
@@ -330,10 +337,17 @@ jobs:
             --entrypoint node \
             "$IMAGE@$DIGEST" \
             -e 'const n=require("net"),s=n.connect({host:process.env.H,port:+process.env.P});s.setTimeout(5000);s.on("connect",()=>{console.log("OK");s.end();process.exit(0)});s.on("timeout",()=>{console.log("TIMEOUT");process.exit(1)});s.on("error",e=>{console.log(e.code||"ERROR");process.exit(1)})' \
-            2>&1 | tail -1)
+            2>&1 | tail -1) || true
 
-          echo "Result: $result"
-          [ "$result" = "OK" ] && exit 0
+          echo "Result: ${result:-<no output>}"
+
+          # An `if`, not `[ ... ] && exit 0`, for the same reason: a false test
+          # is a non-zero command, and under errexit that would end the step
+          # before the diagnosis below could be written.
+          if [ "$result" = "OK" ]; then
+            echo "The API can reach MySQL."
+            exit 0
+          fi
 
           echo "::error::The API container cannot reach MySQL at $DB_HOST:$DB_PORT ($result)."
           {
