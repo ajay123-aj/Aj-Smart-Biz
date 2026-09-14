@@ -1,0 +1,248 @@
+/* ------------------------------------------------------------------ *
+ * Features / Benefits.
+ *
+ * A sticky heading column beside a two-up grid of cards, rather than the
+ * heading-over-grid every other section uses. Six cards under a full-width
+ * heading is a long unbroken run of tiles; beside one, the heading stays with
+ * them the whole way down and the row reads as one block.
+ *
+ * The card itself is the template's one card — frosted panel, ghosted numeral,
+ * accent hairline filling on hover — the same object `StatsGrid` renders, so
+ * the two sections belong to the same page.
+ * ------------------------------------------------------------------ */
+
+/*
+ * `section--muted` supplies the ground, its light source and the hairline grid.
+ * All this adds is the rhythm: slightly tighter than a default section, because
+ * the figures band sits directly above it.
+ */
+.section {
+  padding-block: 92px;
+}
+
+.layout {
+  display: grid;
+  /* The heading is the short column and the cards the long one — 2fr/3fr keeps
+     the measure of the lede comfortable without starving the grid. */
+  grid-template-columns: 2fr 3fr;
+  gap: 64px;
+}
+
+/*
+ * The grid item, left to stretch to the row — which the cards set. Deliberately
+ * not `align-items: start`: `sticky` travels inside its containing block, a
+ * grid item's block is the item itself, and an item sized to its own content
+ * has no travel at all. So the item takes the full height and `.head` sticks
+ * inside it.
+ */
+.headCol {
+  min-height: 100%;
+}
+
+.head {
+  position: sticky;
+  /* Clear of the sticky header, plus a little air. */
+  top: calc(var(--header-height) + 32px);
+}
+
+.title {
+  font-size: clamp(1.85rem, 3.2vw, 2.6rem);
+}
+
+.lede {
+  margin-top: 18px;
+  max-width: 34ch;
+  color: var(--text-muted);
+  font-size: 1.06rem;
+}
+
+.cta {
+  margin-top: 28px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 30px 28px 32px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease,
+    background-color 0.22s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: var(--shadow-hover);
+}
+
+/* The hairline that fills across the top on hover — the card acknowledging you. */
+.card::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  width: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.card:hover::after {
+  transform: scaleX(1);
+}
+
+.index {
+  position: absolute;
+  top: 6px;
+  right: 14px;
+  font-size: 3.4rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  color: color-mix(in srgb, var(--accent) 13%, transparent);
+  pointer-events: none;
+}
+
+/*
+ * The glyph on a soft brand tile. Accent-coloured at rest so the row of icons
+ * carries the tenant's colour without any one card shouting; it inverts to the
+ * solid brand on hover, which is what makes the card feel like a control
+ * rather than a paragraph in a box.
+ */
+.icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 14px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  transition: background-color 0.22s ease, color 0.22s ease, transform 0.22s ease;
+}
+
+.icon svg {
+  width: 23px;
+  height: 23px;
+}
+
+.card:hover .icon {
+  color: var(--brand-contrast);
+  background: var(--brand);
+  transform: translateY(-1px);
+}
+
+.cardTitle {
+  font-size: 1.06rem;
+  letter-spacing: -0.015em;
+  /* The numeral sits top-right; without this a long title runs under it. */
+  padding-right: 34px;
+}
+
+.cardBody {
+  color: var(--text-muted);
+  font-size: 0.94rem;
+  line-height: 1.62;
+}
+
+/* ------------------------------ responsive ------------------------------ */
+
+/*
+ * Laptop. The two columns are still right, only closer — 64px of gutter at this
+ * width comes out of the cards, which is where it is needed.
+ */
+@media (max-width: 1180px) {
+  .layout {
+    gap: 44px;
+  }
+
+  .card {
+    padding: 26px 22px 28px;
+  }
+}
+
+/*
+ * Tablet. Side-by-side stops working before the grid does: the heading column
+ * narrows to a stack of two-word lines while the cards are still legible. So
+ * the heading goes back on top — and un-sticks, since there is nothing beside
+ * it to stay with.
+ */
+@media (max-width: 940px) {
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .headCol {
+    min-height: 0;
+  }
+
+  .head {
+    position: static;
+    max-width: 46rem;
+  }
+
+  .lede {
+    max-width: 60ch;
+  }
+}
+
+/*
+ * Phone. One card per row. Two would be a 150px column of prose, which is a
+ * word or two a line — the icons and headings survive that width, the bodies
+ * do not.
+ */
+@media (max-width: 620px) {
+  .section {
+    padding-block: 62px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .card {
+    padding: 22px 20px 24px;
+    border-radius: var(--radius-sm);
+  }
+
+  .icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  .icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .index {
+    font-size: 2.6rem;
+    top: 4px;
+    right: 12px;
+  }
+
+  .cta {
+    width: 100%;
+  }
+}

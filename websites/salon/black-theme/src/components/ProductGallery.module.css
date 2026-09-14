@@ -1,0 +1,121 @@
+/*
+ * A product's photographs.
+ *
+ * One large image with a strip of thumbnails under it — and, crucially, **no
+ * JavaScript**. The whole gallery is CSS: each thumbnail is an anchor to the
+ * matching image, and the images sit in a scroll-snapping track, so tapping a
+ * thumbnail scrolls its image into view. On a phone the track is already a swipe
+ * gallery for the same reason.
+ *
+ * That matters more here than anywhere else in the template: a product page is
+ * the page most likely to be opened from a search result on a slow connection,
+ * and a gallery that needs a hydrated bundle to show the second photograph shows
+ * nothing until it arrives.
+ */
+
+.gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* ---------------------------------- stage --------------------------------- */
+
+.track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  border-radius: var(--arch-soft);
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+  scrollbar-width: none;
+}
+
+.track::-webkit-scrollbar {
+  display: none;
+}
+
+.slide {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  aspect-ratio: 4 / 3;
+}
+
+.slide img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* A product with no photograph at all. Same footprint as a real one, so the
+   page's two columns do not collapse into a ragged shape. */
+.noPhoto {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--arch-soft);
+  border: 1px solid var(--border);
+  background: linear-gradient(140deg, var(--surface-sunken), var(--brand-soft));
+  color: var(--text-faint);
+  font-size: 0.85rem;
+}
+
+/* -------------------------------- thumbnails ------------------------------ */
+
+.thumbs {
+  display: flex;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.thumbs::-webkit-scrollbar {
+  display: none;
+}
+
+.thumb {
+  display: block;
+  flex: 0 0 72px;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background: var(--surface-sunken);
+  transition: border-color 0.15s ease, opacity 0.15s ease;
+  opacity: 0.72;
+}
+
+.thumb:hover,
+.thumb:focus-visible {
+  border-color: var(--border-strong);
+  opacity: 1;
+}
+
+.thumb:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/*
+ * The thumbnail whose image is currently in the stage.
+ *
+ * `:target-within` would be ideal and is not supported anywhere yet, so this is
+ * the honest version: the anchors change the URL fragment, and the *slide*
+ * highlights rather than the thumbnail. It costs nothing and degrades to a
+ * gallery that still works.
+ */
+.slide:target {
+  outline: none;
+}

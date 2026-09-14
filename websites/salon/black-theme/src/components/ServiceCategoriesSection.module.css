@@ -1,0 +1,235 @@
+/* ------------------------------------------------------------------ *
+ * The kinds of work a business takes on.
+ *
+ * Wider, shorter cards than the services grid, because these carry a name and a
+ * count rather than a price and a tick list. Four across on a desktop: a
+ * taxonomy is meant to be taken in at a glance, and a grid deep enough to
+ * scroll has stopped being one.
+ *
+ * The subheadings sit inside the card as a row of small links rather than as
+ * cards of their own — fifteen identical tiles is a worse answer to "what kind
+ * of thing do you do" than four tiles with the detail underneath.
+ * ------------------------------------------------------------------ */
+
+.section {
+  padding-block: 88px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  align-items: start;
+}
+
+@media (max-width: 1020px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * The tile.
+ *
+ * A column rather than a row: at four across, an icon beside two lines of text
+ * left the name on a 14-character measure and broke every second heading in
+ * half. Stacked, the glyph gets room to be a mark and the name gets the width
+ * of the card.
+ *
+ * It keeps the template's frosted panel and its accent hairline on hover, so the
+ * categories band, the service cards and the benefit cards read as one family.
+ */
+.link {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 22px 22px 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px);
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.22s ease,
+    box-shadow 0.22s ease, background-color 0.22s ease;
+}
+
+.link:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: var(--shadow-hover);
+}
+
+.link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  width: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.link:hover::after {
+  transform: scaleX(1);
+}
+
+/* --------------------------------- the head -------------------------------- */
+
+/*
+ * The glyph alone.
+ *
+ * A ghosted count sat here at first, and it said the same thing as the line at
+ * the foot of the tile — twice on one card, in two sizes. The number that means
+ * something is the one with its unit beside it; see `.go`.
+ */
+.head {
+  display: flex;
+  margin-bottom: 16px;
+}
+
+.photo {
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  border-radius: 14px;
+  background: var(--surface-sunken);
+  display: block;
+}
+
+/*
+ * The glyph in a tinted tile, at the accent.
+ *
+ * Sized to match the photograph exactly, so a band mixing categories that have
+ * a picture with ones that do not still has its headings on one line.
+ */
+.glyph {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  transition: background-color 0.22s ease, transform 0.22s ease;
+}
+
+.glyph svg {
+  width: 26px;
+  height: 26px;
+}
+
+.link:hover .glyph {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  transform: translateY(-1px);
+}
+
+/* --------------------------------- the body -------------------------------- */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-size: 1.06rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+}
+
+.text {
+  margin-top: 7px;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/*
+ * The line at the foot of the tile: what is in here, and an arrow that moves.
+ *
+ * Pushed down by `margin-top: auto` so a row of tiles with descriptions of
+ * different lengths still has its arrows on one line.
+ */
+.go {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 14px;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--brand);
+  font-variant-numeric: tabular-nums;
+}
+
+.arrow {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.link:hover .arrow {
+  transform: translateX(4px);
+}
+
+/* ------------------------------ subheadings ------------------------------- */
+
+.children {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.55rem 0 0;
+  padding: 0 0.4rem;
+  list-style: none;
+}
+
+.child {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: border-color 0.16s ease, color 0.16s ease;
+}
+
+.child:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.childCount {
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}

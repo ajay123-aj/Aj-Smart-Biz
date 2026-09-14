@@ -1,0 +1,289 @@
+/* ------------------------------------------------------------------ *
+ * One article.
+ *
+ * The only page on the site laid out for **reading** rather than for scanning,
+ * and that is the whole of its design: one column, a measure of about 68
+ * characters, and type a step larger than anywhere else. Everything the rest of
+ * the site does to keep a visitor moving — cards, grids, bands — would work
+ * against somebody who has decided to read four hundred words.
+ *
+ * The masthead is the same language as the archive and the other pages, so an
+ * article still belongs to the site it is on.
+ * ------------------------------------------------------------------ */
+
+.masthead {
+  position: relative;
+  overflow: hidden;
+  padding-block: 56px 46px;
+  /* Blooms only, no flat fill — see `CatalogueMasthead` for why every masthead
+     in the template stopped painting over the page wash. */
+  background:
+    radial-gradient(52rem 28rem at 88% -20%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
+    radial-gradient(38rem 24rem at 4% 120%, color-mix(in srgb, var(--brand) 7%, transparent), transparent 70%);
+}
+
+.masthead::after {
+  content: '';
+  position: absolute;
+  top: -34rem;
+  right: -18rem;
+  width: 60rem;
+  height: 60rem;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  pointer-events: none;
+}
+
+/* ------------------------------ breadcrumb ------------------------------ */
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 26px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  /* An article title can be long; the trail wraps rather than pushing the page
+     sideways on a phone. */
+  flex-wrap: wrap;
+}
+
+.crumb {
+  color: var(--text-muted);
+  border-bottom: 1px solid transparent;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.crumb:hover {
+  color: var(--brand);
+  border-bottom-color: currentColor;
+}
+
+.crumbSep {
+  color: var(--text-faint);
+}
+
+/* -------------------------------- heading -------------------------------- */
+
+.title {
+  font-size: clamp(2rem, 4.6vw, 3.1rem);
+  max-width: 22ch;
+  line-height: 1.12;
+}
+
+.lead {
+  margin-top: 18px;
+  max-width: 62ch;
+  font-size: 1.18rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/*
+ * The date, the byline and the estimate, on one line.
+ *
+ * A reader deciding whether to start asks all three at once — is this recent,
+ * who says so, and have I got ten minutes — so they are answered together
+ * rather than scattered around the page.
+ */
+.meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 24px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+}
+
+.dot {
+  opacity: 0.5;
+}
+
+/* --------------------------------- cover --------------------------------- */
+
+.coverWrap {
+  margin-top: -18px;
+  padding-top: 34px;
+}
+
+.cover {
+  display: block;
+  width: 100%;
+  max-height: 30rem;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+}
+
+/* --------------------------------- body ---------------------------------- */
+
+/*
+ * The measure is the design.
+ *
+ * About 68 characters a line is where continuous prose stops being tiring; the
+ * container on this site is wide enough for three cards, which is far too wide
+ * for a sentence. So the column is narrowed here rather than the page being
+ * made narrow — the masthead and the cover still use the full width.
+ */
+.body {
+  max-width: 68ch;
+  margin: 0 auto;
+  padding-block: 48px 8px;
+  font-size: 1.08rem;
+  line-height: 1.78;
+  color: var(--text);
+}
+
+.body p {
+  margin: 0 0 1.35em;
+}
+
+/* The opening paragraph, set a shade larger — the drop into the article. */
+.body p:first-child {
+  font-size: 1.16rem;
+  color: var(--text);
+}
+
+.body p:last-child {
+  margin-bottom: 0;
+}
+
+/* ---------------------------------- tags --------------------------------- */
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  max-width: 68ch;
+  margin: 32px auto 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag {
+  display: inline-block;
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: border-color 0.18s ease, color 0.18s ease;
+}
+
+.tag:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* ------------------------------ what is next ----------------------------- */
+
+.around {
+  margin-top: 56px;
+  padding-block: 30px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.aroundRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+/*
+ * A link that names the article it leads to, not just its direction. "Next post"
+ * on its own asks a reader to click to find out what it is; the title is the
+ * thing that makes them want to.
+ */
+.jump {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  max-width: 24ch;
+  text-decoration: none;
+  color: inherit;
+}
+
+.jumpNext {
+  text-align: right;
+  align-items: flex-end;
+}
+
+.jumpLabel {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.jumpTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.4;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.16s ease, color 0.16s ease;
+}
+
+.jump:hover .jumpTitle {
+  color: var(--brand);
+  border-bottom-color: currentColor;
+}
+
+.allPosts {
+  flex: none;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--text-muted);
+  border-bottom: 1px solid transparent;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.allPosts:hover {
+  color: var(--brand);
+  border-bottom-color: currentColor;
+}
+
+@media (max-width: 720px) {
+  .masthead {
+    padding-block: 40px 34px;
+  }
+
+  .crumbs {
+    margin-bottom: 18px;
+  }
+
+  .lead {
+    font-size: 1.06rem;
+  }
+
+  .body {
+    padding-block: 34px 4px;
+    font-size: 1.02rem;
+  }
+
+  /* The three-way row becomes a stack: two long titles side by side on a phone
+     are two columns of two words each. */
+  .aroundRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .jumpNext {
+    text-align: left;
+    align-items: flex-start;
+  }
+
+  .jump {
+    max-width: none;
+  }
+}

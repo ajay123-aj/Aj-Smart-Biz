@@ -1,0 +1,85 @@
+/*
+ * The catalogue band — the products on the home page, the whole list on
+ * `/products`, and the offers wherever they appear.
+ *
+ * One grid, one heading block, one *View all* link. What changes between the
+ * three is the copy and the rows, which is the point: a section that reworded
+ * itself per page is what `CtaBand` was written to undo.
+ */
+
+/*
+ * The band has no ground of its own, and declares none.
+ *
+ * It used to paint itself opaque white, which on a theme whose page is a fixed
+ * gradient wash is a flat rectangle punched out of it — and the cards inside are
+ * glass, so they were frosting a sheet of plain white rather than the page.
+ *
+ * Note that the fix is to *remove* the declaration rather than to set
+ * `transparent`. `.offers` below resolves to the global `.section--muted`, and
+ * that lands on the same element as this class: two single-class selectors, same
+ * specificity, decided by stylesheet order — and the module is emitted after
+ * globals.css, so a `background: transparent` here would quietly win and the
+ * offers panel would come out with no fill at all.
+ */
+.section {
+  /*
+   * The one declaration left, and it is here so the rule is not empty: an empty
+   * rule is a candidate for removal by the minifier, and removing it would take
+   * `styles.section` out of the module's exports with it. `relative` is also
+   * what `.section--muted` sets, so the two agree on the element they share.
+   */
+  position: relative;
+}
+
+/*
+ * The offers band, set apart. Offers are a different argument from the
+ * catalogue — "why buy today" rather than "here is what we sell" — so it needs
+ * to look different where the two sit on the same page.
+ *
+ * It does that by lifting onto a panel rather than by changing colour, and it
+ * borrows the one the template already has instead of building a second: the
+ * glass, the inset, the radius and both breakpoints all come from
+ * `.section--muted` in globals.css. `composes` is what keeps that a reference
+ * rather than a copy — a change to the panel reaches this band, and there is no
+ * second definition to drift.
+ */
+.offers {
+  composes: section--muted from global;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 560px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem;
+  }
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  margin-top: 2.4rem;
+}
+
+/*
+ * The count under the *View all* link.
+ *
+ * The link says where it goes and this says how much is there — "See the whole
+ * range" over "38 products" is a better invitation than either alone, and it
+ * stops the link being a promise the page cannot keep.
+ */
+.count {
+  display: block;
+  margin-top: 0.6rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-faint);
+}

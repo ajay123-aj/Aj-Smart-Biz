@@ -9,12 +9,28 @@ resolved at launch through the same public API the admin console already uses.
 websites/
 ├── informational/          Brochure sites — who the company is, what it does
 │   └── white-theme/        Next.js · white theme · single page
+├── salon/                  Salons, studios and spas — treatment menu and diary
+│   └── black-theme/        Next.js · black theme · menu, shop, journal
 └── commercial/             Transactional sites — catalogue, enquiries, orders
+    └── decor-framing/      Next.js · Gilt theme · framing, shop, journal
 ```
 
-More business types get their own folder alongside these two as they are built.
+More business types get their own folder alongside these as they are built.
 Each template inside a business type is a self-contained app with its own
 `package.json`, so they are deployed and versioned independently.
+
+A second **theme** is a sibling folder too, never a flag inside an existing one.
+`salon/black-theme` is `informational/white-theme` with its surfaces inverted —
+same components, same API calls, a different palette — and it is a separate app
+precisely so neither can break the other. See its
+[README](salon/black-theme/README.md) for what actually differs.
+
+`commercial/decor-framing` goes further: same components and same API calls
+again, but a different **design language** rather than a repaint — blurred white
+glass on a fixed gradient ground, generous radii, brass as the only accent, and a
+hero that is an inset dark stage instead of a band. Its
+[README](commercial/decor-framing/README.md) sets the three of them side by
+side.
 
 ## How a site knows which company it is
 
@@ -64,8 +80,17 @@ branch-wise. No GST or PAN number, no plan, subscription or admin data.
 | App | Port |
 | --- | --- |
 | `informational/white-theme` | 4400 |
+| `salon/black-theme` | 4500 |
+| `commercial/decor-framing` | 4600 |
 
 Kept clear of the API (4000) and the two consoles (4200, 4300).
+
+A port is not what separates two tenants, so two sites on one machine need two
+**hosts** as well: the API's resolver strips the port before it matches, which
+makes `localhost:4400` and `localhost:4500` the same host. Give each its own
+label — `localhost`, `salon.localhost`, `decor.localhost` — in `company_domain`
+and in each site's `TENANT_DOMAIN`. Browsers resolve `*.localhost` to the loopback with no
+hosts-file entry.
 
 ## Serving a site from somewhere other than localhost
 

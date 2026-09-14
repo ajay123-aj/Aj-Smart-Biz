@@ -1,0 +1,314 @@
+/* ------------------------------------------------------------------ *
+ * About us — a page of its own.
+ *
+ * It opens with a masthead rather than the home page's photographic hero:
+ * this page is read, not scanned, so it leads with a heading at full size on a
+ * warm ground and gets out of the way.
+ * ------------------------------------------------------------------ */
+
+.masthead {
+  position: relative;
+  overflow: hidden;
+  /*
+   * More at the foot than it looks like it needs. The band of figures used to
+   * close this header and is its own section below it now, so without this the
+   * heading would sit on the seam between the two grounds.
+   */
+  padding-block: 56px 64px;
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(52rem 28rem at 88% -20%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%),
+    radial-gradient(38rem 24rem at 4% 120%, color-mix(in srgb, var(--brand) 8%, transparent), transparent 70%),
+    color-mix(in srgb, var(--surface-sunken) 92%, #fff);
+}
+
+/*
+ * A large, very faint arc bleeding off the top-right corner. Enough to stop the
+ * band reading as a flat rectangle; not enough to compete with the heading.
+ */
+.masthead::after {
+  content: '';
+  position: absolute;
+  top: -34rem;
+  right: -18rem;
+  width: 60rem;
+  height: 60rem;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  pointer-events: none;
+}
+
+/* ------------------------------ breadcrumb ------------------------------ */
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 26px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.crumb {
+  color: var(--text-muted);
+  border-bottom: 1px solid transparent;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.crumb:hover {
+  color: var(--brand);
+  border-bottom-color: currentColor;
+}
+
+.crumbSep {
+  color: var(--text-faint);
+}
+
+/* ------------------------------- masthead ------------------------------- */
+
+.mastheadBody {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 48px;
+}
+
+.title {
+  font-size: clamp(2.1rem, 5vw, 3.4rem);
+  max-width: 18ch;
+}
+
+.lead {
+  margin-top: 20px;
+  max-width: 58ch;
+  font-size: 1.16rem;
+  color: var(--text-muted);
+}
+
+.mark {
+  height: 68px;
+  width: auto;
+  max-width: 200px;
+  object-fit: contain;
+  flex: none;
+  /* Present but not competing with the heading. */
+  opacity: 0.9;
+}
+
+/* --------------------------------- story -------------------------------- */
+
+/*
+ * Heading left, prose right.
+ *
+ * The columns are set in fractions rather than a fixed 16rem aside: a fixed
+ * column that does not grow with the container left the heading cramped on a
+ * wide screen while the panel took everything else, and the two never looked
+ * like halves of one block. At `0.85fr / 2fr` the heading gets a comfortable
+ * two- or three-word measure at every width and the panel keeps the weight.
+ */
+.story {
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.85fr) minmax(0, 2fr);
+  gap: 64px;
+  align-items: start;
+}
+
+/*
+ * No heading beside it — see the page component — so the prose takes the row.
+ * Centred and capped: a panel the full width of the container with a 64ch
+ * measure inside it is a ribbon of text against a wide field of white, which
+ * is the one thing the panel was introduced to avoid.
+ */
+.storyWide {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+}
+
+.storyWide .storyPanel {
+  width: 100%;
+  max-width: 60rem;
+}
+
+/* Stays put while a long story scrolls past it. */
+.storyHead {
+  position: sticky;
+  top: calc(var(--header-height) + 32px);
+}
+
+.storyTitle {
+  margin-top: 10px;
+  font-size: clamp(1.55rem, 2.4vw, 2rem);
+  /* Keeps the heading to two or three lines instead of one word per line. */
+  text-wrap: balance;
+}
+
+/*
+ * A short accent rule under the heading, the same weight as the one the
+ * eyebrow carries. Without it the aside is two lines of type ending in air,
+ * with no visual join to the panel it belongs to.
+ */
+.storyRule {
+  display: block;
+  width: 56px;
+  height: 3px;
+  margin-top: 24px;
+  border-radius: 3px;
+  background: linear-gradient(to right, var(--accent), color-mix(in srgb, var(--accent) 15%, transparent));
+}
+
+.storyPanel {
+  position: relative;
+  overflow: hidden;
+  padding: 48px 52px;
+  /*
+   * A gradient rather than flat translucent white, so the panel has a light
+   * source like every other surface in the theme, and a real hairline in the
+   * border colour rather than white-on-white — the old border was invisible
+   * against the panel it was meant to be edging.
+   */
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+  border: 1px solid color-mix(in srgb, var(--border) 70%, #fff);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+}
+
+/*
+ * The same faint arc the masthead bleeds off its corner, repeated here so the
+ * two blocks read as one page. Decorative only — it sits under the text.
+ */
+.storyPanel::after {
+  content: '';
+  position: absolute;
+  right: -14rem;
+  bottom: -20rem;
+  width: 34rem;
+  height: 34rem;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  pointer-events: none;
+}
+
+/*
+ * The measure lives on this block, not on each paragraph: capping every
+ * paragraph individually let them sit hard against the left edge of a wide
+ * panel with the slack piling up on the right. Capping the block and centring
+ * it keeps the white space even on both sides at any panel width.
+ */
+.storyProse {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 62ch;
+  margin-inline: auto;
+}
+
+.prose {
+  color: var(--text-muted);
+  font-size: 1.04rem;
+}
+
+/*
+ * The first paragraph carries the weight, so it is set larger and darker — an
+ * entry point into the text rather than a wall of it. It used to take an
+ * accent rule down its left edge as well, which was a second border inside a
+ * bordered panel; the rule now lives under the heading, where there is nothing
+ * else competing with it.
+ */
+.storyProse .prose:first-child {
+  font-size: 1.2rem;
+  line-height: 1.6;
+  color: var(--text);
+  letter-spacing: -0.005em;
+}
+
+/* --------------------------------- stats -------------------------------- */
+
+/* ------------------------------ responsive ------------------------------ */
+
+/* The two columns get tight before they get narrow — pull the gutter in first. */
+@media (max-width: 1080px) {
+  .story {
+    gap: 40px;
+  }
+
+  .storyPanel {
+    padding: 40px 40px;
+  }
+}
+
+@media (max-width: 980px) {
+  .story {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  /* Nothing to scroll past once it is stacked. */
+  .storyHead {
+    position: static;
+  }
+
+  /* Stacked, the rule would be a lone dash between the heading and the panel. */
+  .storyRule {
+    display: none;
+  }
+
+  .storyPanel {
+    padding: 36px 34px;
+  }
+
+  /* One column, so the panel is already at a readable width — centring the
+     text inside it as well only adds a second set of margins. */
+  .storyProse {
+    margin-inline: 0;
+    max-width: 66ch;
+  }
+}
+
+@media (max-width: 760px) {
+  .masthead {
+    padding-block: 40px 34px;
+  }
+
+  .mark {
+    display: none;
+  }
+
+  .title {
+    max-width: none;
+  }
+
+  .lead {
+    font-size: 1.06rem;
+  }
+
+  .stats {
+    margin-top: 36px;
+  }
+}
+
+/*
+ * Phone. The figures stay two-up rather than stacking: four of them in a column
+ * is most of a screen scrolled past before the story starts. Smaller type and
+ * tighter padding keep two side by side legible down to the narrowest phones.
+ */
+@media (max-width: 560px) {
+  .crumbs {
+    margin-bottom: 18px;
+  }
+
+  .storyPanel {
+    padding: 28px 22px;
+    border-radius: var(--radius);
+  }
+
+  .storyProse .prose:first-child {
+    font-size: 1.1rem;
+  }
+
+  .prose {
+    font-size: 1rem;
+  }
+}

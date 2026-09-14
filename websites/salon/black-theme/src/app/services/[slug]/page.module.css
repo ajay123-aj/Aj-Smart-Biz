@@ -1,0 +1,263 @@
+/* ------------------------------------------------------------------ *
+ * One service.
+ *
+ * Two columns below the masthead: what the work is on the left, and the thing
+ * that takes a booking on the right. The right column is sticky on a desktop,
+ * because the description can be long and the reason somebody came to this page
+ * should not scroll away while they read about it.
+ *
+ * On a phone the panel comes **after** the description rather than before it: a
+ * booking form above the words would ask for a commitment before saying what is
+ * being committed to.
+ * ------------------------------------------------------------------ */
+
+.masthead {
+  position: relative;
+  overflow: hidden;
+  padding-block: 52px 44px;
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(52rem 28rem at 88% -20%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%),
+    color-mix(in srgb, var(--surface-sunken) 92%, #fff);
+}
+
+/* ------------------------------ breadcrumb ------------------------------ */
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 24px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.crumbGroup {
+  display: contents;
+}
+
+.crumb {
+  color: var(--text-muted);
+  border-bottom: 1px solid transparent;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.crumb:hover {
+  color: var(--brand);
+  border-bottom-color: currentColor;
+}
+
+.crumbSep {
+  color: var(--text-faint);
+}
+
+/* -------------------------------- heading ------------------------------- */
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+}
+
+.headMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-size: clamp(1.9rem, 4.4vw, 3rem);
+  line-height: 1.1;
+  max-width: 20ch;
+}
+
+.lead {
+  margin-top: 16px;
+  max-width: 56ch;
+  font-size: 1.12rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/*
+ * The price and the duration on one line, immediately under the lede.
+ *
+ * They are the two facts somebody weighs before reading a word of the
+ * description — "how much, and how long will I be here" — so they are answered
+ * together and above the fold rather than at the bottom of the page.
+ */
+.facts {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 1.1rem;
+  margin-top: 22px;
+}
+
+.price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.priceNow {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.priceWas {
+  font-size: 1rem;
+  color: var(--text-faint);
+  text-decoration: line-through;
+  font-variant-numeric: tabular-nums;
+}
+
+.saving {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--brand);
+  color: var(--brand-contrast);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.duration {
+  font-size: 0.92rem;
+  color: var(--text-muted);
+}
+
+/* The photograph, or the glyph where there is none — the same pairing the card
+   makes, so the page and the listing look like one design. */
+.photo {
+  flex: none;
+  width: 280px;
+  height: 200px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+}
+
+.glyph {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--brand);
+}
+
+.glyph svg {
+  width: 44px;
+  height: 44px;
+}
+
+@media (max-width: 820px) {
+  .head {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 20px;
+  }
+
+  .photo {
+    width: 100%;
+    height: 200px;
+  }
+}
+
+/* --------------------------------- body --------------------------------- */
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 48px;
+  padding-block: 48px 64px;
+  align-items: start;
+}
+
+@media (max-width: 940px) {
+  .body {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+}
+
+.copy {
+  max-width: 62ch;
+  font-size: 1.02rem;
+  line-height: 1.75;
+  color: var(--text);
+}
+
+.h2 {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+  font-weight: 650;
+}
+
+.points {
+  margin: 0 0 28px;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.points li {
+  position: relative;
+  padding-left: 1.5rem;
+  font-size: 0.98rem;
+}
+
+.points li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.paragraph {
+  margin: 0 0 1.2em;
+}
+
+.aside {
+  position: sticky;
+  top: calc(var(--header-height) + 20px);
+}
+
+@media (max-width: 940px) {
+  .aside {
+    position: static;
+  }
+}
+
+/* The enquiry box, for a service that cannot be booked — a wedding party, a
+   survey. Same frame as the booking panel, so the page looks the same either
+   way and only the promise differs. */
+.enquire {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.enquireNote {
+  margin: 0 0 16px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.more {
+  border-top: 1px solid var(--border);
+}

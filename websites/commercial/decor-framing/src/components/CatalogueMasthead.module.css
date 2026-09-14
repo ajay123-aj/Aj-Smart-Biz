@@ -1,0 +1,118 @@
+/* ------------------------------------------------------------------ *
+ * The head of a catalogue page.
+ *
+ * The same masthead language Services, About and Contact use, extracted because
+ * four pages now need it — products, one category, categories and offers — and
+ * four copies of it is four chances for one of them to drift into looking like
+ * a different website.
+ * ------------------------------------------------------------------ */
+
+/*
+ * No fill of its own, and no rule under it.
+ *
+ * It used to lay an opaque stone rectangle across the top of every catalogue
+ * page. On this theme the page already has a ground — the fixed wash in
+ * globals.css — and painting over it at the top of four pages means the wash
+ * only ever appears below the fold. The blooms stay, because they are the same
+ * two lights the page wash uses and they simply deepen it here; the flat colour
+ * underneath them goes.
+ *
+ * The bottom hairline goes with it. It was separating this band from the next
+ * one, and there is no longer a band under it to separate from — the content
+ * below is a set of floating panels with their own edges.
+ */
+.masthead {
+  position: relative;
+  overflow: hidden;
+  padding-block: 56px 52px;
+  background:
+    radial-gradient(52rem 28rem at 88% -20%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
+    radial-gradient(38rem 24rem at 4% 120%, color-mix(in srgb, var(--brand) 7%, transparent), transparent 70%);
+}
+
+/* The oversized ring in the corner, the same one every other masthead carries. */
+.masthead::after {
+  content: '';
+  position: absolute;
+  top: -34rem;
+  right: -18rem;
+  width: 60rem;
+  height: 60rem;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  pointer-events: none;
+}
+
+/* ------------------------------ breadcrumb ------------------------------ */
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 26px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.crumb {
+  color: var(--text-muted);
+  border-bottom: 1px solid transparent;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.crumb:hover {
+  color: var(--brand);
+  border-bottom-color: currentColor;
+}
+
+.crumbSep {
+  color: var(--text-faint);
+}
+
+/* ------------------------------- masthead ------------------------------- */
+
+.title {
+  font-size: clamp(2.1rem, 5vw, 3.4rem);
+  max-width: 18ch;
+}
+
+.lead {
+  margin-top: 20px;
+  max-width: 56ch;
+  font-size: 1.16rem;
+  color: var(--text-muted);
+}
+
+/*
+ * How many there are. Small, faint and spaced like the eyebrow — it is a fact
+ * about the page rather than part of what the business is saying.
+ */
+.count {
+  margin-top: 26px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 620px) {
+  .masthead {
+    padding-block: 40px 38px;
+  }
+
+  .crumbs {
+    margin-bottom: 20px;
+  }
+
+  .lead {
+    font-size: 1.05rem;
+    margin-top: 16px;
+  }
+
+  .count {
+    margin-top: 20px;
+  }
+}

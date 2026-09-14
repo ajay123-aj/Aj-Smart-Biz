@@ -1,0 +1,179 @@
+/* ------------------------------------------------------------------ *
+ * The blog - its own page.
+ *
+ * The same masthead language as Services, About and Contact, so the set reads
+ * as one site: a breadcrumb, the tenant's own heading, the lede, and then the
+ * content.
+ *
+ * Everything below the masthead is `BlogSection`, which brings its own grid and
+ * its own card - the band on the home page and the archive here must not drift
+ * into two different-looking lists of the same articles. All this file adds is
+ * the head, the tag line under it, and the pager at the foot.
+ * ------------------------------------------------------------------ */
+
+.masthead {
+  position: relative;
+  overflow: hidden;
+  padding-block: 56px 52px;
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(52rem 28rem at 88% -20%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%),
+    radial-gradient(38rem 24rem at 4% 120%, color-mix(in srgb, var(--brand) 8%, transparent), transparent 70%),
+    color-mix(in srgb, var(--surface-sunken) 92%, #fff);
+}
+
+/* The oversized ring in the corner, the same one About and Contact carry. */
+.masthead::after {
+  content: '';
+  position: absolute;
+  top: -34rem;
+  right: -18rem;
+  width: 60rem;
+  height: 60rem;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  pointer-events: none;
+}
+
+/* ------------------------------ breadcrumb ------------------------------ */
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 26px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.crumb {
+  color: var(--text-muted);
+  border-bottom: 1px solid transparent;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.crumb:hover {
+  color: var(--brand);
+  border-bottom-color: currentColor;
+}
+
+.crumbSep {
+  color: var(--text-faint);
+}
+
+/* ------------------------------- masthead ------------------------------- */
+
+.title {
+  font-size: clamp(2.1rem, 5vw, 3.4rem);
+  max-width: 18ch;
+}
+
+.lead {
+  margin-top: 20px;
+  max-width: 56ch;
+  font-size: 1.16rem;
+  color: var(--text-muted);
+}
+
+/*
+ * How many there are. Small, set in the faint tone and spaced like the
+ * eyebrow — it is a fact about the page rather than part of what the business
+ * is saying, and it should read that way.
+ */
+.count {
+  margin-top: 26px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------- list --------------------------------- */
+
+/*
+ * The section under the masthead has no heading of its own here — the page
+ * printed it — so its usual top padding would be a band of nothing between a
+ * lede and the first card.
+ */
+.list {
+  padding-top: 56px;
+}
+
+@media (max-width: 620px) {
+  .masthead {
+    padding-block: 40px 38px;
+  }
+
+  .crumbs {
+    margin-bottom: 20px;
+  }
+
+  .lead {
+    font-size: 1.05rem;
+    margin-top: 16px;
+  }
+
+  .count {
+    margin-top: 20px;
+  }
+
+  .list {
+    padding-top: 40px;
+  }
+}
+
+/* --------------------------------- tags --------------------------------- */
+
+/*
+ * The way out of a tag filter, on the count line.
+ *
+ * Beside the number rather than above the grid, because that line is already
+ * the answer to "what am I looking at" - "4 posts, tagged kitchens" and the way
+ * back belong in the same sentence.
+ */
+.clear {
+  color: var(--brand);
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.16s ease;
+}
+
+.clear:hover {
+  border-bottom-color: currentColor;
+}
+
+.empty {
+  padding-block: 40px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* -------------------------------- pager --------------------------------- */
+
+/*
+ * Two links and a position, not a row of numbers.
+ *
+ * A blog is read in one direction, and "older" and "newer" are the words a
+ * reader thinks in - page 3 of a blog means nothing to anybody. Both are
+ * ordinary links with their own URLs, so they work without JavaScript and can
+ * be shared.
+ */
+.pager {
+  padding-block: 0 72px;
+}
+
+.pagerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.pagerCount {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}

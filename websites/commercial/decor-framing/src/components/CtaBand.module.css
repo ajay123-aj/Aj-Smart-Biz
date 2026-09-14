@@ -1,0 +1,126 @@
+/* ------------------------------------------------------------------ *
+ * The "Next step" band.
+ *
+ * On the brand colour, so a page ends on something rather than trailing off.
+ * This was duplicated in the home and About stylesheets; it lives here now and
+ * nowhere else.
+ * ------------------------------------------------------------------ */
+
+/*
+ * A floating slab, not a full-bleed band.
+ *
+ * It has to be. The footer below it is now the brand colour running edge to
+ * edge, and a full-width band in the same colour directly above it is not a
+ * closing statement — it is the top half of a very tall footer, with the
+ * page's last call to action lost somewhere inside it. Inset and rounded, it
+ * reads as the last object on the page sitting *on* the footer, which is what
+ * it is.
+ *
+ * The gold hairline is the other half of the separation: at 45% it is barely a
+ * colour, and it is the only edge distinguishing two charcoal surfaces that
+ * meet.
+ */
+.band {
+  position: relative;
+  width: calc(100% - 32px);
+  max-width: calc(var(--max-width) + 32px);
+  margin-inline: auto;
+  padding-block: 76px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  overflow: hidden;
+  background: var(--brand);
+  color: var(--brand-contrast);
+  box-shadow: var(--shadow-lg);
+}
+
+/* The gold bloom a `.section--muted` panel gets, at the strength a dark surface
+   needs to show it at all. */
+.band::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    40rem 26rem at 100% 0%,
+    color-mix(in srgb, var(--accent) 38%, transparent),
+    transparent 68%
+  );
+}
+
+.band > * {
+  position: relative;
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 32px;
+}
+
+.title {
+  font-size: clamp(1.6rem, 3.2vw, 2.3rem);
+  max-width: 18ch;
+}
+
+.body {
+  margin-top: 14px;
+  max-width: 48ch;
+  /* A wash of the foreground, not a fixed grey — the brand colour is the
+     tenant's and a grey that reads on charcoal can vanish on blue. */
+  color: color-mix(in srgb, var(--brand-contrast) 78%, transparent);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* The ghost button is defined against a white page; restated for this band. */
+.actions :global(.btn--ghost) {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--brand-contrast) 45%, transparent);
+  color: var(--brand-contrast);
+}
+
+.actions :global(.btn--ghost):hover {
+  background: color-mix(in srgb, var(--brand-contrast) 12%, transparent);
+  border-color: var(--brand-contrast);
+  color: var(--brand-contrast);
+}
+
+/*
+ * The eyebrow takes the pale gold rather than the accent proper. `--accent` is
+ * mixed for a white page and goes muddy on a dark one; `--accent-soft` is the
+ * value this template keeps for exactly this case — see the token's note in
+ * globals.css — and it is the same gold the footer heads its columns with.
+ */
+.band :global(.eyebrow) {
+  color: var(--accent-soft);
+}
+
+@media (max-width: 560px) {
+  .band {
+    width: calc(100% - 20px);
+    padding-block: 52px;
+    border-radius: var(--radius);
+  }
+
+  .inner {
+    gap: 24px;
+  }
+
+  /* Full-width actions read as a stack of buttons rather than a broken row. */
+  .actions {
+    width: 100%;
+  }
+
+  .actions > * {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}

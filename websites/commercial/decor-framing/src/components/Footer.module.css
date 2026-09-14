@@ -1,0 +1,182 @@
+/*
+ * The footer, dark.
+ *
+ * It is the one full-bleed element left on the site, and the only one that
+ * should be: everything above it floats on the page wash, and a page of
+ * floating things has to land on something or it simply stops. A charcoal slab
+ * running edge to edge is that landing — it ends the gradient, and it is the
+ * only surface here that reads as ground rather than as glass.
+ *
+ * Which also settles the type. Every colour token in the template is written for
+ * dark text on a light surface, so none of them can be used below; the footer
+ * restates its own on white at three alphas, with the gold reserved for the
+ * column headings. That is more literal values than anywhere else in the
+ * template, and it is deliberate — the alternative is a second set of inverted
+ * tokens in globals.css that exactly one element reads.
+ */
+.footer {
+  margin-top: 96px;
+  background: var(--brand-strong);
+  color: rgba(255, 255, 255, 0.72);
+  /* A gold hairline along the top edge, which is all the separation a surface
+     this much darker than the page above it needs. */
+  border-top: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/*
+  Flex rather than grid, because the number of columns is not fixed: the
+  locations column only exists once a company has more than one branch.
+
+  `repeat(auto-fit, …)` cannot do this job here — following a `1.6fr` track it
+  resolves to a single repetition, which put every link column on its own row.
+  With flex the about block takes the space it needs and the link columns share
+  what is left, at three columns or four.
+*/
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 48px;
+  padding-block: 64px 48px;
+}
+
+.about {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+/* ------------------------------ about ------------------------------ */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Cropped to a disc with a gold ring, matching the header's treatment of the
+   same image — one logo, one shape, top and bottom of the page. */
+.logo {
+  height: 44px;
+  width: 44px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+  outline: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.logoFallback {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  /* The brand colour is the surface here, so the disc cannot be it. Gold, with
+     the dark text the gold button uses for the same contrast reason. */
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-soft) 50%, var(--accent) 100%);
+  color: var(--brand-strong);
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.brandName {
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+
+.tagline {
+  margin-top: 16px;
+  max-width: 44ch;
+  font-size: 0.94rem;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.branch {
+  margin-top: 12px;
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* ------------------------------ columns ------------------------------ */
+
+.column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  /* Wide enough for an email address before it wraps, narrow enough that three
+     of them still fit beside the about block. */
+  flex: 0 1 210px;
+  min-width: 0;
+}
+
+/* The one gold on the surface, and the reason the columns read as headed lists
+   rather than as three paragraphs of links. */
+.columnTitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent-soft);
+  margin-bottom: 4px;
+}
+
+.link {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.95rem;
+  transition: color 0.16s ease;
+}
+
+.link:hover {
+  color: #ffffff;
+}
+
+.muted {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.95rem;
+}
+
+/* ------------------------------ bottom ------------------------------ */
+
+.bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.meta {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .top {
+    gap: 40px;
+  }
+
+  /* The about block takes the full row and the link columns pair up under it. */
+  .about {
+    flex-basis: 100%;
+  }
+
+  .column {
+    flex: 1 1 160px;
+  }
+}
+
+@media (max-width: 560px) {
+  .footer {
+    margin-top: 64px;
+  }
+
+  .top {
+    flex-direction: column;
+    padding-block: 48px 36px;
+  }
+}

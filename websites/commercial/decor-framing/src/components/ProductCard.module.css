@@ -1,0 +1,352 @@
+/*
+ * One product, as a card.
+ *
+ * Shared by every band and every page in the catalogue — the home page, the
+ * products page, a category, the offers page — so the card a visitor sees is the
+ * same object wherever they meet it. That is not tidiness: a product that looks
+ * different on the home page and on the listing reads as two products.
+ *
+ * The Atelier version framed the photograph: a paper-coloured mat cut around it
+ * with a bevel on the inside edge, so a grid of products read as a wall of hung
+ * prints. That went with the rest of that theme, and what replaces it is the
+ * opposite idea — the picture is a rounded tile floating *inside* a pane of
+ * glass, held off the card edge on all four sides. The frame is no longer drawn
+ * around the product, because on this theme the card itself is the frame.
+ */
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow), var(--glass-sheen);
+  overflow: hidden;
+  transition: box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The same lift `.card-surface` makes in globals.css. Nothing about the border
+   moves, so a pointer crossing a grid never makes a hairline flicker. */
+.card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-hover), var(--glass-sheen);
+}
+
+/* The whole card is the link. The anchor covers it rather than wrapping it, so
+   the markup stays a list of articles and the price is not inside a link. */
+.hit {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+}
+
+.hit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* --------------------------------- picture -------------------------------- */
+
+/*
+ * The picture tile.
+ *
+ * Inset by a margin rather than bled to the card's edges, and rounded a step
+ * tighter than the card is — concentric radii, the way a phone icon sits inside
+ * a phone screen. The margin is what makes the glass read as a surface the
+ * photograph is resting on; take it away and the card becomes a picture with
+ * some text stuck underneath it.
+ */
+.frame {
+  position: relative;
+  margin: 10px;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+/*
+ * A short lift along the bottom of the picture.
+ *
+ * It replaces the Atelier mat, and it earns its place for a different reason: the
+ * shot count sits in that corner, and product photography from a shop is as
+ * often shot on white as on anything else. Without it that badge disappears on
+ * roughly half the catalogue.
+ *
+ * No `z-index`, deliberately: it must sit over the photograph and under the
+ * badges, which are at 1, and the click target, which is at 2.
+ */
+.frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.42) 0%, transparent 28%);
+}
+
+.photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.7s ease;
+}
+
+/*
+ * A real zoom, not the Atelier theme's 3%.
+ *
+ * Inside a tile with its own rounded crop there is nothing for the picture to
+ * bleed into, so it can move far enough to be seen doing it. 8% over 0.7s is
+ * slow enough to read as the object being examined rather than as a transition
+ * playing.
+ */
+.card:hover .photo {
+  transform: scale(1.08);
+}
+
+/*
+ * A product with no photograph.
+ *
+ * Deliberately not an empty frame, which reads as an image that failed to load.
+ * It is a tinted panel carrying the product's initial — quiet, obviously
+ * intentional, and the same height as a real picture so a grid of mixed cards
+ * does not stagger.
+ */
+.noPhoto {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(140deg, var(--surface-sunken), color-mix(in srgb, var(--accent) 18%, transparent));
+  color: var(--text-faint);
+}
+
+.initial {
+  font-size: clamp(2rem, 6vw, 3rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: color-mix(in srgb, var(--brand) 28%, transparent);
+}
+
+/*
+ * The offer badge, in gold, top-left over the picture.
+ *
+ * It is the one place in the catalogue the gradient button's fill appears on
+ * something that is not a button, and the reason is that a discount is the only
+ * thing on a card competing with the photograph for the first look. Gold on a
+ * photograph wins that; the accent as flat type does not.
+ */
+.badge {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.7rem;
+  z-index: 1;
+  padding: 0.28rem 0.7rem;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-soft) 50%, var(--accent) 100%);
+  color: var(--brand);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+}
+
+/* How many photographs there are, so a visitor knows the card is a doorway. */
+.shots {
+  position: absolute;
+  right: 0.7rem;
+  bottom: 0.7rem;
+  z-index: 1;
+  padding: 0.18rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background: rgba(0, 0, 0, 0.42);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/*
+ * Availability, only when it is worth saying — "in stock" is the ordinary case
+ * and a badge on every card for it is noise.
+ *
+ * Smoked glass rather than the paper chip it was: it sits on the photograph, and
+ * a near-opaque light chip there is a hole in the picture.
+ */
+.stock {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  z-index: 1;
+  padding: 0.24rem 0.65rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--brand) 70%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+/* ---------------------------------- body ---------------------------------- */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  /* No top padding: the picture tile's own margin has already supplied it, and
+     doubling the two leaves the name floating in the middle of the card. */
+  padding: 0.35rem 1.25rem 1.3rem;
+  flex: 1;
+}
+
+/* The category above the name, quiet and small — it is context, not the point. */
+.crumb {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* A product name is a heading, so it is set like one — the same family as
+   everything else now, carried by weight instead. */
+.name {
+  margin: 0;
+  font-size: 1.16rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+
+.summary {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/*
+ * The price, on a line of its own — the thing a visitor scans down a column
+ * for, and a figure that moved with the length of the title above it could not
+ * be scanned.
+ */
+.prices {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 0.8rem;
+}
+
+/*
+ * Set hard. It is a shop, the price is the answer to the question the card was
+ * opened to ask, and at 700 on a 1.05rem number it was the fourth-heaviest thing
+ * on the card — behind the name, the badge and the button.
+ */
+.now {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--brand);
+  font-variant-numeric: tabular-nums;
+}
+
+.was {
+  font-size: 0.85rem;
+  color: var(--text-faint);
+  text-decoration: line-through;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The tenant's free-text price. Same weight as a number so the two read alike. */
+.words {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--brand);
+}
+
+.saving {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+
+/*
+ * The button. Not a real button — the card is the link — so it is a cue, marked
+ * aria-hidden, and now styled as the pill it is imitating rather than as a line
+ * of text with an arrow after it.
+ *
+ * It is drawn as the ghost variant rather than the primary one on purpose. A
+ * grid of twelve products would otherwise be twelve filled charcoal pills, and
+ * the page would have no primary action anywhere on it because everything was
+ * one. The fill arrives on hover, when the card being pointed at is briefly the
+ * only card that matters.
+ */
+.cta {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+  padding: 0.6rem 1.15rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--brand) 22%, transparent);
+  background: rgba(255, 255, 255, 0.5);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--brand);
+  transition: gap 0.18s ease, background-color 0.18s ease, color 0.18s ease,
+    border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.card:hover .cta {
+  gap: 0.6rem;
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-contrast);
+  box-shadow: var(--shadow-brand);
+}
+
+/* ------------------------------- compact ---------------------------------- */
+
+/*
+ * The narrow variant, used where a card sits beside a lot of other content —
+ * the offers rail on the home page. Same object, less of it.
+ */
+.compact .frame {
+  margin: 8px;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-sm);
+}
+
+.compact .body {
+  padding: 0.3rem 1rem 1.05rem;
+}
+
+.compact .name {
+  font-size: 0.98rem;
+}
+
+.compact .now {
+  font-size: 1.15rem;
+}
+
+.compact .summary {
+  display: none;
+}

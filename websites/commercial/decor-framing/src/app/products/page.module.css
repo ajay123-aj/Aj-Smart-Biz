@@ -1,0 +1,128 @@
+/* ------------------------------------------------------------------ *
+ * The products page.
+ *
+ * Everything above the grid is here; the grid itself is `ProductsSection`, which
+ * brings its own cards. The band on the home page and the list here must not
+ * drift into two different-looking things, so this file adds only the filter and
+ * the spacing around it.
+ * ------------------------------------------------------------------ */
+
+/*
+ * The category filter, as a row of chips rather than a dropdown.
+ *
+ * A dropdown hides the options, and the options here are the argument: a visitor
+ * who can see that the shop is sorted into six things understands the shop. It
+ * also means every filter is a real link with its own URL, which a `<select>` on
+ * a server-rendered page cannot be without JavaScript.
+ */
+/*
+ * Glass, like the header it pins itself under, rather than the opaque white
+ * strip it used to be — a solid band sliding up to meet a translucent one is
+ * the join you notice most on a theme like this.
+ *
+ * `--header-stack`, not `--header-height`: the header floats clear of the top
+ * edge, so a filter that cleared only the bar would spend the whole page tucked
+ * 14px underneath it. See the token in globals.css.
+ */
+.filter {
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  padding-block: 18px;
+  position: sticky;
+  top: var(--header-stack);
+  z-index: 5;
+}
+
+.chips {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  /* The row scrolls on a phone rather than wrapping to four lines and pushing
+     the products off the screen. */
+  scrollbar-width: none;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  padding: 0.42rem 0.85rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.chipOn {
+  background: var(--brand-strong);
+  border-color: var(--brand-strong);
+  color: var(--brand-contrast);
+}
+
+.chipOn:hover {
+  color: var(--brand-contrast);
+}
+
+/* The count inside a chip. Faint against the chip's own colour, either way. */
+.chipCount {
+  font-size: 0.74rem;
+  font-weight: 600;
+  opacity: 0.62;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A subcategory chip, indented by a leading rule rather than by margin — the
+   row scrolls, so a margin would just be lost space. */
+.chipChild::before {
+  content: '';
+  width: 10px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.4;
+}
+
+/* --------------------------------- list ---------------------------------- */
+
+.list {
+  padding-top: 48px;
+}
+
+/* Nothing matched — only reachable from a stale link, since every chip shown is
+   a category with something in it. */
+.empty {
+  padding-block: 72px;
+  text-align: center;
+}
+
+.emptyText {
+  margin: 0 0 1.4rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 620px) {
+  .filter {
+    padding-block: 14px;
+  }
+
+  .list {
+    padding-top: 34px;
+  }
+}
