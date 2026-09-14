@@ -324,7 +324,18 @@ jobs:
           docker network create "$NETWORK" >/dev/null 2>&1 || true
           docker volume create "$DB_VOLUME" >/dev/null
 
-          state=$(docker inspect -f '{{.State.Status}}' "$DB_CONTAINER" 2>/dev/null || echo missing)
+          # Asked as two questions on purpose. `docker inspect` on a container
+          # that does not exist prints an empty line on *stdout* before it
+          # fails, so `|| echo missing` produced a blank line followed by
+          # `missing` — a two-line value equal to neither "missing" nor
+          # "running", which fell through to the else and ran `docker start`
+          # on a container that was never there. That is the "exists but is
+          # missing" line in the log.
+          if docker container inspect "$DB_CONTAINER" >/dev/null 2>&1; then
+            state=$(docker container inspect -f '{{.State.Status}}' "$DB_CONTAINER" | tr -d '[:space:]')
+          else
+            state=missing
+          fi
 
           if [ "$state" = "missing" ]; then
             # Refuse early and clearly rather than letting `docker run` fail
@@ -379,7 +390,11 @@ jobs:
 
           # What is serving traffic right now, so a failed roll-out has
           # something to go back to. Empty on the very first deploy.
-          PREVIOUS=$(docker inspect -f '{{.Image}}' "$CONTAINER" 2>/dev/null || true)
+          # `tr` for the same reason as above: without it the blank line that a
+          # failed inspect leaves on stdout makes PREVIOUS non-empty on the very
+          # first deploy, and a failed roll-out then tries to "roll back" to an
+          # image id that is a single newline.
+          PREVIOUS=$(docker container inspect -f '{{.Image}}' "$CONTAINER" 2>/dev/null | tr -d '[:space:]' || true)
           echo "Currently running: ${PREVIOUS:-nothing}"
 
           # The `-e` flags override whatever the env file says, and for one
@@ -423,8 +438,8 @@ jobs:
           # a 40s start period, because the first boot syncs the schema.
           wait_healthy() {
             for _ in $(seq 1 60); do
-              state=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$CONTAINER" 2>/dev/null || echo gone)
-              case "$state" in
+              state=$(docker container inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$CONTAINER" 2>/dev/null | tr -d '[:space:]' || true)
+              case "${state:-gone}" in
                 healthy|running) return 0 ;;
                 unhealthy|exited|dead|gone) return 1 ;;
               esac
