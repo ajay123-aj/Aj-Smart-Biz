@@ -1,0 +1,472 @@
+/* ------------------------------------------------------------------ *
+ * Black theme — Studio.
+ *
+ * The dark counterpart to `informational/white-theme` in its **colour** and
+ * nothing else. Every value in the palette below is the one that theme's
+ * inversion arrived at and is not to be touched; what sits on top of it is this
+ * template's own design, and it is no longer the white theme's design in black.
+ *
+ * A salon photographs its work under studio light, and a near-black ground is
+ * what makes those photographs the brightest thing on the page. The design
+ * follows from the same thought — get out of the way of the pictures:
+ *
+ *   **Pictures sit in arches.** A salon mirror is an arch, and so is every
+ *   photograph on this site: the product shelf, the treatment cards, the
+ *   portraits, the gallery wall and the journal covers all carry `--arch`, which
+ *   is one token and the single strongest thing about this theme. It is why the
+ *   page reads as a studio rather than as a dashboard with a dark mode.
+ *
+ *   **Headings are light and large.** Weight 300 at three rems, not 800 at two.
+ *   A near-black page with heavy type on it reads as a terminal; the same page
+ *   with a thin face reads as a magazine, and the photographs get to be the
+ *   loudest thing on it.
+ *
+ *   **Section heads are centred**, under a hanging vertical rule. Everything
+ *   below a head is still a grid, so the page alternates between a centred
+ *   axis and a full-width row — which is what stops a long page of bands from
+ *   reading as one undifferentiated column.
+ *
+ * Two kinds of token live here and they are not interchangeable:
+ *
+ *   --brand / --accent   the tenant's own colours, overridden at runtime in the
+ *                        layout from whatever the company-details API returns.
+ *                        The values below are only what a tenant with no theme
+ *                        configured gets.
+ *   everything else      the template's own design — surfaces, radii, shadows,
+ *                        type scale, rhythm. These do not vary per tenant, and
+ *                        they are what makes every site built on this template
+ *                        recognisably the same template.
+ *
+ * One inversion is worth naming, because everything else follows from it: on a
+ * light ground a panel is *white over cream*, and on this one it is **white at
+ * 4-6% over near-black**. The alpha changes, the colour does not — which is why
+ * the glass surfaces, hairlines and scrims throughout the module stylesheets
+ * are still `rgba(255, 255, 255, …)`, just an order of magnitude fainter.
+ * ------------------------------------------------------------------ */
+
+:root {
+  /*
+   * Brand — replaced at runtime by the company's theme when it has one.
+   *
+   * Gold rather than the white theme's charcoal, because on a near-black ground
+   * the brand colour has to be the *lighter* of the pair to read as an action.
+   * `--brand-contrast` is therefore near-black: a primary button here is a warm
+   * light rectangle with dark type on it, which is the dark-theme inverse of
+   * the white theme's dark button with white type.
+   */
+  --brand: #e0b973;
+  --brand-strong: #f2d9a3;
+  --brand-soft: rgba(224, 185, 115, 0.12);
+  --brand-contrast: #0a0a0c;
+
+  /*
+   * Accent — the tenant's third colour, used for hairlines and eyebrows.
+   *
+   * `--accent-soft` is **opaque**, and has to be: it is a *text* colour — the
+   * role under a name on a team card, over a photograph — and one place fades
+   * it further with `color-mix`, which needs something solid to fade from. Muted
+   * gold rather than a low alpha, so it stays legible whatever the picture
+   * behind it turns out to be.
+   */
+  --accent: #d8b45f;
+  --accent-soft: #d9c29a;
+
+  /*
+   * Neutrals. Warm-tinted near-blacks rather than pure #000, for the same
+   * reason the white theme's cream is not pure white: a flat true black has no
+   * light source, and every shadow laid on it disappears.
+   */
+  --surface: #141418;
+  --surface-muted: #0f0f12;
+  --surface-sunken: #09090b;
+  --border: #26262c;
+  --border-strong: #3a3a43;
+
+  --text: #f4f2ee;
+  --text-muted: #a7a6ae;
+  --text-faint: #74737c;
+
+  /* WhatsApp's own colours. Fixed, never themed — see WhatsAppButton.module.css. */
+  --whatsapp: #25d366;
+  --whatsapp-dark: #1da851;
+
+  --radius-sm: 12px;
+  --radius: 1.5rem;
+  --radius-lg: 2rem;
+
+  /*
+   * The arch, and the theme's signature.
+   *
+   * Elliptical corners: the two horizontal radii are half the width, so the top
+   * closes into a true semicircle whatever the element is; the two vertical
+   * radii are a *percentage of the height*, which is what keeps the curve the
+   * same shape on a 16/10 tile and on a 3/4 portrait. A fixed pixel radius
+   * cannot do that — it flattens on a wide box and turns into a dome on a tall
+   * one.
+   *
+   * The bottom corners stay on the ordinary radius, because an arch is a window
+   * standing on a sill, not a lozenge.
+   */
+  --arch: 50% 50% var(--radius) var(--radius) / 30% 30% 0 0;
+  /* The shallower one, for anything wider than about 2:1 where a 30% rise
+     becomes a tunnel. */
+  --arch-soft: 50% 50% var(--radius) var(--radius) / 16% 16% 0 0;
+
+  /*
+   * Shadows do very little on a dark ground — a black shadow on near-black is
+   * invisible — so they are kept deep and tight for depth under a card, and the
+   * lift a light theme gets from a shadow is carried here by the hairline and
+   * the glass fill instead.
+   */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 30px 80px rgba(0, 0, 0, 0.7);
+  --shadow-hover: 0 20px 56px rgba(0, 0, 0, 0.65);
+
+  /* Taller than the other two themes carry. Light headings need air above
+     them, and a cramped bar under a 300-weight hero undoes it. */
+  --header-height: 84px;
+  --max-width: 1180px;
+
+  /*
+    Geist is the reference's face. It is not a dependency of this template — no
+    package, no build-time font download — so it is simply preferred where the
+    visitor or the deployment already has it, and falls back to the same
+    neutral grotesques it was designed alongside.
+  */
+  --font-sans: 'Geist', 'Inter', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /*
+   * Tells the browser this document is dark, so form controls, scrollbars and
+   * the space above a rubber-band scroll are drawn dark too. Without it a dark
+   * page gets a white scrollbar and white native selects.
+   */
+  color-scheme: dark;
+  scroll-behavior: smooth;
+  /* So an anchor jump does not land under the sticky header. */
+  scroll-padding-top: calc(var(--header-height) + 16px);
+}
+
+body {
+  margin: 0;
+  /*
+   * The deepest of the three greys, not black. The panels above it are
+   * translucent white, so they only read as panels when the ground behind them
+   * is a shade they can lift off.
+   */
+  background: var(--surface-sunken);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Display and card headings are two different jobs, so they are set as two
+ * different things rather than as one rule with a size range.
+ *
+ * h1 and h2 are the page talking: light, large, close-set. h3 and h4 are a
+ * card's own label — four words on a tile — and a thin face at that size on a
+ * dark ground simply disappears, so they keep their weight.
+ */
+h1,
+h2 {
+  margin: 0;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  font-weight: 300;
+}
+
+h3,
+h4 {
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  font-weight: 600;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ---------------------------- shared layout ---------------------------- */
+
+.container {
+  width: 100%;
+  max-width: var(--max-width);
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+.section {
+  padding-block: 116px;
+}
+
+/*
+  The eyebrow hangs from a vertical rule rather than being led in from the left
+  by a horizontal one.
+
+  The reason is the centred head below it: a rule on one side of a centred label
+  puts the whole block off axis, and a rule on both sides is the decor template's
+  device. A line dropping *into* the label is symmetric, works just as well in
+  the hero where the copy is left-aligned, and is the gesture of something hung
+  on a wall — which is the rest of this theme's idea.
+*/
+.eyebrow {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  /* The tracking is applied to the right of the last letter too, which throws a
+     centred label visibly off centre. Half of it back as padding. */
+  text-indent: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 20px;
+}
+
+.eyebrow::before {
+  content: '';
+  width: 1px;
+  height: 30px;
+  background: linear-gradient(to bottom, transparent, currentColor);
+  flex: none;
+}
+
+.section-title {
+  font-size: clamp(2.1rem, 4.4vw, 3.4rem);
+}
+
+.section-lede {
+  margin-top: 20px;
+  max-width: 58ch;
+  /* Centred with the head that contains it, and still capped at a readable
+     measure — a centred paragraph running the full width of a desktop is the
+     one arrangement worse than a left-aligned one. */
+  margin-inline: auto;
+  color: var(--text-muted);
+  font-size: 1.06rem;
+}
+
+/*
+ * The block every section opens with: centred, on its own axis, capped well
+ * short of the container.
+ *
+ * Centred heads over full-width grids is the page's rhythm — see the note at
+ * the top of this file. It is also why nothing else in the template centres:
+ * a card whose text is centred as well turns the whole page into an axis and
+ * there is then nothing for the head to be an exception to.
+ */
+.section-head {
+  max-width: 44rem;
+  margin-inline: auto;
+  margin-bottom: 56px;
+  text-align: center;
+}
+
+/* ---------------------------- surfaces ---------------------------- */
+
+/*
+ * One card, everywhere. White at 4% over near-black, with a slightly brighter
+ * hairline: the dark-theme equivalent of the white theme's translucent white
+ * panel over cream. The fill alone cannot separate a card from the page at this
+ * contrast, so the border does half the work.
+ */
+.card-surface {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease,
+    background-color 0.22s ease, border-color 0.22s ease;
+}
+
+/*
+ * A shorter lift than the four pixels this used to travel.
+ *
+ * The arches are the thing that moves now — every photograph on the site grows
+ * inside its own frame on hover — and a card that jumps at the same time gives
+ * a grid of six of them a twitch. The panel lightens and stays put; the picture
+ * inside it does the moving.
+ */
+.card-surface:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: var(--shadow-hover);
+}
+
+/*
+ * A muted section is otherwise a flat black rectangle. The gradient gives it a
+ * light source, and the arcs a texture you register without reading — both very
+ * low contrast on purpose.
+ *
+ * Arcs rather than the grid this used to draw, for the same reason the pictures
+ * are arched: a ruled grid is the texture of a dashboard. These are concentric
+ * rings struck from above the top edge, so what shows inside the band is the
+ * shoulder of an arch far too big to see the top of.
+ */
+.section--muted {
+  position: relative;
+  border-block: 1px solid rgba(255, 255, 255, 0.06);
+  background:
+    radial-gradient(60rem 30rem at 88% -10%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%),
+    rgba(255, 255, 255, 0.025);
+}
+
+.section--muted::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.6;
+  background-image:
+    repeating-radial-gradient(
+      circle at 50% -40%,
+      transparent 0 86px,
+      var(--border) 86px 87px
+    );
+  /* Fades out before the edges so the texture never becomes a visible panel. */
+  mask-image: radial-gradient(70% 60% at 50% 40%, #000 20%, transparent 100%);
+}
+
+.section--muted > * {
+  position: relative;
+}
+
+/* ---------------------------- buttons ---------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  /* Taller and wider than the other two themes' control, and tracked open.
+     Against 300-weight headings a small tight button reads as a form element
+     rather than as the thing the section is asking you to do. */
+  padding: 16px 32px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-weight: 600;
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease,
+    transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+/*
+ * The glow is the brand colour rather than black, for the reason the shadows
+ * above are shallow: a black halo around a light button on a black page is
+ * nothing at all, and the button has to look lit.
+ */
+.btn--primary {
+  background: var(--brand);
+  color: var(--brand-contrast);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--brand) 26%, transparent);
+}
+
+.btn--primary:hover {
+  background: var(--brand-strong);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--brand) 36%, transparent);
+}
+
+.btn--ghost {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.btn--ghost:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* Screen-reader-only, for the skip link and icon-button labels. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: 16px;
+  top: -60px;
+  z-index: 100;
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  background: var(--brand);
+  color: var(--brand-contrast);
+  font-weight: 600;
+  transition: top 0.16s ease;
+}
+
+.skip-link:focus {
+  top: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .section {
+    padding-block: 66px;
+  }
+}

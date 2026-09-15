@@ -1,0 +1,431 @@
+/*
+ * The hero, as a floating stage.
+ *
+ * The Atelier version cut a window in a sheet of mount board and put the
+ * photograph behind it; the copy sat on a pale scrim in dark type. None of that
+ * survives, and the two changes are related:
+ *
+ *   **It is a card, not a band.** Inset from the window on all sides and rounded
+ *   to `--radius-lg`, so the page's wash runs past it top, left and right. The
+ *   header above it is a floating pane and the panels below it are floating
+ *   panels; a hero bleeding to three edges would be the only element on the site
+ *   that was not.
+ *
+ *   **The copy is white, over the artwork rather than beside it.** A pale scrim
+ *   is how you keep dark type readable, and it costs you the photograph — at the
+ *   96% the Atelier scrim needed on its left-hand third, the picture a shop
+ *   uploaded is simply not visible there. A dark gradient falling away to
+ *   transparent keeps white type at full contrast where the words are and leaves
+ *   the right-hand half of the image untouched, which is the half the product is
+ *   usually in.
+ *
+ * The consequence is that everything inside here is a dark-surface control, and
+ * the three global classes the markup uses — `.eyebrow`, `.btn--primary`,
+ * `.btn--ghost` — are all restyled at the bottom of this file for it. That is
+ * the one place in the template where a global is overridden wholesale, and it
+ * is because this is the one place a light-theme control is asked to sit on a
+ * photograph.
+ */
+.slider {
+  position: relative;
+  /* The same inset and the same ceiling a `.section--muted` panel takes, so the
+     hero and every band under it share one left and right edge. */
+  width: calc(100% - 32px);
+  max-width: calc(var(--max-width) + 32px);
+  margin-inline: auto;
+  /*
+   * Floated top and bottom, not just top.
+   *
+   * 10px below: the panel that follows carries no top margin of its own, so this
+   * is the whole of the gap between the hero and the first band, and it is meant
+   * to read as two sheets stacked rather than as two separated blocks.
+   */
+  margin-top: 20px;
+  margin-bottom: 10px;
+
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  /* Deeper than any other shadow on the page. The hero is the one object that
+     should look like it is floating highest. */
+  box-shadow: var(--shadow-lg);
+  /* Behind the artwork while it decodes, so a slow image does not flash the
+     page ground through a hero that is about to be dark. */
+  background: var(--brand-strong);
+}
+
+.slider:focus-visible {
+  outline-offset: -4px;
+}
+
+/**
+ * The slide's own background photo, when it has one. Each slide gets its own
+ * layer so they cross-fade with the copy instead of cutting.
+ *
+ * Full-bleed within the card now rather than inset to a mount opening — the
+ * card's own `overflow: hidden` and radius do the cropping the mount used to.
+ */
+.photo {
+  position: absolute;
+  inset: 0;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.7s ease;
+  pointer-events: none;
+}
+
+.photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.photoActive {
+  opacity: 1;
+}
+
+/*
+ * A slow push in on whichever photograph is showing.
+ *
+ * Scoped to the active layer, so it restarts on each slide rather than running
+ * once on all three while two of them are invisible. 9% over 7s is under a pixel
+ * a frame at this size — you notice it has happened, not that it is happening,
+ * which is the only version of this effect worth having.
+ */
+.photoActive img {
+  animation: kenburns 7s ease-out both;
+}
+
+@keyframes kenburns {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.09);
+  }
+}
+
+/*
+ * The ground behind the copy when the tenant has uploaded no artwork — which is
+ * every new tenant, so it has to be a design rather than an absence.
+ *
+ * Dark, because the copy over it is white whether or not a photograph ever
+ * arrives: a hero that switched to dark type on the tenant's empty state and
+ * back again when they uploaded a picture would need two sets of type styles,
+ * two sets of button styles and two scrims, and one of the two would rot.
+ * Charcoal, with a gold bloom bottom-left and a colder one top-right — the same
+ * two lights the page wash uses, turned up to where they read on a dark ground.
+ */
+.wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(46rem 30rem at 4% 108%, color-mix(in srgb, var(--accent) 42%, transparent), transparent 70%),
+    radial-gradient(50rem 28rem at 88% -14%, color-mix(in srgb, var(--brand) 60%, transparent), transparent 68%),
+    linear-gradient(150deg, var(--brand) 0%, var(--brand-strong) 100%);
+  transition: background 0.55s ease;
+}
+
+/*
+ * Two nested rounded rectangles off the top-right corner, drawn in gold
+ * hairlines: an empty frame leaning against the wall.
+ *
+ * The Atelier theme drew the same motif with square corners and argued a
+ * framing shop never cuts a circle. The shapes stay — they are still the right
+ * reference — but they take the theme's radius like everything else, because a
+ * sharp-cornered rectangle is now the only sharp-cornered thing on the site and
+ * it reads as a rendering fault rather than as a frame. Hidden the moment there
+ * is a photograph — see `.washOverPhoto`.
+ */
+.wash::before,
+.wash::after {
+  content: '';
+  position: absolute;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  border-radius: var(--radius-lg);
+}
+
+.wash::before {
+  width: 30rem;
+  height: 34rem;
+  top: -9rem;
+  right: -7rem;
+  transform: rotate(-8deg);
+}
+
+.wash::after {
+  width: 19rem;
+  height: 22rem;
+  top: -3rem;
+  right: -1rem;
+  transform: rotate(4deg);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+/**
+ * Over a photograph the wash becomes a scrim instead.
+ *
+ * Heavy at the left edge where the headline is, gone by about two-thirds
+ * across. Black rather than the brand colour, and deliberately: a tenant whose
+ * theme sets `--brand` to something saturated would otherwise get a coloured
+ * film over their own product photography, and the point of a scrim is that
+ * nobody should be able to tell it is there.
+ *
+ * The second layer is a short lift along the bottom edge, which is what keeps
+ * the slide controls legible over a light-coloured photo without darkening the
+ * whole image to do it.
+ */
+.washOverPhoto::before,
+.washOverPhoto::after {
+  display: none;
+}
+
+.washOverPhoto {
+  background:
+    linear-gradient(to top, rgba(0, 0, 0, 0.5) 0%, transparent 28%),
+    linear-gradient(100deg, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.38) 38%, transparent 72%);
+}
+
+.stage {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  /* Every slide shares one cell, so the hero keeps the height of the tallest
+     and nothing jumps as they cross-fade. */
+  grid-template-areas: 'slide';
+  align-items: center;
+  min-height: min(70vh, 560px);
+  padding-block: 72px 96px;
+}
+
+.slide {
+  grid-area: slide;
+  max-width: 44rem;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+  pointer-events: none;
+}
+
+.active {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/*
+ * The one heading on the site set large enough to be read as a shape rather
+ * than as words, and the only one allowed a measure longer than 16ch.
+ *
+ * Heavier than the global 800 and tracked tighter. At 4rem the gaps between
+ * words are the size of a word at body scale, and a headline that is not closed
+ * up at display size reads as a sentence that happens to be large.
+ */
+.title {
+  font-size: clamp(2.3rem, 5.4vw, 3.9rem);
+  font-weight: 900;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  max-width: 17ch;
+  color: #ffffff;
+  /* Not decoration: a headline crossing from the scrim onto a bright part of a
+     photograph loses its edge without it. Kept low and wide so it reads as the
+     letters sitting slightly off the image rather than as a drop shadow — at any
+     more than this it fogs the counters of a 900-weight face. */
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.26);
+}
+
+.body {
+  margin-top: 20px;
+  max-width: 52ch;
+  font-size: clamp(1rem, 1.4vw, 1.14rem);
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.28);
+}
+
+.actions {
+  margin-top: 32px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* ---------------------------- controls ---------------------------- */
+
+.controls {
+  position: absolute;
+  z-index: 3;
+  left: 40px;
+  bottom: 34px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/*
+ * Round, translucent, blurred: the same glass as the header, over artwork
+ * instead of over the page. White at 12% rather than a solid fill, because an
+ * opaque control sitting on a photograph is a hole punched in it.
+ */
+.arrow {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  color: #ffffff;
+  font-size: 1.05rem;
+  transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+.arrow:hover {
+  background: rgba(255, 255, 255, 0.26);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: translateY(-2px);
+}
+
+.dots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/*
+ * Lozenges rather than the Atelier theme's 2px tick marks.
+ *
+ * A 2px rule was legible against mount board; over a photograph it is a scratch.
+ * These are 10px tall, which is enough to hold a colour, and the active one
+ * stretches to 36px and takes the gold — the one place on a dark surface the
+ * accent appears as a fill rather than as type.
+ */
+.dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.5);
+  transition: width 0.28s ease, background-color 0.22s ease;
+}
+
+.dot:hover {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.dotActive {
+  width: 36px;
+  background: var(--accent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+/* ------------------- globals, restyled for a dark stage ------------------- */
+
+/*
+ * See the note at the top. `.eyebrow`, `.btn--primary` and `.btn--ghost` are
+ * defined in globals.css for a light ground; inside the hero all three would be
+ * either invisible or wrong, so each is replaced here rather than a second class
+ * being added to the markup — the slide does not know what it is sitting on, and
+ * it should not have to.
+ */
+
+/*
+ * The eyebrow becomes a bordered pill. On a light band the tracked gold label
+ * has the whole page to sit quietly on; over a photograph it needs an edge, or
+ * it reads as a caption that has come adrift from something.
+ */
+.slide :global(.eyebrow) {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 18px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  background: rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--accent-soft);
+  margin-bottom: 18px;
+}
+
+/*
+ * The hero's primary action is gold, not charcoal.
+ *
+ * This is the one screen where `.btn--gold` would have been the right class in
+ * the markup, and it cannot be: the slides come from the API, and the primary
+ * button is whatever the tenant typed into Slider Management. So the class stays
+ * `.btn--primary` everywhere and the *stage* decides what primary looks like on
+ * it — which is also the honest description of what is happening. A charcoal
+ * button on a charcoal scrim is not a call to action.
+ */
+.slide :global(.btn--primary) {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-soft) 50%, var(--accent) 100%);
+  color: var(--brand);
+  font-weight: 700;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.3);
+}
+
+.slide :global(.btn--primary):hover {
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.38);
+}
+
+/* Glass, matching the arrows below it. The light-theme ghost is a white pane
+   with a dark label, which over a photograph is neither. */
+.slide :global(.btn--ghost) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #ffffff;
+}
+
+.slide :global(.btn--ghost):hover {
+  background: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.7);
+  color: #ffffff;
+}
+
+/**
+ * Where the artwork turns portrait, the scrim turns vertical with it: heavy
+ * behind the copy, clearing below. A left-to-right scrim on a 390px screen
+ * covers the whole image, which is a poor return on a company having uploaded a
+ * mobile crop at all.
+ *
+ * 768px, not 640: a phone held in landscape and a small tablet are both "mobile
+ * view" to the person looking at them. Must match the `media` on the <source>
+ * in Slider.tsx.
+ */
+@media (max-width: 768px) {
+  .washOverPhoto {
+    background:
+      linear-gradient(to top, rgba(0, 0, 0, 0.55) 0%, transparent 30%),
+      linear-gradient(180deg, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.42) 48%, rgba(0, 0, 0, 0.3) 100%);
+  }
+}
+
+@media (max-width: 640px) {
+  .slider {
+    /* Matches the gutter the header and the panels drop to at this breakpoint. */
+    width: calc(100% - 20px);
+    margin-top: 12px;
+    /* The same 10px as the desktop gap. It is already the tightest the stack
+       reads at, and halving it on a phone would close it entirely. */
+    margin-bottom: 10px;
+    border-radius: var(--radius);
+  }
+
+  .stage {
+    min-height: 0;
+    padding-block: 56px 92px;
+  }
+
+  /* Centred under the copy, where a thumb reaches. */
+  .controls {
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 28px;
+  }
+}

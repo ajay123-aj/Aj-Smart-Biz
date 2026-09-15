@@ -16,6 +16,20 @@ module.exports = (sequelize) =>
       /** Relative upload paths, e.g. /uploads/branch/logo-17...png */
       logo: { type: DataTypes.STRING(255), allowNull: true },
       favicon: { type: DataTypes.STRING(255), allowNull: true },
+      /**
+       * This branch's **own** website colours, laid over the company's.
+       *
+       * Only ever consulted when a host resolved to this branch — see
+       * `company_domain`, which may pin one. A company whose Surat shop has its
+       * own domain can give that one site its own colours without touching the
+       * others, and a branch that sets only an accent keeps the company's
+       * primary and secondary.
+       *
+       * Same column, same shape and same rules as `companies.theme_config`; the
+       * merge order is branch → company → preset and lives in one place, in
+       * `services/theme.service`.
+       */
+      themeConfig: { type: DataTypes.JSON, allowNull: true },
       email: { type: DataTypes.STRING(160), allowNull: true, validate: { isEmail: true } },
       phone: { type: DataTypes.STRING(20), allowNull: true },
       gstNumber: { type: DataTypes.STRING(20), allowNull: true },

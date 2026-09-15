@@ -1,0 +1,87 @@
+/* ------------------------------------------------------------------ *
+ * The figures — the band around the cards.
+ *
+ * The cards bring their own styling; see `StatsGrid.module.css`. What is left
+ * here is the ground and the head above it.
+ *
+ * This lived in the home page's stylesheet while the home page was the only
+ * caller. The About page shows the same band now, so it belongs to the
+ * component rather than to a page — two copies of a band is how two bands end
+ * up different.
+ * ------------------------------------------------------------------ */
+
+.section {
+  padding-block: 88px;
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--border);
+}
+
+/*
+ * The heading over the row. Centred and narrow — centred because the row it
+ * heads is wide, shallow and symmetrical; narrow because a centred measure is
+ * harder to read than a ragged-left one and has to be kept short to compensate.
+ */
+.head {
+  max-width: 44rem;
+  margin: 0 auto 52px;
+  text-align: center;
+}
+
+/*
+ * The global eyebrow carries a hairline on its left, which is right when it is
+ * flush left and lopsided when it is centred. A matching one on the right makes
+ * it symmetrical; `justify-content` is what actually centres the flex box,
+ * since the element is `inline-flex` and would otherwise sit left inside a
+ * centred line box on its own.
+ */
+.eyebrow {
+  justify-content: center;
+}
+
+.eyebrow::after {
+  content: '';
+  width: 26px;
+  height: 1px;
+  background: currentColor;
+  flex: none;
+}
+
+/*
+ * Not `.section-lede`: that one is left-aligned with a 62ch measure, which
+ * centred would be a very wide ragged block. This is capped shorter and centred
+ * with it.
+ */
+.lede {
+  margin: 18px auto 0;
+  max-width: 54ch;
+  color: var(--text-muted);
+  font-size: 1.06rem;
+}
+
+/* ------------------------------ responsive ------------------------------ */
+
+/* Tablet. The head loses the width it does not need before the cards reflow. */
+@media (max-width: 900px) {
+  .section {
+    padding-block: 68px;
+  }
+
+  .head {
+    margin-bottom: 40px;
+  }
+}
+
+@media (max-width: 620px) {
+  .section {
+    padding-block: 52px;
+  }
+
+  .head {
+    margin-bottom: 30px;
+  }
+
+  .lede {
+    margin-top: 14px;
+    font-size: 0.98rem;
+  }
+}

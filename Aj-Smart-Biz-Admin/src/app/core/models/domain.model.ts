@@ -1562,6 +1562,66 @@ export interface CompanyAdmin extends AuditFields {
   generatedPassword?: string | null;
 }
 
+/* ----------------------------- website theme ---------------------------- */
+
+/**
+ * The four colours a website template actually reads. Deliberately shorter
+ * than the platform's `themes` table, which also carries text, background,
+ * sidebar and font columns — nothing consumes those today, so the screen does
+ * not offer them.
+ */
+export interface WebsiteThemeColours {
+  primaryColor: string | null;
+  secondaryColor: string | null;
+  accentColor: string | null;
+  mode: 'light' | 'dark' | null;
+}
+
+/** The shared preset a company falls back to, named so the screen can say which. */
+export interface WebsiteThemePreset extends WebsiteThemeColours {
+  id: number | null;
+  name: string | null;
+}
+
+/**
+ * What the console *sends*, which is not quite what it reads back.
+ *
+ * The extra `''` is the whole point: a blank field means "clear this one and
+ * follow the preset", and the API strips blanks before they reach the column.
+ * Typing the request as `WebsiteThemeColours` would force the screen to invent
+ * a `null` for an empty text input, which is a different value the form cannot
+ * actually hold.
+ */
+export type WebsiteThemeInput = {
+  [K in keyof WebsiteThemeColours]?: NonNullable<WebsiteThemeColours[K]> | '';
+};
+
+/**
+ * `GET /admin/company/theme[?branchId=]`.
+ *
+ * Everything the screen needs to be honest about what it is showing, for one
+ * **scope** — the company-wide theme, or one branch's own.
+ *
+ * The chain is branch → company → preset, each winning over the next key by
+ * key, so a field sitting on an inherited colour is *inheriting*, not empty.
+ * That is the same distinction the About and Contact editors draw, and
+ * `inherited` is what makes it showable: it is what this scope would fall back
+ * to if its own values were cleared.
+ */
+export interface WebsiteThemeView {
+  /** The scope this describes. `null` is the company-wide theme. */
+  branchId: number | null;
+  effective: WebsiteThemeColours | null;
+  /** Only this scope's own values. `null` when it is fully inheriting. */
+  own: Partial<WebsiteThemeColours> | null;
+  overridden: boolean;
+  /** What Clear would give this scope: the company's colours for a branch, the preset for the company. */
+  inherited: WebsiteThemeColours | null;
+  preset: WebsiteThemePreset | null;
+  /** The branches this company can scope to, for the selector. */
+  branches: { id: number; name: string; code: string }[];
+}
+
 /* -------------------------------- company ------------------------------ */
 export interface Company extends AuditFields {
   name: string;

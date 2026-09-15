@@ -1,6 +1,6 @@
 'use strict';
 
-const { Joi, id, idParam, listQuery, email, phone, password, status } = require('./common');
+const { Joi, id, idParam, listQuery, email, phone, password, status, hexColor } = require('./common');
 const { PAYMENT_MODE, TRANSACTION_STATUS, SUBSCRIPTION_STATUS } = require('../constants');
 
 /** An upload path returned by `POST /uploads/:folder`, or an absolute URL. */
@@ -92,6 +92,53 @@ const companyCreate = {
 const companyUpdate = { params: idParam, body: Joi.object(companyFields).min(1) };
 /** `PUT /my-company` has no `:id` in the path - the tenant comes from the token. */
 const companyUpdateSelf = { body: Joi.object(companyFields).min(1) };
+
+/* ---------------- Website theme ---------------- */
+/**
+ * Which scope is being read or written. Absent, `none` or `null` all mean the
+ * company-wide theme; an id means that branch's own.
+ *
+ * Accepted in the query *and* the body because the console sends it either way
+ * depending on the verb, which is the arrangement the About and Contact
+ * editors already use — see `themeScopeOf` in the company controller, which
+ * reads both.
+ */
+const themeScope = Joi.alternatives()
+  .try(id, Joi.string().valid('none', 'null', ''))
+  .messages({ 'alternatives.match': 'branchId must be a branch id, or "none" for the company-wide theme' });
+
+const themeQuery = { query: Joi.object({ branchId: themeScope }) };
+
+/**
+ * `PUT /my-company/theme[?branchId=]` - the colours one scope paints the
+ * website with.
+ *
+ * A closed set, and only the four keys a template actually reads. The `themes`
+ * table carries text, background, sidebar and font columns as well; none of
+ * them is consumed by any website today, so accepting them here would be
+ * storing settings that change nothing. Add one when a template starts using
+ * it - see `WEBSITE_THEME_KEYS` in `services/theme.service`, which this has to
+ * stay in step with.
+ *
+ * Every field allows `''` and `null`, and both mean the same thing: *unset*.
+ * That is what makes a single field resettable - clearing the accent on a
+ * branch drops it back to the company's accent rather than to no accent, and
+ * the service strips blanks before they reach the column.
+ *
+ * `.min(1)` rather than requiring a primary colour: a caller may legitimately
+ * send only `mode`, or only an accent, and the merge in `theme.service` fills
+ * the rest in from the level below.
+ */
+const themeSave = {
+  query: Joi.object({ branchId: themeScope }),
+  body: Joi.object({
+    branchId: themeScope,
+    primaryColor: hexColor.allow('', null),
+    secondaryColor: hexColor.allow('', null),
+    accentColor: hexColor.allow('', null),
+    mode: Joi.string().valid('light', 'dark').allow('', null),
+  }).min(1),
+};
 
 const companyList = {
   query: listQuery({
@@ -222,6 +269,8 @@ module.exports = {
   domainCreate,
   domainUpdate,
   companyUpdateSelf,
+  themeQuery,
+  themeSave,
   companyList,
   branchCreate,
   branchUpdate,

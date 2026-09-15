@@ -1,0 +1,93 @@
+.head {
+  padding-block: 64px 12px;
+}
+
+.title {
+  max-width: 22ch;
+  font-size: clamp(2.1rem, 4.6vw, 3rem);
+  line-height: 1.07;
+  letter-spacing: -0.032em;
+}
+
+.lede {
+  margin-top: 18px;
+  max-width: 62ch;
+  color: var(--text-muted);
+  font-size: 1.06rem;
+  line-height: 1.66;
+}
+
+/* -------------------------------- prose -------------------------------- */
+
+.bodySection {
+  padding-block: 40px 20px;
+}
+
+/*
+ * Three paragraphs of argument, at a proper reading measure.
+ *
+ * 66 characters, one column. This is the only place on the site with more than
+ * four sentences in a row, and the one thing it must not do is set them at the
+ * container's full 1200px — a 150-character line is unreadable however good the
+ * writing is.
+ */
+.prose {
+  display: grid;
+  gap: 20px;
+  max-width: 66ch;
+  color: var(--text-muted);
+  font-size: 1.02rem;
+  line-height: 1.75;
+}
+
+/* -------------------------------- values -------------------------------- */
+
+/* Rows, not cards — this band sits on a panel, and glass inside glass makes the
+   material stop meaning anything. Same reasoning as the promises band. */
+.values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 28px 34px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.value {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.valueIcon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--aurora-1) 28%, transparent),
+    color-mix(in srgb, var(--aurora-3) 20%, transparent)
+  );
+  border: 1px solid var(--hairline-strong);
+  color: var(--text);
+}
+
+.valueIcon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.valueTitle {
+  font-size: 1.04rem;
+  letter-spacing: -0.012em;
+}
+
+.valueBody {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}

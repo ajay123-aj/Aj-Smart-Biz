@@ -1,0 +1,95 @@
+/*
+ * A denser grid than the capability one.
+ *
+ * There are fifteen of these and each carries a short line, so the tiles are
+ * narrower and the block reads as a *list of trades* at a glance — which is the
+ * job. A grid of six wide cards would read as six offerings.
+ */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(222px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 22px 20px 20px;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 15px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--hairline);
+  color: var(--accent-text);
+}
+
+.icon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.name {
+  font-size: 0.98rem;
+  letter-spacing: -0.01em;
+}
+
+.body {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+/*
+ * The "yours isn't listed" tile.
+ *
+ * Marked out by its edge and its icon colour rather than by a fill: it sits in
+ * the same grid as the real trades and should read as one more tile that
+ * happens to be pressable, not as an advertisement wedged into the list.
+ */
+.other {
+  border-color: var(--hairline-strong);
+}
+
+.other .icon {
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--aurora-1) 30%, transparent),
+    color-mix(in srgb, var(--aurora-3) 22%, transparent)
+  );
+  border-color: var(--hairline-strong);
+  color: var(--text);
+}
+
+.otherCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  /* `margin-top: auto` inside the flex column pins this to the bottom, so the
+     link sits on the tile's baseline however long the line above it runs. */
+  margin-top: auto;
+  padding-top: 16px;
+  color: var(--accent-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.otherIcon {
+  width: 15px;
+  height: 15px;
+  transition: transform 0.2s ease;
+}
+
+.other:hover .otherIcon {
+  transform: translateX(3px);
+}

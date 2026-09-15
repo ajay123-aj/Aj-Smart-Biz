@@ -1,0 +1,149 @@
+.footer {
+  background: var(--surface-muted);
+  border-top: 1px solid var(--border);
+  color: var(--text);
+}
+
+/*
+  Flex rather than grid, because the number of columns is not fixed: the
+  locations column only exists once a company has more than one branch.
+
+  `repeat(auto-fit, …)` cannot do this job here — following a `1.6fr` track it
+  resolves to a single repetition, which put every link column on its own row.
+  With flex the about block takes the space it needs and the link columns share
+  what is left, at three columns or four.
+*/
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 48px;
+  padding-block: 64px 48px;
+}
+
+.about {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+/* ------------------------------ about ------------------------------ */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  height: 42px;
+  width: auto;
+  max-width: 180px;
+  object-fit: contain;
+}
+
+.logoFallback {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--brand);
+  color: var(--brand-contrast);
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.brandName {
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+}
+
+.tagline {
+  margin-top: 16px;
+  max-width: 44ch;
+  color: var(--text-muted);
+}
+
+.branch {
+  margin-top: 12px;
+  font-size: 0.88rem;
+  color: var(--text-faint);
+}
+
+/* ------------------------------ columns ------------------------------ */
+
+.column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  /* Wide enough for an email address before it wraps, narrow enough that three
+     of them still fit beside the about block. */
+  flex: 0 1 210px;
+  min-width: 0;
+}
+
+.columnTitle {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+
+.link {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  transition: color 0.16s ease;
+}
+
+.link:hover {
+  color: var(--brand);
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* ------------------------------ bottom ------------------------------ */
+
+.bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 22px;
+  border-top: 1px solid var(--border);
+  font-size: 0.87rem;
+  color: var(--text-faint);
+}
+
+.meta {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .top {
+    gap: 40px;
+  }
+
+  /* The about block takes the full row and the link columns pair up under it. */
+  .about {
+    flex-basis: 100%;
+  }
+
+  .column {
+    flex: 1 1 160px;
+  }
+}
+
+@media (max-width: 560px) {
+  .top {
+    flex-direction: column;
+    padding-block: 48px 36px;
+  }
+}

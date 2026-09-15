@@ -11,6 +11,7 @@ const customerService = require('../services/customer.service');
 const bookingService = require('../services/booking.service');
 const logger = require('../utils/logger');
 const { resolveServiceState } = require('../services/serviceState.service');
+const { resolveTheme } = require('../services/theme.service');
 const ApiError = require('../utils/ApiError');
 const { created } = require('../utils/response');
 const {
@@ -117,12 +118,25 @@ const branding = asyncHandler(async (req, res) => {
     return success(res, { message: 'Branding fetched successfully', data: platform });
   }
 
-  const theme = company.themeId
+  /**
+   * The preset, then the company's own values laid over it.
+   *
+   * `themes` is the platform's shared catalogue, so the row found here may be
+   * serving a dozen other tenants — it is the starting point, not the answer.
+   * See `services/theme.service`.
+   */
+  const preset = company.themeId
     ? await db.Theme.findOne({
       where: { id: company.themeId, status: STATUS.ACTIVE },
       attributes: ['id', 'name', 'primaryColor', 'secondaryColor', 'accentColor', 'mode'],
     })
     : null;
+  /*
+   * Branch first, then the company, then the preset — the same order the logo
+   * and favicon below already follow, so a visitor on a branch domain never
+   * gets that branch's mark above the company's colours.
+   */
+  const theme = resolveTheme({ branch, company, preset });
 
   /**
    * Last resort for images: the head office. A company that only ever branded
@@ -149,14 +163,8 @@ const branding = asyncHandler(async (req, res) => {
       logo: branch?.logo || company.logo || mainBranch?.logo || null,
       favicon: branch?.favicon || company.favicon || mainBranch?.favicon || null,
       branch: branch ? { id: branch.id, name: branch.name, code: branch.code } : null,
-      theme: theme
-        ? {
-          primaryColor: theme.primaryColor,
-          secondaryColor: theme.secondaryColor,
-          accentColor: theme.accentColor,
-          mode: theme.mode,
-        }
-        : null,
+      /** Already merged and already shaped for the client — see above. */
+      theme,
     },
   });
 });
@@ -281,7 +289,7 @@ const platformDetails = (host) => ({
  *
  * The whole public profile of the tenant that owns a host: name, tagline, logo,
  * favicon, theme, contact details, address and branches. This is what the
- * customer-facing websites in `websites/` launch with — they pass the domain they
+ * customer-facing websites in `themes/` launch with — they pass the domain they
  * were served on and render whatever comes back.
  *
  * Unauthenticated, like `/public/branding`, and bound by the same two rules:
@@ -321,7 +329,8 @@ const companyDetails = asyncHandler(async (req, res) => {
     return success(res, { message: 'Company details fetched successfully', data: platformDetails(host) });
   }
 
-  const [theme, businessType, state, branches] = await Promise.all([
+  const [preset, businessType, state, branches] = await Promise.all([
+    // The shared preset. The company's own colours are laid over it below.
     company.themeId
       ? db.Theme.findOne({
         where: { id: company.themeId, status: STATUS.ACTIVE },
@@ -390,14 +399,12 @@ const companyDetails = asyncHandler(async (req, res) => {
       businessType: businessType
         ? { id: businessType.id, name: businessType.name, slug: businessType.slug ?? null }
         : null,
-      theme: theme
-        ? {
-          primaryColor: theme.primaryColor,
-          secondaryColor: theme.secondaryColor,
-          accentColor: theme.accentColor,
-          mode: theme.mode,
-        }
-        : null,
+      /**
+       * The preset with the company's own colours laid over it, key by key.
+       * `null` when neither has anything to say, which every template reads as
+       * "use the design you shipped with". See `services/theme.service`.
+       */
+      theme: resolveTheme({ branch, company, preset }),
       contact: {
         email: company.email ?? null,
         phone: company.phone ?? null,

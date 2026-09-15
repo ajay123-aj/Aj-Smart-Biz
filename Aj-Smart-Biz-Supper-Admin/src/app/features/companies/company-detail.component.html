@@ -310,10 +310,25 @@
         <dl class="dl">
           <div class="dl-item"><dt>Legal name</dt><dd>{{ c.legalName || '—' }}</dd></div>
           <div class="dl-item"><dt>Business type</dt><dd>{{ c.businessType?.name || '—' }}</dd></div>
+          <!--
+            The swatch shows the colour the website is actually painted with,
+            which is not always the preset's: a company can set its own colours
+            under Company Details → Website theme, and those win. Showing the
+            preset's swatch unqualified would be wrong for precisely the
+            companies somebody came here to look at.
+          -->
           <div class="dl-item"><dt>Theme</dt><dd>
-            @if (c.theme) {
+            @if (effectivePrimary(c); as primary) {
               <span class="row" style="gap:6px">
-                <span class="swatch" [style.background]="c.theme.primaryColor"></span>{{ c.theme.name }}
+                <span class="swatch" [style.background]="primary"></span>
+                @if (hasOwnTheme(c)) {
+                  <span>Own colours</span>
+                  @if (c.theme) {
+                    <span class="tiny muted">(preset: {{ c.theme.name }})</span>
+                  }
+                } @else {
+                  {{ c.theme?.name || 'Preset' }}
+                }
               </span>
             } @else { — }
           </dd></div>

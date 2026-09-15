@@ -247,6 +247,27 @@ export class CompanyDetailComponent {
     );
   }
 
+  /**
+   * True when this company has recoloured its own website.
+   *
+   * A preset is shared, so the row named beside the swatch may be serving a
+   * dozen tenants — and any of them can override it. Without this the detail
+   * screen shows the preset's colour as though it were the company's, which is
+   * wrong for exactly the companies somebody is most likely to be looking at.
+   */
+  hasOwnTheme(company: Company): boolean {
+    const own = company.themeConfig;
+    return Boolean(own && Object.values(own).some((value) => typeof value === 'string' && value.trim() !== ''));
+  }
+
+  /**
+   * The primary colour the website is actually painted with: the company's own
+   * if it set one, otherwise the preset's.
+   */
+  effectivePrimary(company: Company): string | null {
+    return company.themeConfig?.primaryColor || company.theme?.primaryColor || null;
+  }
+
   modeLabel(mode: string): string {
     return mode.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
   }

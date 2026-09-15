@@ -33,6 +33,39 @@ favicon (`.ico` only) and description. Saving applies them immediately — the t
 icon, the tab title and the sidebar logo all repaint without a reload, because
 the form feeds `BrandingService` straight from the update response.
 
+### Setting your website colours
+
+**Company Details → Website theme** sets the colours the company's *public
+website* is painted with — primary, secondary, accent and light/dark mode — for
+the whole company or for one branch. Writes are the main admin's, like the
+profile and the domains.
+
+The thing worth understanding about this screen is what it does **not** edit.
+The platform keeps a catalogue of theme *presets*, and a preset can be serving a
+dozen tenants at once — so editing one to recolour a single website would
+recolour all of them. This screen writes the company's own colours instead, and
+the API lays them over the preset field by field.
+
+That is why every control can be cleared individually: an empty field is not "no
+colour", it is "follow the preset". The hint under each field says which of the
+two it is currently doing, and **Reset to the preset** discards the lot. A field
+left empty with no preset behind it falls through to the website template's own
+default.
+
+**Branch-aware.** A company with more than one branch gets a scope selector at
+the top: *All branches (company-wide)*, or one branch. A branch only shows its
+own colours on a domain pinned to it — branches without one are served the
+company-wide site — so the screen says that plainly rather than letting somebody
+set colours nobody will ever see. The full chain is branch → company → preset,
+and the hint under each field names whichever of those it is currently following.
+
+Four colours and no more, because four is what the website templates read. The
+preset rows carry text, background, sidebar and font columns as well; offering
+controls for those would be offering settings that change nothing.
+
+> Not to be confused with the light/dark toggle in the console header. That one
+> is *this console's* appearance, is per-browser, and never leaves your machine.
+
 The same fields exist on the super admin's company form, so a tenant can be set
 up centrally and then adjust its own branding afterwards.
 
@@ -95,7 +128,7 @@ follow the company on the token, whatever host the app was opened from.
 | Route | Menu slug | What it does |
 | --- | --- | --- |
 | `/dashboard` | `dashboard` | Total admins (active / inactive), branches, roles, current plan with days remaining and a quota usage bar |
-| `/company` | `company-details` | Tabbed: **Company profile** (editable by the main admin), **Branches** (add, edit incl. logo/favicon upload, activate/deactivate, delete), **Domains** (map hosts to the company or one of its branches), **Plan & billing** |
+| `/company` | `company-details` | Tabbed: **Company profile** (editable by the main admin), **Branches** (add, edit incl. logo/favicon upload, activate/deactivate, delete), **Domains** (map hosts to the company or one of its branches), **Website theme** (the company's own website colours), **Plan & billing** |
 | `/company/branches/:id` | `branch-management` | Branch details and its contacts — add, edit, delete, mark primary |
 | `/roles` | `role-management` | Role list — create, edit, activate/deactivate, delete; shows how many admins hold each role |
 | `/menu-permissions` | `menu-permission` | **Role permissions** grid (view / create / edit / delete / export per menu) and **Menus** CRUD |

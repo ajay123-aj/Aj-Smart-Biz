@@ -1,0 +1,260 @@
+/*
+ * The hero, domed.
+ *
+ * The same elliptical trick `--arch` uses, turned over: the bottom two corners
+ * take half the width horizontally and a few percent of the height vertically,
+ * so the foot of the hero is the *top* of an arch far too large to see the rest
+ * of. It is the first thing on the page and it sets up every arched picture
+ * below it.
+ *
+ * Kept to 4%. A deeper curve eats the corners of a photograph somebody uploaded
+ * and starts cropping the controls, and the shape is meant to be noticed on the
+ * second look rather than the first.
+ */
+.slider {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  border-radius: 0 0 50% 50% / 0 0 4% 4%;
+}
+
+.slider:focus-visible {
+  outline-offset: -4px;
+}
+
+/**
+ * The slide's own background photo, when it has one. Each slide gets its own
+ * layer so they cross-fade with the copy instead of cutting.
+ */
+.photo {
+  position: absolute;
+  inset: 0;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.55s ease;
+  pointer-events: none;
+}
+
+.photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.photoActive {
+  opacity: 1;
+}
+
+/*
+ * The ground behind the copy when the tenant has uploaded no artwork — which is
+ * every new tenant, so it has to be a design rather than an absence. Warm
+ * gradients, an accent bloom, and the concentric arcs below.
+ */
+.wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(50rem 28rem at 78% -14%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 68%),
+    radial-gradient(46rem 30rem at 6% 112%, color-mix(in srgb, var(--brand) 12%, transparent), transparent 70%),
+    linear-gradient(170deg, var(--surface-sunken) 0%, var(--surface) 62%);
+  transition: background 0.55s ease;
+}
+
+/*
+ * Two very faint concentric rings off the right edge. They give the empty hero
+ * a focal point and a sense of depth without needing a photograph, and they are
+ * hidden the moment there is one — see `.washOverPhoto`.
+ */
+.wash::before,
+.wash::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+.wash::before {
+  width: 40rem;
+  height: 40rem;
+  top: -12rem;
+  right: -10rem;
+}
+
+.wash::after {
+  width: 26rem;
+  height: 26rem;
+  top: -4rem;
+  right: -2rem;
+  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/**
+ * Over a photo the tint becomes a scrim instead: the copy is light text on a
+ * black theme, so it needs the image held back on the side it sits on. Solid
+ * enough at the left edge to keep the headline readable over a busy photo,
+ * clearing by the middle so the image is still the thing you see.
+ *
+ * Black here where the white theme uses white, and that is the whole difference
+ * — the same stops, the same angle, the opposite colour. A scrim's job is to
+ * separate the copy from the picture, so it has to be the ground's colour, not
+ * the picture's.
+ */
+.washOverPhoto::before,
+.washOverPhoto::after {
+  display: none;
+}
+
+.washOverPhoto {
+  background: linear-gradient(
+    100deg,
+    rgba(6, 6, 8, 0.96) 0%,
+    rgba(6, 6, 8, 0.9) 34%,
+    rgba(6, 6, 8, 0.66) 56%,
+    rgba(6, 6, 8, 0.34) 78%,
+    rgba(6, 6, 8, 0.18) 100%
+  );
+}
+
+.stage {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  /* Every slide shares one cell, so the hero keeps the height of the tallest
+     and nothing jumps as they cross-fade. */
+  grid-template-areas: 'slide';
+  align-items: center;
+  min-height: min(80vh, 680px);
+  padding-block: 104px 132px;
+}
+
+.slide {
+  grid-area: slide;
+  max-width: 760px;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+  pointer-events: none;
+}
+
+.active {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/*
+ * Larger than the other two themes carry, because it is set in the 300 weight
+ * the h1 rule now gives it — a light face has to be big to have any presence,
+ * and that is the trade this theme makes deliberately.
+ */
+.title {
+  font-size: clamp(2.6rem, 6.4vw, 4.8rem);
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+  max-width: 15ch;
+}
+
+.body {
+  margin-top: 20px;
+  max-width: 60ch;
+  font-size: clamp(1.02rem, 1.5vw, 1.2rem);
+  color: var(--text-muted);
+}
+
+.actions {
+  margin-top: 34px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* ---------------------------- controls ---------------------------- */
+
+/* Held clear of the dome: at the left-hand edge the foot of the hero has
+   already started to rise, and controls on the old offsets sat on the curve. */
+.controls {
+  position: absolute;
+  left: 40px;
+  bottom: 64px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.arrow {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.05rem;
+  transition: border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.arrow:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+  box-shadow: var(--shadow-sm);
+}
+
+.dots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: width 0.22s ease, background-color 0.22s ease;
+}
+
+.dotActive {
+  width: 30px;
+  background: var(--brand);
+}
+
+/**
+ * Where the artwork turns portrait, the scrim turns vertical with it: heavy
+ * behind the copy, clearing below. A flat wash at the strength the headline
+ * needs erases the picture entirely, which is a poor return on a company having
+ * uploaded a mobile crop at all.
+ *
+ * 768px, not 640: a phone held in landscape and a small tablet are both "mobile
+ * view" to the person looking at them. Must match the `media` on the <source>
+ * in Slider.tsx.
+ */
+@media (max-width: 768px) {
+  .washOverPhoto {
+    background: linear-gradient(
+      180deg,
+      rgba(6, 6, 8, 0.94) 0%,
+      rgba(6, 6, 8, 0.92) 52%,
+      rgba(6, 6, 8, 0.7) 74%,
+      rgba(6, 6, 8, 0.4) 100%
+    );
+  }
+}
+
+@media (max-width: 640px) {
+  .stage {
+    min-height: 0;
+    padding-block: 64px 104px;
+  }
+
+  .controls {
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 48px;
+  }
+}

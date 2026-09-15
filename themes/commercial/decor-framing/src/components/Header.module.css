@@ -1,0 +1,409 @@
+/*
+ * The header, as a floating bar.
+ *
+ * The Atelier version was a full-width strip of mount board ruled off from the
+ * page with `3px double`. This one does not touch any edge of the window: the
+ * `<header>` itself is an invisible sticky frame that only supplies the gutter,
+ * and the bar inside it is a rounded pane of glass with the page sliding under
+ * it. That is the theme's first decision applied to the one element present on
+ * every screen of the site — if the header sat flush to the top there would be
+ * no wash visible above it, and the whole page would lose its ground.
+ */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  /* The gutter the bar floats in. Top padding is what separates it from the
+     window edge; the side padding matches the inset a `.section--muted` panel
+     takes, so the bar and the panels below it line up. */
+  padding: 14px 16px 0;
+  background: transparent;
+}
+
+/*
+ * The bar. `.container` is on the same element, so the max-width and the
+ * 24px inner gutter come from there and everything below is the material.
+ *
+ * `backdrop-filter` is the load-bearing line: at 45% white the fill alone would
+ * show whatever scrolls behind it as a legible picture, and the blur is what
+ * turns that into a shift in colour. The saturation boost stops the warm ground
+ * going grey behind it — same reasoning as `--glass-blur` in globals.css, at a
+ * heavier blur because this is the one surface with content moving under it.
+ */
+.inner {
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.55);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  backdrop-filter: blur(28px) saturate(170%);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 16px 50px color-mix(in srgb, var(--brand) 12%, transparent), var(--glass-sheen);
+  transition: background-color 0.24s ease, box-shadow 0.24s ease;
+}
+
+/*
+ * Once the page has moved under it the glass thickens slightly and the shadow
+ * deepens. The bar is in exactly the same place — nothing resizes, nothing
+ * reflows — it has simply been told it is now in front of something.
+ */
+.scrolled .inner {
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 22px 60px color-mix(in srgb, var(--brand) 18%, transparent), var(--glass-sheen);
+}
+
+/* ------------------------------ brand ------------------------------ */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/*
+ * The tenant's logo, cropped to a circle.
+ *
+ * `object-fit: cover` on a fixed square rather than the Atelier theme's
+ * `contain` on a free-width box. Contain is the safe choice — it never crops
+ * anybody's wordmark — but it also means the bar's left-hand end changes shape
+ * per tenant, and a round mark with a ring around it is the single strongest
+ * signal that everything on this page is a floating object. A tenant whose logo
+ * is a long wordmark is better served by the name beside it, which is already
+ * there.
+ */
+.logo {
+  height: 44px;
+  width: 44px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--brand) 22%, transparent);
+  outline: 1px solid rgba(255, 255, 255, 0.5);
+  transition: transform 0.3s ease;
+}
+
+.brand:hover .logo {
+  transform: scale(1.06);
+}
+
+.logoFallback {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  /* A disc, matching the shape a real logo is cropped to above, so a tenant
+     with no artwork gets the same silhouette as one with. */
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: var(--brand-contrast);
+  font-weight: 700;
+  font-size: 1.15rem;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--brand) 25%, transparent);
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.brandName {
+  font-weight: 700;
+  font-size: 1.06rem;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The branch, in the accent. It is the one place on the bar gold appears, and
+   it is what keeps the brand block from being two lines of the same grey. */
+.brandBranch {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ------------------------------ nav ------------------------------ */
+
+/*
+ * The menu is a pill of its own, inside the bar — glass on glass.
+ *
+ * It reads as a segmented control rather than as a row of links, which is the
+ * point: the links in it are the *pages*, and grouping them visually is what
+ * separates them from the actions further right, which are not pages at all.
+ */
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  /* Takes itself and the actions after it to the right-hand end. */
+  margin-left: auto;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.45);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/*
+ * Each link is a chip that fills with the brand colour on hover.
+ *
+ * The Atelier version underlined a word in tracked capitals. A fill rather than
+ * a rule, because inside a segmented control the thing that shows which segment
+ * you are pointing at is the segment lighting up — and because the padding is
+ * already there at rest, so the fill costs no reflow.
+ */
+.navLink {
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--text) 78%, transparent);
+  transition: color 0.16s ease, background-color 0.16s ease;
+}
+
+.navLink:hover {
+  background: var(--brand);
+  color: var(--brand-contrast);
+}
+
+/*
+  Sized down from the default pill so the bar keeps its height. It sits before
+  the primary CTA rather than after it: the CTA is still the action the page is
+  asking for, and WhatsApp is the alternative to it.
+*/
+.navWhatsapp {
+  margin-left: 8px;
+  padding: 10px 18px;
+  font-size: 0.86rem;
+}
+
+.navCta {
+  margin-left: 8px;
+  padding: 11px 22px;
+  font-size: 0.86rem;
+}
+
+/* ------------------------------- actions ------------------------------- */
+
+/*
+ * WhatsApp, the account and the basket: three glyphs, one group, hard right.
+ *
+ * They are not places on the site — they are things about *you* and about this
+ * moment — which is why they sit outside the navigation and stay reachable when
+ * the mobile menu is shut. Grouped so the gap between them is tighter than the
+ * gap to the menu; a row of evenly spaced controls reads as one undifferentiated
+ * strip.
+ */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+/*
+ * One round button for all three, so they line up whatever is inside them.
+ *
+ * **Scoped under `.actions` deliberately.** Each of these components carries its
+ * own base class too — the WhatsApp link is a full button elsewhere on the page,
+ * the basket is a pill in its own module — and two single-class rules would be
+ * left to fight it out on stylesheet order, which is not a thing to leave to
+ * chance. Two classes beats one, everywhere, every time.
+ *
+ * Sized to the touch target a thumb needs rather than to the glyph inside it,
+ * and circular rather than square: these are the only controls on the bar that
+ * carry no label, and a disc is what reads as "icon" without one.
+ */
+.actions .action {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  padding: 0;
+  gap: 0;
+
+  border: 1px solid color-mix(in srgb, var(--brand) 20%, transparent);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--brand);
+
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+/* The same fill the nav chips take, for the same reason. */
+.actions .action:hover {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--brand-contrast);
+}
+
+.actions .action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.actions .action svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* WhatsApp keeps its own colour: it is the one action that leaves the site. */
+.actions .action:first-child {
+  color: var(--whatsapp-dark);
+}
+
+.actions .action:first-child:hover {
+  background: var(--whatsapp);
+  border-color: var(--whatsapp);
+  color: #ffffff;
+}
+
+/* ------------------------------ mobile ------------------------------ */
+
+.toggle {
+  display: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--brand) 20%, transparent);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.5);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.bar {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--brand);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.barTop {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.barMid {
+  opacity: 0;
+}
+
+.barBottom {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+@media (max-width: 900px) {
+  .toggle {
+    display: flex;
+  }
+
+  /*
+   * The sheet.
+   *
+   * It is a second floating panel rather than a strip dropped from the bottom of
+   * the bar — inset by the same gutter, rounded the same amount, carrying the
+   * same glass. Offset by the header's own top padding as well as its height, or
+   * it would open behind the bar it belongs to.
+   */
+  .nav {
+    position: absolute;
+    top: calc(var(--header-stack) + 8px);
+    left: 16px;
+    right: 16px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding: 12px;
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.86);
+    -webkit-backdrop-filter: blur(28px) saturate(170%);
+    backdrop-filter: blur(28px) saturate(170%);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-lg), var(--glass-sheen);
+    /* Kept out of the tab order while collapsed. */
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+  }
+
+  .navOpen {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* In the sheet each link is a full-width row, so the chip stretches rather
+     than hugging its label — but it is still a chip, and it still fills. */
+  .navLink {
+    padding: 13px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+  }
+
+  /*
+   * The nav leaves the flow here and becomes a sheet, so its `margin-left: auto`
+   * stops doing anything. The actions take over holding the right-hand end, with
+   * the menu button after them.
+   */
+  .actions {
+    margin-left: auto;
+  }
+
+  /* Tighter on a phone: three circles and a menu button is most of a narrow bar. */
+  .actions .action {
+    width: 36px;
+    height: 36px;
+  }
+
+  /* The one action still rendered inside the sheet, where it is a real row. */
+  .navCta {
+    margin: 10px 0 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Matches the gutter `.section--muted` drops to at the same breakpoint. */
+  .header {
+    padding: 10px 10px 0;
+  }
+
+  .nav {
+    left: 10px;
+    right: 10px;
+    top: calc(var(--header-stack) + 6px);
+  }
+
+  .inner {
+    border-radius: var(--radius);
+  }
+
+  .logo,
+  .logoFallback {
+    width: 38px;
+    height: 38px;
+  }
+}

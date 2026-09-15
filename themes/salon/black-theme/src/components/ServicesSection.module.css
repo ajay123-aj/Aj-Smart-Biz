@@ -1,0 +1,856 @@
+/* ------------------------------------------------------------------ *
+ * Services.
+ *
+ * A two-column grid of the template's card, with one deliberate break in it:
+ * a **wide** card spans the row and turns on its side — header on the left,
+ * the words beside it. A featured service is always wide, and so is the last
+ * ordinary card when it would otherwise sit alone beside a gap. Which cards
+ * those are is decided in the component, not here; see `arrange`.
+ *
+ * Two columns rather than three is what makes the wide card safe: a spanning
+ * item always fills its row exactly, so the grid never has a hole in it.
+ *
+ * The card keeps the template's frosted panel and its accent hairline on hover,
+ * so Services, the benefit cards and the figures read as one family. What it
+ * adds is a **header** — a photograph, or a tinted band carrying the glyph and
+ * the card's number — because a services list with no photographs in it still
+ * has to look like something rather than like a form.
+ * ------------------------------------------------------------------ */
+
+.section {
+  /*
+   * Slightly tighter than a default section. On the home page this sits
+   * directly under the hero and directly above the benefits band, and the full
+   * 96px on both sides opened a gap the eye reads as an ending.
+   */
+  padding-block: 92px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 22px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  /*
+   * Each card ends where its content ends rather than being stretched to its
+   * neighbour. It matters more here than on any other grid on the site: a
+   * service with a photograph is much taller than one without, and stretching
+   * the shorter card leaves a band of nothing *inside* a bordered panel, which
+   * reads as a card that failed to load. Unstretched, the same difference falls
+   * outside the card and reads as spacing.
+   */
+  align-items: start;
+}
+
+/* --------------------------------- the card ------------------------------- */
+
+.card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease,
+    background-color 0.22s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: var(--shadow-hover);
+}
+
+/* The hairline that fills across the top on hover — the card acknowledging
+   you. Above the header, or a photograph would cover it. */
+.card::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  height: 2px;
+  width: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.card:hover::after {
+  transform: scaleX(1);
+}
+
+/* --------------------------------- header --------------------------------- */
+
+/*
+ * Every card has one. It is the photograph where there is one and a tinted band
+ * where there is not — the two modifiers below are the only things that differ.
+ */
+.header {
+  position: relative;
+  overflow: hidden;
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+/*
+ * No photograph. A short band rather than a picture-sized frame: it carries the
+ * glyph and the number and nothing else, so it reads as the head of a card
+ * instead of as an image that failed to arrive.
+ *
+ * The wash is the accent at low strength thrown from the top right over the
+ * sunken surface — the same light source `section--muted` uses, so the band
+ * belongs to the page rather than sitting on it.
+ */
+.hasGlyph .header {
+  height: 104px;
+  padding-inline: 28px;
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(22rem 12rem at 88% -40%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 72%),
+    var(--surface-sunken);
+}
+
+/* With a photograph the header is the photograph, at a shape that shows the
+   work without taking the whole card. */
+/*
+ * With a photograph the header is the photograph, arched and standing clear of
+ * the card edge like every other picture on the site. Shallow, because at 16/10
+ * the full rise closes the opening into a tunnel.
+ */
+.hasPhoto .header {
+  margin: 12px 12px 0;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--arch-soft);
+  align-items: flex-end;
+  background: var(--surface-sunken);
+}
+
+.photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.card:hover .photo {
+  transform: scale(1.04);
+}
+
+/* Only enough to keep a white glyph legible over a pale photograph. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(20, 20, 22, 0.55) 0%, rgba(20, 20, 22, 0.06) 46%, transparent 70%);
+}
+
+/* ---------------------------------- glyph --------------------------------- */
+
+.icon {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  flex: none;
+  transition: background-color 0.22s ease, color 0.22s ease, transform 0.22s ease;
+}
+
+/* Leading the band: large and accent-coloured, with no tile behind it. The
+   band is already the tile. */
+.hasGlyph .icon {
+  width: 44px;
+  height: 44px;
+  color: var(--accent);
+}
+
+.hasGlyph .icon svg {
+  width: 40px;
+  height: 40px;
+  stroke-width: 1.35;
+}
+
+.hasGlyph.card:hover .icon {
+  transform: translateY(-2px);
+}
+
+/* Over a photograph: a solid tile in the corner, so it reads against whatever
+   is underneath it. */
+.hasPhoto .icon {
+  margin: 0 0 16px 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  color: var(--brand-contrast);
+  background: color-mix(in srgb, var(--brand) 80%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.hasPhoto .icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.hasPhoto.card:hover .icon {
+  background: var(--accent);
+  transform: translateY(-2px);
+}
+
+/* --------------------------------- number --------------------------------- */
+
+/*
+ * The card's position, ghosted into the corner of the header. The same device
+ * `StatsGrid` and the benefit cards carry — it is what makes a run of cards
+ * read as a numbered set rather than as repeated furniture.
+ */
+.number {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  right: 24px;
+  transform: translateY(-50%);
+  font-size: 3.2rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  color: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* On a photograph it sits at the top, clear of the glyph, and in white — an
+   accent tint disappears against a picture. */
+.hasPhoto .number {
+  top: 16px;
+  right: 20px;
+  transform: none;
+  font-size: 2.4rem;
+  color: rgba(255, 255, 255, 0.55);
+  text-shadow: 0 1px 10px rgba(20, 20, 22, 0.4);
+}
+
+/* ---------------------------------- body ---------------------------------- */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  padding: 26px 28px 28px;
+  flex: 1;
+}
+
+.title {
+  font-size: 1.18rem;
+  letter-spacing: -0.018em;
+}
+
+/*
+ * The price, on a line of its own directly under the heading.
+ *
+ * Not a pill: a badge floated to the right of the title moves with the length
+ * of the title, so a column of them is a ragged edge rather than something to
+ * run an eye down. Here it is in the same place on every card, in the accent,
+ * with a short rule in front of it — the mark that says "this is the number"
+ * without boxing it in.
+ */
+.price {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  color: var(--accent);
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.priceRule {
+  width: 20px;
+  height: 2px;
+  flex: none;
+  background: currentColor;
+  border-radius: 2px;
+}
+
+/* ---------------------------------- meta ---------------------------------- */
+
+/*
+ * How long it takes, and what it is filed under.
+ *
+ * Chips rather than more text on the price line: they are facts of a different
+ * kind from the figure — what a visitor weighs the price *against* — and hanging
+ * them off it made a line that grew ragged as soon as a service had both.
+ */
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.chip,
+.chipQuiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* The duration carries the accent: it is the one a visitor is actually
+   budgeting for. The category is context and stays out of the way. */
+.chip {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 26%, transparent);
+  color: var(--brand-strong);
+}
+
+.chipQuiet {
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+
+.chipIcon {
+  width: 13px;
+  height: 13px;
+  opacity: 0.8;
+}
+
+.summary {
+  margin-top: 14px;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.62;
+}
+
+/*
+ * What is included, above a hairline. It is a different kind of statement from
+ * the sentence over it — that is a description, this is a commitment — and the
+ * rule is what stops the two reading as one paragraph.
+ */
+.points {
+  display: grid;
+  gap: 9px;
+  margin: 18px 0 0;
+  padding: 18px 0 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.points li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.tick {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  /* Optical alignment with the first line of text rather than with its box. */
+  margin-top: 3px;
+  color: var(--accent);
+}
+
+/* ------------------------------- action bar ------------------------------- */
+
+/*
+ * Where a card's actions live.
+ *
+ * Pinned to the bottom with `margin-top: auto`, which is what keeps a row of
+ * cards carrying different amounts of copy from having their buttons at
+ * different heights. The hairline separates *what this is* from *what you can
+ * do about it* — the same rule the tick list above it uses.
+ *
+ * It holds two things of deliberately different weight: the primary action, and
+ * a quiet link to the service's own page. `space-between` puts one at each end,
+ * and the `<span />` the component renders when there is no primary action keeps
+ * the quiet one on the right rather than letting it slide left.
+ */
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+/*
+ * The primary action: booking a time, or the page where the booking is.
+ *
+ * A **compact** pill rather than the site's own `.btn`, which is sized for a
+ * hero and looks like a landing page when three of them sit in a grid. The
+ * arrow is what says it goes somewhere, and it moves on hover — the one bit of
+ * motion on the card that is about the action rather than about the card.
+ *
+ * This is where the book button was wrong: it carried `.cta`, a class written
+ * for the underline-style enquiry trigger, whose `padding-top: 22px` landed
+ * *inside* a solid button and pushed its label off centre.
+ */
+.book {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--brand);
+  color: var(--brand-contrast);
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.book:hover {
+  background: var(--brand-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--brand) 24%, transparent);
+}
+
+.arrow {
+  width: 15px;
+  height: 15px;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.book:hover .arrow {
+  transform: translateX(3px);
+}
+
+/*
+ * The enquiry trigger's hook.
+ *
+ * It brings its own appearance — an underline that grows — because it renders a
+ * dialog nothing here knows about. All the card adds is that hovering anywhere
+ * on it lights the button up.
+ */
+.card:hover .cta {
+  background-size: 100% 1.5px;
+  color: var(--accent);
+}
+
+/* The quiet way to the full description. Never competing with the button. */
+.details {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.details::after {
+  content: ' \2192';
+}
+
+.details:hover {
+  color: var(--brand);
+  border-bottom-color: currentColor;
+}
+
+/*
+ * The body of a card is a column that ends in the action bar, so it has to be
+ * allowed to grow: without this the hairline sits directly under the copy on a
+ * short card and halfway up a tall one.
+ */
+.body {
+  min-height: 0;
+}
+
+/* ---------------------------------- wide ---------------------------------- */
+
+/*
+ * A card that takes the row: the featured service, and the last ordinary one
+ * when it would otherwise be alone. Header on the left, words beside it.
+ *
+ * The header column is a fixed share rather than fractional, so its width does
+ * not move with the amount of copy next to it, and it stretches to the row
+ * rather than keeping a ratio — a 16:10 frame beside a long tick list would
+ * leave a band of empty card underneath it.
+ */
+.wide {
+  grid-column: span 2;
+  flex-direction: row;
+}
+
+.wide .header {
+  width: 34%;
+  flex: none;
+  aspect-ratio: auto;
+  height: auto;
+  min-height: 280px;
+  border-bottom: 0;
+}
+
+/*
+ * A wide card with no photograph turns its header into a **plate**: the glyph
+ * over its number, stacked and centred.
+ *
+ * Laid out as the short band is — glyph on the left, number in the corner — the
+ * column was 280px of mostly nothing with a small mark floating in it. Stacked,
+ * the two read as one object, which is something to look at.
+ *
+ * They are stacked rather than superimposed: printed on top of each other the
+ * number showed through whatever the glyph's strokes did not cover, and a
+ * diagonal one — the spanner, the bolt — cut straight across the digits. The
+ * glyph is the tenant's choice and any of thirty shapes, so the composition had
+ * to work for all of them rather than for the ones that happen to be round.
+ *
+ * The wash is repointed to come from directly above: a gradient aimed at the
+ * top-right corner of a wide band lands outside a narrow tall one entirely.
+ */
+.wide.hasGlyph .header {
+  border-right: 1px solid var(--border);
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  padding-inline: 24px;
+  background:
+    radial-gradient(16rem 16rem at 50% -10%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 72%),
+    var(--surface-sunken);
+}
+
+.wide.hasGlyph .icon {
+  width: 80px;
+  height: 80px;
+}
+
+.wide.hasGlyph .icon svg {
+  width: 76px;
+  height: 76px;
+  stroke-width: 1.05;
+}
+
+/* In the flow under the glyph rather than pinned to a corner — the two are one
+   mark here, not a mark and a label in opposite corners. */
+.wide.hasGlyph .number {
+  position: static;
+  transform: none;
+  font-size: 3rem;
+  color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.wide .body {
+  padding: 34px 36px 36px;
+  justify-content: center;
+}
+
+.wide .title {
+  font-size: 1.5rem;
+}
+
+.wide .price {
+  font-size: 1.14rem;
+}
+
+.wide .summary {
+  font-size: 1rem;
+  max-width: 60ch;
+}
+
+/*
+ * The inclusions take the width, in two columns. It is the one part of the card
+ * that is a list rather than prose, so it is the part that can use the room a
+ * full-width card has and prose cannot.
+ */
+.wide .points {
+  display: block;
+  columns: 2;
+  column-gap: 44px;
+  max-width: 62rem;
+}
+
+.wide .points li {
+  margin-bottom: 9px;
+  /* A tick and its line must never be split across the column break. */
+  break-inside: avoid;
+}
+
+/* The words are vertically centred here, so a button pinned to the bottom
+   would float away from them. */
+.wide .cta {
+  margin-top: 14px;
+  padding-top: 0;
+}
+
+/* --------------------------------- the link ------------------------------- */
+
+.more {
+  margin-top: 40px;
+  display: flex;
+  justify-content: center;
+}
+
+/* ------------------------------- responsive ------------------------------- */
+
+/*
+ * Laptop. The columns are still right, only tighter — and a wide card's header
+ * takes a bigger share, because the words beside it have less room and a 40%
+ * column starts to squeeze them into a narrow measure.
+ */
+@media (max-width: 1180px) {
+  .grid {
+    gap: 18px;
+  }
+
+  .body {
+    padding: 22px 24px 24px;
+  }
+
+  .wide .header {
+    width: 44%;
+    min-height: 270px;
+  }
+
+  .wide .body {
+    padding: 28px 30px 30px;
+  }
+}
+
+/*
+ * Tablet. One column, and a wide card goes back to being an ordinary one: side
+ * by side stops working long before the grid does, and a header in a 300px
+ * column beside two-word lines of text is worse than one above them. A featured
+ * card keeps its larger heading — it is still the one to read first.
+ */
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .card,
+  .wide {
+    grid-column: span 1;
+    flex-direction: column;
+  }
+
+  .wide .header {
+    width: 100%;
+    min-height: 0;
+    border-right: 0;
+  }
+
+  .wide.hasGlyph .header {
+    height: 116px;
+    /* Back to a band: glyph leading, number in the corner. */
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 0;
+    padding-inline: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .wide.hasPhoto .header {
+    aspect-ratio: 16 / 9;
+  }
+
+  .wide.hasGlyph .icon {
+    width: 52px;
+    height: 52px;
+  }
+
+  .wide.hasGlyph .icon svg {
+    width: 48px;
+    height: 48px;
+  }
+
+  .wide.hasGlyph .number {
+    position: absolute;
+    top: 50%;
+    right: 24px;
+    transform: translateY(-50%);
+    font-size: 3.2rem;
+    color: color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+
+  .wide .body {
+    padding: 26px 26px 28px;
+  }
+
+  /* One column of inclusions again: two of them in a phone-width card is two
+     words a line. */
+  .wide .points {
+    display: grid;
+    columns: auto;
+  }
+
+  .wide .points li {
+    margin-bottom: 0;
+  }
+
+  .wide .cta {
+    margin-top: auto;
+    padding-top: 22px;
+  }
+}
+
+/* Phone. Shorter frames — a 16:10 photograph at this width eats the fold before
+   a single word of the service has been read. */
+@media (max-width: 620px) {
+  .section {
+    padding-block: 62px;
+  }
+
+  .card {
+    border-radius: var(--radius-sm);
+  }
+
+  .hasPhoto .header,
+  .wide.hasPhoto .header {
+    aspect-ratio: 3 / 2;
+  }
+
+  .hasGlyph .header,
+  .wide.hasGlyph .header {
+    height: 92px;
+    padding-inline: 22px;
+  }
+
+  .hasGlyph .icon,
+  .wide.hasGlyph .icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .hasGlyph .icon svg,
+  .wide.hasGlyph .icon svg {
+    width: 34px;
+    height: 34px;
+  }
+
+  .number,
+  .wide.hasGlyph .number {
+    font-size: 2.6rem;
+    right: 20px;
+  }
+
+  .body,
+  .wide .body {
+    padding: 22px 22px 24px;
+  }
+
+  .title {
+    font-size: 1.1rem;
+  }
+
+  .wide .title {
+    font-size: 1.24rem;
+  }
+
+  .more .btn {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .photo,
+  .icon,
+  .cta {
+    transition: none;
+  }
+
+  .card:hover {
+    transform: none;
+  }
+
+  .card:hover .photo,
+  .card:hover .icon {
+    transform: none;
+  }
+}
+
+/* --------------------------- prices and offers ---------------------------- */
+
+/*
+ * The price line now carries up to three things — today's figure, the one it
+ * replaced, and how long the appointment takes. They sit on one line because a
+ * visitor reads them as one answer: what it costs and what it costs me in time.
+ */
+/*
+ * The figure itself, a step larger than the line it sits on. It is the thing a
+ * visitor came to find, and at the same size as the label beside it there was
+ * nothing to run an eye down a column of cards for.
+ */
+.priceNow {
+  font-size: 1.16rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.priceWas {
+  color: var(--text-faint);
+  text-decoration: line-through;
+  font-weight: 500;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * The offer badge, in the corner of the header. The same device the catalogue
+ * uses, so an offer reads identically whether it is on a product or a treatment
+ * — a badge rather than a colour, because a colour is not a fact.
+ */
+/*
+ * The offer badge, in the accent rather than the brand.
+ *
+ * It is the one thing on a card that is about *today* rather than about the
+ * service, so it is the one thing allowed to use the accent as a fill. In the
+ * brand colour it read as a category label; in the accent it reads as a price
+ * change, which is what it is.
+ */
+.offerFlag {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 3;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--brand-contrast);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* The title is a link now. It keeps the heading's weight and picks up the brand
+   colour on hover, so it reads as a heading that happens to be clickable rather
+   than as a link that happens to be big. */
+.titleLink {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.titleLink:hover {
+  color: var(--brand);
+  border-bottom-color: currentColor;
+}

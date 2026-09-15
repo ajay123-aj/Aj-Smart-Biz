@@ -1,0 +1,502 @@
+/* ------------------------------------------------------------------ *
+ * The customer's own pages: signing in, their details, their addresses,
+ * and what they have ordered.
+ *
+ * One stylesheet for all of them, because they are one place a person moves
+ * around in rather than three unrelated screens — and because the sign-in form
+ * and the profile form are the same form to a reader, and should not be two
+ * slightly different ones to look at.
+ * ------------------------------------------------------------------ */
+
+.stack {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.panel {
+  padding: 1.6rem 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.1rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  margin: 0 0 0.85rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.lede {
+  margin: 0.25rem 0 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+/* --------------------------------- forms ---------------------------------- */
+
+.form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+/*
+ * Two columns on a laptop, one on a phone. The pairs are chosen so that the
+ * narrow fields sit together — a pincode beside a label, a name beside a
+ * number — rather than a full address line stranded at half width.
+ */
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+@media (max-width: 560px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field {
+  display: block;
+}
+
+.label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Said plainly rather than by absence: a form where some fields are required
+   and nothing says which is a form people fill in twice. */
+.optional {
+  font-weight: 400;
+  color: var(--text-faint);
+}
+
+.input {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.92rem;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+/* The one-time code. Wide tracking and a monospace face, because six digits
+   being read off another screen is the moment a 0 and an O cost a sign-in. */
+.code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 1.3rem;
+  letter-spacing: 0.4em;
+  text-align: center;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.88rem;
+}
+
+.formActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+/* -------------------------------- buttons --------------------------------- */
+
+.primary {
+  justify-self: start;
+  padding: 0.75rem 1.5rem;
+  border: 1px solid var(--brand);
+  border-radius: 999px;
+  background: var(--brand);
+  color: var(--brand-contrast);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.primary:hover {
+  background: var(--brand-strong);
+}
+
+.primary:disabled {
+  opacity: 0.62;
+  cursor: progress;
+}
+
+/* Everything that is not the main action on its panel. */
+.quiet {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.84rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.quiet:hover {
+  color: var(--text);
+}
+
+/* The way between signing in and registering. Centred and quiet: it is an
+   escape hatch, not a second call to action competing with the button above it. */
+.switch {
+  justify-self: center;
+  padding: 0.35rem;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.84rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.link {
+  color: var(--brand-strong);
+  font-weight: 600;
+}
+
+/* -------------------------------- messages -------------------------------- */
+
+.note {
+  margin: 0.4rem 0 0;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.good {
+  margin: 0;
+  font-size: 0.86rem;
+  color: #4ade80;
+}
+
+.bad {
+  margin: 0;
+  font-size: 0.86rem;
+  color: #f87171;
+}
+
+/*
+ * The development code, while no SMS gateway is connected.
+ *
+ * Deliberately conspicuous and deliberately ugly. It is a standing reminder that
+ * this install is not sending messages, and it should never be mistaken for a
+ * finished piece of the interface.
+ */
+.dev {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: 0.83rem;
+  color: var(--text-muted);
+}
+
+/* ------------------------------- addresses -------------------------------- */
+
+.addresses {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.85rem;
+}
+
+.address {
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+}
+
+.addressHead {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.45rem;
+}
+
+.tag,
+.tagDefault {
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tag {
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+
+.tagDefault {
+  background: var(--brand);
+  color: var(--brand-contrast);
+}
+
+.addressText {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.addressWho {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.addressActions {
+  display: flex;
+  gap: 0.9rem;
+  margin-top: 0.7rem;
+}
+
+.addressForm {
+  margin-top: 1.1rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--border);
+}
+
+/* --------------------------------- orders --------------------------------- */
+
+.orders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.order {
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.orderHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+/* The service asked about — the headline of an enquiry, where an order has its
+   number. Set in the body face rather than the monospace one: it is a name, not
+   a reference. */
+.enquiryName {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.orderNo {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.orderWhen {
+  font-size: 0.8rem;
+  color: var(--text-faint);
+}
+
+.orderTotal {
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The tag strip: where it went, and whether it is paid. Two facts, never one
+   badge — see `orderTags`. */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.6rem 0;
+}
+
+.pill {
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  background: var(--surface-muted);
+}
+
+.pillWhatsapp {
+  border-color: var(--whatsapp);
+  color: var(--whatsapp-dark);
+  background: transparent;
+}
+
+.pillAccent {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: transparent;
+}
+
+.pillGood {
+  border-color: #4ade80;
+  color: #4ade80;
+  background: transparent;
+}
+
+.pillWarn {
+  border-color: #fbbf24;
+  color: #fcd34d;
+  background: transparent;
+}
+
+.pillBad {
+  border-color: #f87171;
+  color: #f87171;
+  background: transparent;
+}
+
+/* Where the order has got to. The largest thing after the number, because it is
+   the only question somebody opens this page to answer. */
+.state {
+  margin: 0.2rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.lines {
+  list-style: none;
+  margin: 0.8rem 0 0;
+  padding: 0.8rem 0 0;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 0.4rem;
+}
+
+.line {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  font-size: 0.86rem;
+}
+
+.lineName {
+  color: var(--text);
+}
+
+.lineQty {
+  color: var(--text-faint);
+}
+
+.lineSum {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* ------------------------------ appointments ------------------------------ */
+
+/*
+ * A booking on the enquiry history.
+ *
+ * Framed rather than run in with the rest, because it is the one thing on this
+ * page a person is *waiting on* — a slot they picked that somebody has to
+ * confirm. The border carries the answer, so the state is readable before the
+ * words are.
+ */
+.booking {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  background: var(--surface-2, var(--surface));
+}
+
+.bookingWhen {
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+.bookingState {
+  margin-top: 2px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.bookingNote {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* Waiting: no colour at all. A pending slot is not good news or bad, and
+   colouring it would make every unanswered booking look like a problem. */
+.booking_requested {
+  border-left-color: var(--border-strong, var(--border));
+}
+
+.booking_accepted {
+  border-left-color: var(--success, #34d399);
+}
+
+.booking_declined,
+.booking_cancelled {
+  border-left-color: var(--danger, #f87171);
+}
+
+.booking_completed {
+  border-left-color: var(--brand);
+}

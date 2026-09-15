@@ -1,0 +1,82 @@
+/* ------------------------------------------------------------------ *
+ * The basket in the header.
+ *
+ * Sits beside the WhatsApp button and is built to the same weight, so the two
+ * do not compete: one is "talk to us", the other is "you have an order
+ * started", and neither should shout over the navigation.
+ * ------------------------------------------------------------------ */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.85rem;
+
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.button:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.glyph {
+  width: 1.15em;
+  height: 1.15em;
+  flex: none;
+}
+
+/*
+ * The count, as a badge on the corner of the glyph rather than a number beside
+ * it.
+ *
+ * Beside it, the button would change width as the count went from 9 to 10 and
+ * shove the rest of the bar along; on the corner it cannot. Pulled slightly
+ * outside the circle and ringed in the header's own background so it reads as
+ * attached to the basket rather than sitting inside it — the convention every
+ * shopper already knows.
+ *
+ * Positioned against the button, which the header gives `position: relative`.
+ */
+.count {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+
+  display: inline-grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+
+  border: 2px solid var(--surface);
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: var(--brand-contrast);
+
+  font-size: 0.63rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/*
+ * `.label` is gone from the component: the header shows the basket as a glyph
+ * with a badge, and the button's own `aria-label` carries the wording in full.
+ * There is no longer a word here to hide on a narrow screen.
+ */

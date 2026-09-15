@@ -1,0 +1,116 @@
+/*
+ * One column, capped at a readable measure.
+ *
+ * An FAQ in two columns reads in the wrong order and always has — the eye goes
+ * down the left, back up, down the right, and the order the questions were
+ * written in is lost.
+ */
+.list {
+  display: grid;
+  gap: 12px;
+  max-width: 54rem;
+}
+
+.item {
+  border-radius: var(--radius);
+  background: var(--panel);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-sm), var(--glass-sheen);
+  overflow: hidden;
+  transition: border-color 0.24s ease, background 0.24s ease;
+}
+
+.item[open] {
+  background: var(--panel-hover);
+  border-color: var(--hairline-strong);
+}
+
+/* -------------------------------- question -------------------------------- */
+
+.question {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 19px 22px;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.45;
+  cursor: pointer;
+  /* The default triangle, removed in both spellings — WebKit still needs the
+     pseudo-element even now that `list-style` works. */
+  list-style: none;
+}
+
+.question::-webkit-details-marker {
+  display: none;
+}
+
+/*
+ * The focus ring goes on the summary, which is the focusable element.
+ *
+ * Inset rather than offset: an offset ring on a full-width row inside a card
+ * with `overflow: hidden` is clipped along the top and bottom edges, so it
+ * appears as two floating vertical strokes.
+ */
+.question:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: -3px;
+  box-shadow: none;
+}
+
+/* ---------------------------------- sign ---------------------------------- */
+
+.sign {
+  position: relative;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 3px;
+  color: var(--accent-text);
+}
+
+.signBar {
+  position: absolute;
+  inset: 50% 0 auto;
+  display: block;
+  height: 1.8px;
+  border-radius: 2px;
+  background: currentColor;
+  transform: translateY(-50%);
+}
+
+/* The vertical stroke rotates flat as the item opens, turning + into −. */
+.signBarV {
+  transform: translateY(-50%) rotate(90deg);
+  transition: transform 0.24s ease, opacity 0.2s ease;
+}
+
+.item[open] .signBarV {
+  transform: translateY(-50%) rotate(0deg);
+  opacity: 0;
+}
+
+/* --------------------------------- answer --------------------------------- */
+
+.answer {
+  padding: 0 22px 21px;
+  /* Shorter than the question's line: it is prose, and prose wants a measure. */
+  max-width: 62ch;
+  color: var(--text-muted);
+  font-size: 0.94rem;
+  line-height: 1.66;
+}
+
+@media (max-width: 560px) {
+  .question {
+    padding: 17px 18px;
+    font-size: 0.96rem;
+  }
+
+  .answer {
+    padding: 0 18px 18px;
+  }
+}

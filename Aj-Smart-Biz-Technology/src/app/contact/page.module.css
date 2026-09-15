@@ -1,0 +1,119 @@
+.head {
+  padding-block: 64px 12px;
+}
+
+.title {
+  max-width: 18ch;
+  font-size: clamp(2.1rem, 4.6vw, 3rem);
+  line-height: 1.06;
+  letter-spacing: -0.032em;
+}
+
+.lede {
+  margin-top: 18px;
+  max-width: 58ch;
+  color: var(--text-muted);
+  font-size: 1.06rem;
+  line-height: 1.66;
+}
+
+/* ------------------------------- channels ------------------------------- */
+
+.channelsSection {
+  padding-block: 40px 20px;
+}
+
+.channels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * Each channel is the whole card, not a card with a link inside it.
+ *
+ * The target is then the full tile rather than eleven characters of phone
+ * number, which on a phone is the difference between one tap and three.
+ * `height: 100%` so a longer note does not leave one tile short of the row.
+ */
+.channel {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+  height: 100%;
+  padding: 24px 22px 22px;
+}
+
+.channelIcon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 14px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--hairline);
+  color: var(--accent-text);
+}
+
+.channelIcon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.channelLabel {
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.channelValue {
+  margin-top: 6px;
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  /* Wraps rather than overflowing: an email address on a 300px tile has to go
+     somewhere, and `anywhere` breaks it at the sensible point. */
+  overflow-wrap: anywhere;
+}
+
+.channelNote {
+  margin-top: 9px;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.address {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 22px;
+  color: var(--text-faint);
+  font-size: 0.9rem;
+}
+
+.addressIcon {
+  width: 17px;
+  height: 17px;
+}
+
+/* --------------------------------- form --------------------------------- */
+
+/*
+ * The form is capped well short of the container.
+ *
+ * At 1200px the two-up rows inside it would be 580px each, which is four times
+ * the width a phone number needs and reads as a database screen rather than as
+ * a note to somebody.
+ */
+.formWrap {
+  max-width: 44rem;
+  margin-inline: auto;
+}

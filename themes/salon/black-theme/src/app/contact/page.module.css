@@ -1,0 +1,276 @@
+/* ------------------------------------------------------------------ *
+ * Contact — its own page.
+ *
+ * Same masthead language as About, so the two read as a pair, then a two-column
+ * body: the form on the left because it is what most visitors came to do, the
+ * details beside it for the ones who would rather phone.
+ * ------------------------------------------------------------------ */
+
+.masthead {
+  position: relative;
+  overflow: hidden;
+  padding-block: 56px 52px;
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(52rem 28rem at 88% -20%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%),
+    radial-gradient(38rem 24rem at 4% 120%, color-mix(in srgb, var(--brand) 8%, transparent), transparent 70%),
+    color-mix(in srgb, var(--surface-sunken) 92%, #fff);
+}
+
+.masthead::after {
+  content: '';
+  position: absolute;
+  top: -34rem;
+  right: -18rem;
+  width: 60rem;
+  height: 60rem;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  pointer-events: none;
+}
+
+/* ------------------------------ breadcrumb ------------------------------ */
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 26px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.crumb {
+  color: var(--text-muted);
+  border-bottom: 1px solid transparent;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.crumb:hover {
+  color: var(--brand);
+  border-bottom-color: currentColor;
+}
+
+.crumbSep {
+  color: var(--text-faint);
+}
+
+/* ------------------------------- masthead ------------------------------- */
+
+.title {
+  font-size: clamp(2.1rem, 5vw, 3.4rem);
+  max-width: 18ch;
+}
+
+.lead {
+  margin-top: 20px;
+  max-width: 56ch;
+  font-size: 1.16rem;
+  color: var(--text-muted);
+}
+
+/* The direct routes, before the form — nobody should scroll past a text area
+   to find a phone number. */
+.quick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+/* --------------------------------- body --------------------------------- */
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 52px;
+  align-items: start;
+}
+
+/* Only child when the form is switched off — then the details take the width. */
+.split > :only-child {
+  grid-column: 1 / -1;
+  max-width: 46rem;
+}
+
+.formPanel,
+.details {
+  padding: 34px 32px 36px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+}
+
+.panelTitle {
+  font-size: 1.32rem;
+}
+
+.panelLede {
+  margin: 10px 0 26px;
+  color: var(--text-muted);
+  font-size: 0.98rem;
+}
+
+/* ------------------------------- details -------------------------------- */
+
+.dl {
+  margin: 0;
+}
+
+.dlRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 15px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.dlRow:last-child {
+  border-bottom: 0;
+}
+
+.dlRow dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.dlRow dd {
+  margin: 0;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.dlLink {
+  border-bottom: 1px solid transparent;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.dlLink:hover {
+  color: var(--brand);
+  border-bottom-color: currentColor;
+}
+
+.shareRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+
+.shareLabel {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+/* ------------------------------- locations ------------------------------ */
+
+.locationGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.location {
+  padding: 28px 26px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease,
+    background-color 0.22s ease;
+}
+
+.location:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: var(--shadow-hover);
+}
+
+.locationName {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 1.06rem;
+}
+
+.locationTag {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.locationLine {
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: 0.94rem;
+}
+
+.locationHours {
+  margin-top: 6px;
+  font-size: 0.88rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.locationLinks {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.locationLink {
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-bottom: 1px solid transparent;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.locationLink:hover {
+  color: var(--brand);
+  border-bottom-color: currentColor;
+}
+
+/* ------------------------------ responsive ------------------------------ */
+
+@media (max-width: 980px) {
+  .split {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+@media (max-width: 760px) {
+  .masthead {
+    padding-block: 40px 36px;
+  }
+
+  .title {
+    max-width: none;
+  }
+
+  .formPanel,
+  .details {
+    padding: 26px 22px 28px;
+  }
+}

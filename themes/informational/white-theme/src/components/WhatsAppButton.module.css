@@ -1,0 +1,128 @@
+/* ------------------------------------------------------------------ *
+ * WhatsApp actions.
+ *
+ * WhatsApp green is fixed, not themed: it is the platform's own colour and a
+ * visitor recognises the button by it. The tenant's brand colour drives the
+ * rest of the page — this is the one element that deliberately does not follow
+ * it, which is also how the reference site treats it.
+ * ------------------------------------------------------------------ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 12px 22px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease,
+    transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.mark {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.solid {
+  background: var(--whatsapp);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(37, 211, 102, 0.28);
+}
+
+.solid:hover {
+  background: var(--whatsapp-dark);
+  box-shadow: 0 10px 24px rgba(37, 211, 102, 0.34);
+}
+
+.outline {
+  background: var(--surface);
+  border-color: var(--whatsapp);
+  color: var(--whatsapp-dark);
+}
+
+.outline:hover {
+  background: rgba(37, 211, 102, 0.08);
+}
+
+/* For footers and dense lists, where a pill would be too loud. */
+.plain {
+  padding: 0;
+  border-radius: 0;
+  font-weight: 500;
+  color: inherit;
+  gap: 8px;
+}
+
+.plain:hover {
+  transform: none;
+  color: var(--whatsapp);
+}
+
+/* ------------------------------- the bubble ------------------------------- */
+
+.fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px 14px 16px;
+  border-radius: 999px;
+  background: var(--whatsapp);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.94rem;
+  line-height: 1;
+  box-shadow: 0 14px 34px rgba(37, 211, 102, 0.36);
+  transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.fab:hover {
+  background: var(--whatsapp-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 18px 42px rgba(37, 211, 102, 0.42);
+}
+
+.fabMark {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+
+/*
+  On a phone the bubble collapses to the mark alone. The label would otherwise
+  eat a fifth of the screen width, and it sits above the share button, so the
+  two together must stay out of the way of the content.
+*/
+@media (max-width: 640px) {
+  .fab {
+    right: 14px;
+    bottom: 14px;
+    padding: 15px;
+    gap: 0;
+  }
+
+  .fabText {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}

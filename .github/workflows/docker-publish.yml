@@ -1,0 +1,498 @@
+# ------------------------------------------------------------------ #
+# Build the API image, push it to Docker Hub, then roll it out on the dev
+# server.
+#
+# Runs on every push to `dev_live`, and on demand from the Actions tab.
+#
+# Two repository secrets are required — Settings → Secrets and variables →
+# Actions:
+#
+#   DOCKERHUB_USERNAME   the Docker Hub account the image is pushed as
+#   DOCKERHUB_TOKEN      an access token from Docker Hub → Account settings →
+#                        Personal access tokens, with Read & Write scope.
+#                        An account password works and should not be used: a
+#                        token can be revoked on its own.
+#
+# ------------------------------ the image ------------------------------ #
+#
+# Everything is pushed to ONE Docker Hub repository, `ajtechhub/ajtechhub`, so
+# the tag is the only thing separating one service's images from another's.
+# That is the whole reason every tag below is prefixed with the service name:
+# in a repository of its own a bare `dev_live` tag is unambiguous, and in a
+# shared one it is a collision waiting for the second service to be added.
+#
+#   ajtechhub/ajtechhub:aj-smart-biz-backend-<run number>   this exact build
+#   ajtechhub/ajtechhub:aj-smart-biz-backend-dev_live       whatever is newest
+#
+# `<run number>` is `github.run_number` — the build number GitHub increments
+# per workflow, the same one shown against the run in the Actions tab. It does
+# NOT change when a run is re-run, so re-running a build overwrites that tag
+# with the image it should have produced the first time, which is the intended
+# behaviour rather than an accident.
+#
+# The repository name is fixed here rather than read from the username secret,
+# so the tag a deployment pulls does not change if the pushing account ever
+# does.
+#
+# ---------------------------- the deploy job ---------------------------- #
+#
+# The second job runs on the self-hosted runner and is what puts the new image
+# in front of users. What the server needs, once:
+#
+#   * Docker installed, and the runner's user in the `docker` group — the job
+#     never uses `sudo`, so `docker ps` has to work as that user.
+#   * `/opt/aj-smart-biz/backend.env` — the real production environment,
+#     the JWT secrets included. It lives on the server and not in this
+#     repository or in the image; the container is configured from it with
+#     `--env-file`.
+#   * Nothing else. The job does not check the repository out on the server —
+#     it only pulls an image and starts two containers.
+#
+# ----------------------------- the database ----------------------------- #
+#
+# The deploy job creates a MySQL container if the server has not got one, and
+# otherwise leaves the running one completely alone. The two containers share a
+# private network, so the API reaches the database by container name — no port
+# on the host is involved in that path, and `127.0.0.1` never enters into it.
+#
+# What it will NOT do is replace a database that is already running. The API
+# container is disposable and is destroyed on every deploy; the database is the
+# opposite, and a step that recreated it would take every tenant on the server
+# with it. Create-if-missing, start-if-stopped, never replace.
+#
+# The password comes from GitHub. Set **either**:
+#
+#   MYSQL_ROOT_PASSWORD   a repository *secret* — masked in logs. Preferred.
+#   MYSQL_ROOT_PASSWORD   a repository *variable* — used if no secret is set.
+#                         Visible to anyone who can read the settings page and
+#                         printed in plain text if a command ever echoes it.
+#
+# The user is `root`, and is not configurable: the official image refuses
+# `MYSQL_USER=root` outright, because root is the account it creates from
+# MYSQL_ROOT_PASSWORD itself.
+#
+# Optional repository variables (Settings → Secrets and variables → Actions →
+# Variables), each with the default shown:
+#
+#   BACKEND_ENV_FILE    /opt/aj-smart-biz/backend.env
+#   BACKEND_APP_PORT    4000   the port the API listens on inside the container
+#   BACKEND_HOST_PORT   4000   the port it is published on, on the server
+#   MYSQL_IMAGE         mysql:8.4
+#   MYSQL_HOST_PORT     3306   where the database is published on the server, for
+#                              Workbench and the like. Set it to something else
+#                              if the server already has a MySQL on 3306 — the
+#                              API does not use this port either way.
+#   MYSQL_DATABASE      aj_smart_biz
+# ------------------------------------------------------------------ #
+
+name: Docker image
+
+on:
+  push:
+    branches: [dev_live]
+    # Only when something that ends up *in* the image changes. A commit that
+    # touches the Angular consoles or the websites rebuilds nothing, which is
+    # the difference between a queue that is worth watching and one nobody
+    # looks at.
+    paths:
+      - 'Aj-Smart-Biz-Backend/**'
+      - '.github/workflows/docker-publish.yml'
+  # So the image can be rebuilt without an empty commit — a rotated base image
+  # or a re-run after fixing a secret.
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: aj-smart-biz-backend
+    runs-on: ubuntu-latest
+
+    # A second push while the first is still building makes the first one's
+    # image pointless: both would push the same moving `dev_live` tag, and the
+    # older run could land last. Newest wins, the older build is cancelled.
+    #
+    # This sits on the job rather than on the workflow so that it can never
+    # cancel a *deploy* that is half-way through replacing the container.
+    concurrency:
+      group: docker-build-${{ github.ref }}
+      cancel-in-progress: true
+
+    # The job reads the repository and writes to Docker Hub. It has no reason
+    # to be able to write back to GitHub, so it is not given the chance.
+    permissions:
+      contents: read
+
+    env:
+      # One shared repository for every service on the platform; see the note at
+      # the top of this file for why the service name then has to live in the
+      # tag rather than in the repository.
+      IMAGE: ajtechhub/ajtechhub
+      SERVICE: aj-smart-biz-backend
+
+    outputs:
+      # The digest, not a tag. The moving tag moves, and a deploy that pulled it
+      # could start a different image than the one this run built if another
+      # push landed in between; a digest is the exact bytes.
+      digest: ${{ steps.build.outputs.digest }}
+      # The readable name of what was built, so the deploy summary can say which
+      # build is live without anybody having to match a digest by eye.
+      build_tag: ${{ steps.build_tag.outputs.value }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # Buildx is what makes the registry cache and the layer cache below
+      # available at all; the default docker driver supports neither.
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Last step before the push that could fail for a boring reason, so it is
+      # deliberately early: a missing or expired token fails here in seconds
+      # rather than after a full build.
+      - name: Sign in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # The name of this build, worked out once and reused by the tag list, the
+      # image label and the job summary — three places that must agree, and
+      # would drift the moment the expression was written out three times.
+      - name: Work out the build tag
+        id: build_tag
+        run: echo "value=$SERVICE-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      # Two tags on purpose:
+      #
+      #   <service>-<run number>  this exact build, so a bad deploy can be
+      #                           rolled back to a numbered one before it rather
+      #                           than to "whatever was newest yesterday"
+      #   <service>-dev_live      the moving tag a dev environment pulls
+      #
+      # Both carry the service name because the repository is shared — see the
+      # note at the top of this file.
+      #
+      # No `latest`. This branch is not the release branch, and a `latest` tag
+      # pointing at dev builds is how a staging image ends up in production.
+      - name: Work out the tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=${{ steps.build_tag.outputs.value }}
+            type=raw,value=${{ env.SERVICE }}-dev_live
+          labels: |
+            org.opencontainers.image.title=Aj Smart Biz API
+            org.opencontainers.image.description=Multi-tenant SaaS backend (Express + Sequelize)
+            org.opencontainers.image.version=${{ steps.build_tag.outputs.value }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          # The backend directory, not the repository root: the Dockerfile and
+          # its .dockerignore live there, and a root context would ship three
+          # Angular apps and four Next.js sites into the build.
+          context: ./Aj-Smart-Biz-Backend
+          file: ./Aj-Smart-Biz-Backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Restores the `npm ci` layer between runs, so a commit that only
+          # touches `src/` does not reinstall the dependency tree.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Say what was pushed
+        run: |
+          echo "### Pushed to Docker Hub" >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.meta.outputs.tags }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ env.IMAGE }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: deploy to the dev server
+    # Only if the image actually reached Docker Hub. `needs` already implies
+    # it, and it is what makes this a deploy pipeline rather than two jobs that
+    # happen to be in the same file.
+    needs: backend
+    # The labels of the self-hosted runner (ajay-mithapara-HP-ProBook-450-G1).
+    # `runs-on` matches labels, never the runner's name — if a second Linux
+    # runner is ever registered, give this one a unique label under Settings →
+    # Actions → Runners and add that label to this list.
+    runs-on: [self-hosted, Linux, X64]
+
+    # Deploys queue, they do not cancel each other: a cancelled deploy is a
+    # server with the old container removed and the new one not yet started.
+    concurrency:
+      group: docker-deploy-${{ github.ref }}
+      cancel-in-progress: false
+
+    permissions:
+      contents: read
+
+    env:
+      IMAGE: ajtechhub/ajtechhub
+      DIGEST: ${{ needs.backend.outputs.digest }}
+      # What the build job called this image, for the logs and the summary. The
+      # pull below still goes by digest — this is the human-readable half.
+      BUILD_TAG: ${{ needs.backend.outputs.build_tag }}
+      CONTAINER: aj-smart-biz-backend
+      ENV_FILE: ${{ vars.BACKEND_ENV_FILE || '/opt/aj-smart-biz/backend.env' }}
+      APP_PORT: ${{ vars.BACKEND_APP_PORT || '4000' }}
+      HOST_PORT: ${{ vars.BACKEND_HOST_PORT || '4000' }}
+      UPLOADS_VOLUME: aj-smart-biz-uploads
+
+      # ---------------------------- the database ---------------------------- #
+      #
+      # A private bridge network for the two containers. It is what lets the API
+      # reach the database as `aj-smart-biz-mysql:3306` — Docker resolves a
+      # container name on a user-defined network, and does not on the default
+      # bridge. The host port below is for people, not for the API.
+      NETWORK: aj-smart-biz
+      DB_CONTAINER: aj-smart-biz-mysql
+      DB_VOLUME: aj-smart-biz-mysql-data
+      DB_IMAGE: ${{ vars.MYSQL_IMAGE || 'mysql:8.4' }}
+      DB_HOST_PORT: ${{ vars.MYSQL_HOST_PORT || '3306' }}
+      DB_NAME: ${{ vars.MYSQL_DATABASE || 'aj_smart_biz' }}
+      # Not configurable — the official image refuses MYSQL_USER=root, because
+      # root is the account it creates from the password below.
+      DB_USER: root
+      # Secret first, variable second. A secret is masked in the logs; a
+      # variable is not, and the check below says so rather than letting a
+      # password leak quietly.
+      DB_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD || vars.MYSQL_ROOT_PASSWORD }}
+      DB_PASSWORD_IS_SECRET: ${{ secrets.MYSQL_ROOT_PASSWORD != '' }}
+    steps:
+      # Fails in a second, with a sentence that says what to do, rather than
+      # leaving a container crash-looping on a missing env file.
+      - name: Check the server is set up
+        run: |
+          if ! docker info >/dev/null 2>&1; then
+            echo "::error::Docker is not reachable as $(whoami). Run: sudo usermod -aG docker $(whoami), then restart the runner service."
+            exit 1
+          fi
+          if [ ! -r "$ENV_FILE" ]; then
+            echo "::error::$ENV_FILE is missing or unreadable. Copy Aj-Smart-Biz-Backend/.env.production there, fill in the real values, and chmod 600 it."
+            exit 1
+          fi
+          if [ -z "$DB_PASSWORD" ]; then
+            echo "::error::No MySQL password. Set MYSQL_ROOT_PASSWORD as a repository secret (Settings -> Secrets and variables -> Actions), or as a variable if you accept it being readable."
+            exit 1
+          fi
+          if [ "$DB_PASSWORD_IS_SECRET" != "true" ]; then
+            echo "::warning::MYSQL_ROOT_PASSWORD is a repository *variable*, not a secret, so GitHub will not mask it in these logs. Move it to a secret when you get the chance."
+          fi
+
+      # The image is pulled, not built, on the server, so the runner needs read
+      # access to the repository on Docker Hub — which a private repository
+      # would not grant it anonymously.
+      - name: Sign in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # By digest, deliberately, even though the run has a tag of its own: two
+      # pushes can race, and only the digest names the bytes this run produced.
+      # The tag is echoed so the log says which build that digest is.
+      - name: Pull the image this run built
+        run: |
+          echo "Pulling $IMAGE:$BUILD_TAG ($DIGEST)"
+          docker pull "$IMAGE@$DIGEST"
+
+      # Uploads are a volume, not a path in the image: company logos and
+      # favicons have to outlive the container that is about to be thrown away.
+      # A no-op once it exists.
+      - name: Make sure the uploads volume exists
+        run: docker volume create "$UPLOADS_VOLUME" >/dev/null
+
+      # Brings the database up if it is not already, and otherwise leaves it
+      # completely alone. See the note in the header for why those are the only
+      # two things it is allowed to do.
+      #
+      # Changing MYSQL_ROOT_PASSWORD after the first run does NOT change the
+      # password: the image only reads it while initialising an empty data
+      # directory, and from then on the password is a property of the volume.
+      - name: Make sure MySQL is running
+        run: |
+          set -euo pipefail
+
+          docker network create "$NETWORK" >/dev/null 2>&1 || true
+          docker volume create "$DB_VOLUME" >/dev/null
+
+          # Asked as two questions on purpose. `docker inspect` on a container
+          # that does not exist prints an empty line on *stdout* before it
+          # fails, so `|| echo missing` produced a blank line followed by
+          # `missing` — a two-line value equal to neither "missing" nor
+          # "running", which fell through to the else and ran `docker start`
+          # on a container that was never there. That is the "exists but is
+          # missing" line in the log.
+          if docker container inspect "$DB_CONTAINER" >/dev/null 2>&1; then
+            state=$(docker container inspect -f '{{.State.Status}}' "$DB_CONTAINER" | tr -d '[:space:]')
+          else
+            state=missing
+          fi
+
+          if [ "$state" = "missing" ]; then
+            # Refuse early and clearly rather than letting `docker run` fail
+            # with "port is already allocated" halfway down a wall of output.
+            if command -v ss >/dev/null 2>&1 && ss -lnt "( sport = :$DB_HOST_PORT )" 2>/dev/null | grep -q ":$DB_HOST_PORT"; then
+              echo "::error::Port $DB_HOST_PORT is already in use on this server, so a new MySQL container cannot publish on it. Set the MYSQL_HOST_PORT variable to a free port — the API does not use it, it talks to the container by name."
+              exit 1
+            fi
+
+            echo "No MySQL container yet — creating one."
+            docker run -d \
+              --name "$DB_CONTAINER" \
+              --restart unless-stopped \
+              --network "$NETWORK" \
+              -e MYSQL_ROOT_PASSWORD="$DB_PASSWORD" \
+              -e MYSQL_DATABASE="$DB_NAME" \
+              -p "$DB_HOST_PORT:3306" \
+              -v "$DB_VOLUME:/var/lib/mysql" \
+              "$DB_IMAGE" >/dev/null
+          elif [ "$state" = "running" ]; then
+            echo "MySQL is already running — left untouched."
+          else
+            echo "MySQL container exists but is $state — starting it."
+            docker start "$DB_CONTAINER" >/dev/null
+          fi
+
+          # A container from an earlier run may predate the network. Joining is
+          # a no-op when it is already a member.
+          docker network connect "$NETWORK" "$DB_CONTAINER" >/dev/null 2>&1 || true
+
+          # Wait for it to actually accept connections. The API syncs the schema
+          # on boot, so starting it against a database that is still
+          # initialising is a crash-loop and a failed deploy. Five minutes,
+          # because a first run has to build the data directory.
+          echo "Waiting for MySQL to accept connections..."
+          for _ in $(seq 1 60); do
+            if docker exec "$DB_CONTAINER" mysqladmin ping -h 127.0.0.1 -uroot -p"$DB_PASSWORD" --silent >/dev/null 2>&1; then
+              echo "MySQL is ready."
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "::error::MySQL did not become ready. Its last 50 log lines:"
+          docker logs --tail 50 "$DB_CONTAINER" 2>&1 || true
+          exit 1
+
+      - name: Replace the running container
+        id: rollout
+        run: |
+          set -euo pipefail
+
+          # What is serving traffic right now, so a failed roll-out has
+          # something to go back to. Empty on the very first deploy.
+          # `tr` for the same reason as above: without it the blank line that a
+          # failed inspect leaves on stdout makes PREVIOUS non-empty on the very
+          # first deploy, and a failed roll-out then tries to "roll back" to an
+          # image id that is a single newline.
+          PREVIOUS=$(docker container inspect -f '{{.Image}}' "$CONTAINER" 2>/dev/null | tr -d '[:space:]' || true)
+          echo "Currently running: ${PREVIOUS:-nothing}"
+
+          # The `-e` flags override whatever the env file says, and for one
+          # reason in both cases: these are not the operator's settings, they
+          # are the wiring between two containers this job runs, and the two
+          # cannot be allowed to drift apart.
+          #
+          #   PORT   the published port and the port the app listens on are a
+          #          single fact; split them and the container is up and
+          #          unreachable.
+          #   DB_*   the API reaches the database over the private network by
+          #          container name, on its *internal* 3306 — not the port
+          #          published on the host, which is there for people. An env
+          #          file saying `127.0.0.1` would be pointing the API at
+          #          itself, which is the single most common way this fails.
+          #
+          # Everything else — JWT secrets, the super admin, CORS, upload limits
+          # — still comes from the env file, which is where it belongs.
+          start() {
+            docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+            docker run -d \
+              --name "$CONTAINER" \
+              --restart unless-stopped \
+              --network "$NETWORK" \
+              --env-file "$ENV_FILE" \
+              -e PORT="$APP_PORT" \
+              -e DB_DIALECT=mysql \
+              -e DB_HOST="$DB_CONTAINER" \
+              -e DB_PORT=3306 \
+              -e DB_NAME="$DB_NAME" \
+              -e DB_USER="$DB_USER" \
+              -e DB_PASSWORD="$DB_PASSWORD" \
+              -p "$HOST_PORT:$APP_PORT" \
+              -v "$UPLOADS_VOLUME:/app/uploads" \
+              "$1" >/dev/null
+          }
+
+          # Waits on the HEALTHCHECK baked into the image — `GET /`, the API's
+          # own liveness route — rather than on `docker run` returning, which
+          # only means a process was spawned. Bounded at three minutes, against
+          # a 40s start period, because the first boot syncs the schema.
+          wait_healthy() {
+            for _ in $(seq 1 60); do
+              state=$(docker container inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$CONTAINER" 2>/dev/null | tr -d '[:space:]' || true)
+              case "${state:-gone}" in
+                healthy|running) return 0 ;;
+                unhealthy|exited|dead|gone) return 1 ;;
+              esac
+              sleep 3
+            done
+            return 1
+          }
+
+          start "$IMAGE@$DIGEST"
+
+          if wait_healthy; then
+            echo "New container is healthy."
+            exit 0
+          fi
+
+          echo "::error::The new container never became healthy. Its last 100 log lines:"
+          docker logs --tail 100 "$CONTAINER" 2>&1 || true
+
+          if [ -n "$PREVIOUS" ]; then
+            echo "::warning::Rolling back to $PREVIOUS"
+            start "$PREVIOUS"
+            if wait_healthy; then
+              echo "Rolled back — the previous image is serving again."
+            else
+              echo "::error::The rollback did not come up either. The server needs a look."
+            fi
+          fi
+          exit 1
+
+      # Only the layers nothing points at any more. Not `-a`, which would take
+      # the image we might still need to roll back to — on a machine where the
+      # whole point of keeping it is that it is one `docker run` away.
+      - name: Tidy up old layers
+        if: always()
+        run: docker image prune -f >/dev/null || true
+
+      # The runner is a laptop that other jobs share. The credential does not
+      # stay in its docker config after the job that needed it.
+      - name: Sign out of Docker Hub
+        if: always()
+        run: docker logout >/dev/null 2>&1 || true
+
+      - name: Say what is running
+        if: always()
+        run: |
+          {
+            echo "### Deploy — ${{ steps.rollout.outcome == 'success' && 'live' || 'FAILED' }}"
+            echo ''
+            echo '```'
+            echo "build     $IMAGE:$BUILD_TAG"
+            echo "image     $IMAGE@$DIGEST"
+            echo "container $CONTAINER"
+            echo "port      $HOST_PORT -> $APP_PORT"
+            echo "database  $DB_CONTAINER:3306 (published on $DB_HOST_PORT)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,209 @@
+/* ------------------------------------------------------------------ *
+ * Services — its own page.
+ *
+ * The same masthead language as About and Contact, so the three read as a set:
+ * a breadcrumb, the tenant's own heading, the lede, and then the content.
+ *
+ * Everything below the masthead is `ServicesSection`, which brings its own
+ * grid and its own card. All this file adds is the head and the spacing under
+ * it — the list on this page and the band on the home page must not drift into
+ * two different-looking things.
+ * ------------------------------------------------------------------ */
+
+.masthead {
+  position: relative;
+  overflow: hidden;
+  padding-block: 56px 52px;
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(52rem 28rem at 88% -20%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%),
+    radial-gradient(38rem 24rem at 4% 120%, color-mix(in srgb, var(--brand) 8%, transparent), transparent 70%),
+    color-mix(in srgb, var(--surface-sunken) 92%, #fff);
+}
+
+/* The oversized ring in the corner, the same one About and Contact carry. */
+.masthead::after {
+  content: '';
+  position: absolute;
+  top: -34rem;
+  right: -18rem;
+  width: 60rem;
+  height: 60rem;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  pointer-events: none;
+}
+
+/* ------------------------------ breadcrumb ------------------------------ */
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 26px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.crumb {
+  color: var(--text-muted);
+  border-bottom: 1px solid transparent;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.crumb:hover {
+  color: var(--brand);
+  border-bottom-color: currentColor;
+}
+
+.crumbSep {
+  color: var(--text-faint);
+}
+
+/* ------------------------------- masthead ------------------------------- */
+
+.title {
+  font-size: clamp(2.1rem, 5vw, 3.4rem);
+  max-width: 18ch;
+}
+
+.lead {
+  margin-top: 20px;
+  max-width: 56ch;
+  font-size: 1.16rem;
+  color: var(--text-muted);
+}
+
+/*
+ * How many there are. Small, set in the faint tone and spaced like the
+ * eyebrow — it is a fact about the page rather than part of what the business
+ * is saying, and it should read that way.
+ */
+.count {
+  margin-top: 26px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------- list --------------------------------- */
+
+/*
+ * The section under the masthead has no heading of its own here — the page
+ * printed it — so its usual top padding would be a band of nothing between a
+ * lede and the first card.
+ */
+.list {
+  padding-top: 56px;
+}
+
+@media (max-width: 620px) {
+  .masthead {
+    padding-block: 40px 38px;
+  }
+
+  .crumbs {
+    margin-bottom: 20px;
+  }
+
+  .lead {
+    font-size: 1.05rem;
+    margin-top: 16px;
+  }
+
+  .count {
+    margin-top: 20px;
+  }
+
+  .list {
+    padding-top: 40px;
+  }
+}
+
+/* -------------------------------- filter -------------------------------- */
+
+/*
+ * The category filter, as a row of chips rather than a dropdown — the same
+ * decision the catalogue's own filter makes, and the same reason: a dropdown
+ * hides the options, and the options here are the argument. A visitor who can
+ * see that the shop is sorted into six things understands the shop.
+ *
+ * Each chip is a real link with its own URL, so the row works without
+ * JavaScript and a filtered view can be shared.
+ */
+.filter {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  padding-block: 16px;
+  /*
+   * Sticks under the header, like the catalogue's own filter.
+   *
+   * A price list of forty treatments is a long scroll, and a filter that leaves
+   * the screen with the first three of them is a filter somebody has to scroll
+   * back up to use.
+   */
+  position: sticky;
+  top: var(--header-height);
+  z-index: 5;
+}
+
+.chips {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  /* Scrolls on a phone rather than wrapping to four lines and pushing the list
+     off the screen. */
+  scrollbar-width: none;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex: none;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease;
+}
+
+.chip:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.chipOn {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--brand-contrast);
+}
+
+/* A subcategory, set slightly smaller and indented by its own left margin —
+   enough to read as "under the one before it" without a second row. */
+.chipChild {
+  font-weight: 500;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.chipCount {
+  font-size: 0.74rem;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}

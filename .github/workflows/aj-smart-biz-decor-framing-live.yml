@@ -1,0 +1,188 @@
+# ------------------------------------------------------------------ #
+# aj-smart-biz-decor-framing image - build the image and push it to Docker Hub.
+#
+# Runs on every push to `aj-smart-biz-decor-framing-live`, which includes the merge commit that
+# a pull request into that branch produces, and on demand from the Actions tab.
+#
+# Two repository secrets are required - Settings -> Secrets and variables ->
+# Actions:
+#
+#   DOCKERHUB_USERNAME   the Docker Hub account the image is pushed as
+#   DOCKERHUB_TOKEN      an access token from Docker Hub -> Account settings ->
+#                        Personal access tokens, with Read & Write scope. An
+#                        account password works and should not be used: a token
+#                        can be revoked on its own.
+#
+# ------------------------------ the image ------------------------------ #
+#
+# Every service on the platform is pushed to ONE Docker Hub repository,
+# `ajtechhub/ajtechhub`, so the tag is the only thing separating one service's
+# images from another's. That is the whole reason the tags below are prefixed
+# with the service name: in a repository of its own a bare `1.0.7` tag is
+# unambiguous, and in a shared one it is a collision waiting to happen.
+#
+#   ajtechhub/ajtechhub:aj-smart-biz-decor-framing-1.0.<run number>   this exact build
+#   ajtechhub/ajtechhub:aj-smart-biz-decor-framing-live               whatever is newest
+#
+# `<run number>` is `github.run_number` - the build number GitHub increments
+# per workflow, the same one shown against the run in the Actions tab. It
+# counts per *workflow*, so each service numbers independently and the backend
+# being on 1.0.40 says nothing about where this one is.
+#
+# It does NOT change when a run is re-run, so re-running a build overwrites
+# that version's tag with the image it should have produced the first time.
+# That is intended rather than accidental: a numbered tag names a commit, and a
+# re-run of the same commit should not consume a new number.
+#
+# There is no `latest`. A single shared repository has one `latest` between
+# four services, so it could only ever be right for one of them.
+#
+# The repository name is fixed here rather than read from the username secret,
+# so the tag a deployment pulls does not change if the pushing account does.
+#
+# No `paths:` filter. On a shared branch one is worth having, but this branch
+# exists to hold releases of this one service - everything that lands on it is
+# meant to produce an image, including a merge that only moves a version
+# number. A filter here is a release that silently did not happen.
+#
+# -------------------------- build-time settings ------------------------- #
+#
+# Almost everything this site reads - API_URL, TENANT_DOMAIN - is read while
+# serving a request, so it belongs on `docker run` and not here. Two things
+# cannot be: `next.config.ts` derives the `/uploads` rewrite from the API URL
+# and Next.js freezes rewrites into the route manifest at build time, and
+# anything named NEXT_PUBLIC_* is compiled into the browser bundle by
+# definition. Those are the build args below, and setting them at run time
+# instead does nothing at all, silently.
+#
+# Each is an optional repository *variable* (Settings -> Secrets and variables
+# -> Actions -> Variables). Left unset, `/uploads` is not rewritten, which is
+# the right answer when something in front of the container already serves the
+# API on the same origin.
+#
+#   DECOR_FRAMING_API_URL          e.g. https://api.example.com/api/v1
+#   DECOR_FRAMING_BACKEND_ORIGIN   overrides the origin derived from the above
+#   DECOR_FRAMING_FILES_URL        serves /uploads straight off the API's own
+#                                  origin instead of proxying them through this
+#                                  site
+# ------------------------------------------------------------------ #
+
+name: aj-smart-biz-decor-framing image
+
+on:
+  push:
+    branches: [aj-smart-biz-decor-framing-live]
+  # So the image can be rebuilt without an empty commit - a rotated base image,
+  # or a re-run after fixing a secret.
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: aj-smart-biz-decor-framing
+    runs-on: ubuntu-latest
+
+    # A second push while the first is still building makes the first one's
+    # image pointless: both would push the same moving `-live` tag, and the
+    # older run could land last. Newest wins, the older build is cancelled.
+    # Keyed on the workflow as well as the ref, so the four services can never
+    # cancel each other.
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+
+    # The job reads the repository and writes to Docker Hub. It has no reason
+    # to be able to write back to GitHub, so it is not given the chance.
+    permissions:
+      contents: read
+
+    env:
+      IMAGE: ajtechhub/ajtechhub
+      SERVICE: aj-smart-biz-decor-framing
+
+    outputs:
+      # The digest, not a tag. The moving tag moves, and anything that pulled it
+      # later could get a different image than the one this run built; a digest
+      # names the exact bytes. Exposed here so a deploy job can be added later
+      # without having to change the build.
+      digest: ${{ steps.build.outputs.digest }}
+      build_tag: ${{ steps.build_tag.outputs.value }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # Buildx is what makes the layer cache below available at all; the
+      # default docker driver supports no cache backend.
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Deliberately before the build rather than after it. A missing or
+      # expired token then fails in seconds, rather than after a full `next build`.
+      - name: Sign in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # The name of this build, worked out once and reused by the tag list, the
+      # image label and the job summary - three places that must agree, and
+      # would drift the moment the expression was written out three times.
+      - name: Work out the build tag
+        id: build_tag
+        run: echo "value=$SERVICE-1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      # Two tags on purpose:
+      #
+      #   <service>-1.0.<run number>  this exact build, so a bad deploy can be
+      #                               rolled back to a numbered one before it
+      #                               rather than to "whatever was newest
+      #                               yesterday"
+      #   <service>-live              the moving tag a deployment pulls
+      - name: Work out the tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=${{ steps.build_tag.outputs.value }}
+            type=raw,value=${{ env.SERVICE }}-live
+          labels: |
+            org.opencontainers.image.title=Aj Smart Biz Decor and Framing
+            org.opencontainers.image.description=Next.js commercial storefront theme (decor and custom framing)
+            org.opencontainers.image.version=${{ steps.build_tag.outputs.value }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          # The theme directory, not the repository root: the Dockerfile and its
+          # .dockerignore live there, and a root context would ship every other
+          # app on the platform into this build.
+          context: ./themes/commercial/decor-framing
+          file: ./themes/commercial/decor-framing/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # See the note at the top of this file: these are build-time only.
+          # An empty value is a real answer here, not a missing one.
+          build-args: |
+            API_URL=${{ vars.DECOR_FRAMING_API_URL }}
+            BACKEND_ORIGIN=${{ vars.DECOR_FRAMING_BACKEND_ORIGIN }}
+            NEXT_PUBLIC_FILES_URL=${{ vars.DECOR_FRAMING_FILES_URL }}
+          # Restores the dependency-install layer between runs, so a commit that
+          # only touches source does not reinstall the tree from scratch. The
+          # scope is per service: one shared scope would have four builds
+          # evicting each other's caches all day.
+          cache-from: type=gha,scope=aj-smart-biz-decor-framing
+          cache-to: type=gha,mode=max,scope=aj-smart-biz-decor-framing
+
+      - name: Say what was pushed
+        run: |
+          {
+            echo "### Pushed to Docker Hub"
+            echo ''
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo "${{ env.IMAGE }}@${{ steps.build.outputs.digest }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

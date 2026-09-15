@@ -1,0 +1,79 @@
+/* ------------------------------------------------------------------ *
+ * The API-unreachable page.
+ *
+ * Uses only the template's own tokens — never `--brand` or `--accent`, which
+ * are the tenant's and are overridden at runtime from the API. With the API
+ * down they hold whatever the defaults happen to be, so branding this page with
+ * them would be dressing it in a company nobody confirmed.
+ * ------------------------------------------------------------------ */
+
+.page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 32px 24px;
+  background: var(--surface-sunken);
+}
+
+.panel {
+  max-width: 34rem;
+  width: 100%;
+  padding: 48px 40px 40px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  margin: 0 auto 22px;
+  border-radius: 50%;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+}
+
+.mark svg {
+  width: 28px;
+  height: 28px;
+}
+
+.title {
+  font-size: clamp(1.5rem, 3vw, 1.9rem);
+}
+
+.body {
+  margin-top: 14px;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.retry {
+  margin-top: 26px;
+  /* The one place on this page that may carry the brand colour, because a
+     button has to look like a button and `.btn--primary` supplies it. */
+}
+
+.note {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 0.84rem;
+}
+
+@media (max-width: 560px) {
+  .panel {
+    padding: 34px 22px 30px;
+    border-radius: var(--radius);
+  }
+
+  .retry {
+    width: 100%;
+  }
+}

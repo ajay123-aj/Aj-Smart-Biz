@@ -1,0 +1,597 @@
+/* ------------------------------------------------------------------ *
+ * Gilt theme — the commercial business type, for a shop that frames
+ * pictures and sells the things that hang beside them.
+ *
+ * This replaces the Atelier design that used to live here (square corners,
+ * `3px double` mount rules, a display serif). Same components, same API, same
+ * markup — a different design language, which is the only sane way to change
+ * how a template looks without forking a hundred files.
+ *
+ * Three decisions carry the whole thing, and nearly every rule below is
+ * downstream of one of them:
+ *
+ *   **The page has a ground, and things float on it.** The body is not a flat
+ *   colour: it is a fixed wash — a gold bloom off the top-left, a colder brand
+ *   bloom off the top-right, over a warm white-to-stone gradient. Every panel,
+ *   card and bar on top of it is translucent white with a blur behind it, so
+ *   the wash shows through everything and the page reads as one sheet of glass
+ *   laid over one sheet of paper. `--glass` and `--glass-blur` are that
+ *   material, named once here and read everywhere.
+ *
+ *   **Corners are generous.** 1.35rem on a card, 1.75rem on a panel, and a
+ *   full pill on anything you press. The Atelier theme argued that a framing
+ *   shop should be all right angles; this one argues the opposite — the product
+ *   photography supplies the right angles, and the chrome around it stays soft
+ *   so the frames in the pictures are the only hard edges on screen.
+ *
+ *   **Gold is the only accent, and it is never a surface.** `--accent` is
+ *   brass: it sets eyebrows, hairlines, the active slide marker and the one
+ *   gradient button (`.btn--gold`). It is never a page background and never
+ *   body text — at 4.5:1 against white it is not a colour you can read a
+ *   paragraph in, and keeping it to decoration is what makes it look like metal
+ *   rather than like a highlighter.
+ *
+ * Two kinds of token live here and they are not interchangeable:
+ *
+ *   --brand / --accent   the tenant's own colours, overridden at runtime in the
+ *                        layout from whatever the company-details API returns.
+ *                        The values below are only what a tenant with no theme
+ *                        configured gets.
+ *   everything else      the template's own design — surfaces, radii, shadows,
+ *                        type scale, rhythm. These do not vary per tenant, and
+ *                        they are what makes every site built on this template
+ *                        recognisably the same template.
+ *
+ * Every brand-tinted shadow below is written with `color-mix` rather than an
+ * `rgba()` on a hard-coded triplet. That is not a style preference: a tenant
+ * overriding `--brand` in the layout gets shadows in *their* colour for free,
+ * where a triplet would have left the whole page casting the default charcoal.
+ * ------------------------------------------------------------------ */
+
+:root {
+  /*
+   * Brand — replaced at runtime by the company's theme when it has one.
+   *
+   * Near-black with a little blue in it, not the walnut the Atelier theme used.
+   * On a ground this warm a brown brand sinks into the paper; a charcoal holds
+   * its edge against the gold and leaves the gold as the only warm thing on the
+   * page, which is the whole idea.
+   */
+  --brand: #2b2b30;
+  --brand-strong: #161619;
+  --brand-soft: rgba(43, 43, 48, 0.08);
+  --brand-contrast: #ffffff;
+
+  /*
+   * Accent — brass. Eyebrows, the gradient button, the active slide marker, and
+   * hairlines over dark artwork.
+   *
+   * `--accent-soft` is the pale gold that goes *over* dark surfaces — the hero
+   * eyebrow, a footer column heading — and it is **opaque** because it is a
+   * text colour and one place fades it further with `color-mix`, which needs
+   * something solid to fade from.
+   */
+  --accent: #b08d57;
+  --accent-soft: #d9c29a;
+
+  /*
+   * Neutrals.
+   *
+   * The ordering is a light theme's: panels sit *brighter* than the ground, and
+   * the ground is the stone the body gradient lands on. `--surface` is plain
+   * white here rather than the Atelier cream — the glass fills below are white
+   * at partial alpha, and a cream `--surface` behind white glass shows as a
+   * dirty edge everywhere the two meet.
+   */
+  --surface: #ffffff;
+  --surface-muted: #f7f6f3;
+  --surface-sunken: #efece6;
+  --border: #e6e3dc;
+  --border-strong: #d3cec4;
+
+  --text: #1c1c1f;
+  --text-muted: #6c6c73;
+  --text-faint: #9a9aa2;
+
+  /*
+   * The glass, named rather than written out at each call site.
+   *
+   * A gradient rather than a flat alpha, and a steep one: 78% white at the top
+   * corner falling to 50% at the bottom. That is what makes a card look like a
+   * sheet catching light along one edge instead of like a grey box, and it is
+   * the single detail separating this theme from "the old one with rounder
+   * corners".
+   *
+   * `--glass-blur` carries a saturate() as well as a blur. Blur alone over a
+   * warm ground turns everything behind it grey; the saturation boost is what
+   * keeps the gold bloom readable through a panel sitting on top of it.
+   */
+  --glass: linear-gradient(155deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.5));
+  --glass-strong: linear-gradient(155deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.72));
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-blur: blur(22px) saturate(160%);
+  /* The lit edge along a glass panel. Paired with every shadow below. */
+  --glass-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+
+  /*
+   * The card surfaces, named rather than written out at each call site.
+   *
+   * Seven modules build their card out of `--panel` + `--hairline` + `--shadow`
+   * and nothing else — services, features, the blog rail, the testimonial
+   * carousel, the service categories, the contact panels, the about page. That
+   * is why this theme could change what a card is made of without touching any
+   * of them: the three tokens below *are* the card, and glass is simply what
+   * they now resolve to.
+   *
+   * Each of those modules pairs this with the blur, which cannot live in a
+   * custom property — `backdrop-filter` has to be declared on the element that
+   * does the blurring.
+   */
+  --panel: var(--glass);
+  --panel-hover: var(--glass-strong);
+  --hairline: var(--glass-border);
+  --hairline-strong: rgba(255, 255, 255, 0.9);
+
+  /* Form fields, the one surface that sits *below* the page rather than above it. */
+  --field: #fbfaf7;
+  --field-focus: #ffffff;
+
+  /* The wash a caption sits on over a photograph. Cool here, not warm: it lies
+     over the artwork, and a warm scrim on a cool photo yellows it. */
+  --scrim: rgba(12, 12, 14, 0.55);
+
+  /* WhatsApp's own colours. Fixed, never themed — see WhatsAppButton.module.css. */
+  --whatsapp: #25d366;
+  --whatsapp-dark: #1da851;
+
+  /*
+   * Corners. See the note at the top — this is the theme's second decision, and
+   * the reason no rule below asks for anything sharper.
+   *
+   * `--radius-sm` is not "slightly rounded": it is the radius of a small tile —
+   * a badge, an input, a thumbnail — and at 0.75rem it is still visibly a curve
+   * on something 28px tall. Anything the visitor *presses* takes
+   * `--radius-pill` instead, stated separately so a button can never be
+   * accidentally re-cornered by a change to the tile radius.
+   */
+  --radius-sm: 0.75rem;
+  --radius: 1.35rem;
+  --radius-lg: 1.75rem;
+  --radius-pill: 999px;
+
+  /*
+   * Shadows, all tinted with the brand rather than neutral grey, and all much
+   * softer and much larger than the Atelier theme's. Glass needs distance from
+   * the ground to read as glass: a 6px shadow under a translucent panel looks
+   * like a printing error, and the same panel at 50px looks like it is floating.
+   */
+  --shadow-sm: 0 6px 18px color-mix(in srgb, var(--brand) 7%, transparent);
+  --shadow: 0 18px 50px color-mix(in srgb, var(--brand) 10%, transparent);
+  --shadow-lg: 0 30px 80px color-mix(in srgb, var(--brand) 22%, transparent);
+  --shadow-hover: 0 34px 80px color-mix(in srgb, var(--brand) 20%, transparent);
+  /* The one a pressable thing casts in its own colour. */
+  --shadow-brand: 0 12px 30px color-mix(in srgb, var(--brand) 25%, transparent);
+
+  /*
+   * The header, in two parts, because on this theme it is two things.
+   *
+   * `--header-height` is the glass bar itself — what Header.module.css sets its
+   * own height to. `--header-gap` is the gutter it floats in, which is real
+   * vertical space above it and belongs to nobody else.
+   *
+   * `--header-stack` is the sum, and it is the one a *sticky* element wants:
+   * anything pinning itself under the header — a catalogue filter, a product
+   * summary, an index rail — has to clear the gutter as well as the bar, or it
+   * slides under the bar and loses its first line. That was a single value on
+   * the Atelier theme, where the header sat flush to the top edge and the two
+   * numbers were the same; it is a foot-gun now, so the sum has a name.
+   */
+  --header-height: 76px;
+  --header-gap: 14px;
+  --header-stack: calc(var(--header-height) + var(--header-gap));
+
+  --max-width: 1220px;
+
+  /*
+    One face, everywhere.
+
+    The Atelier theme set every heading in a display serif; this one has no
+    display face at all. A shop page is mostly prices, sizes and
+    specifications, all of which want a grotesque, and a serif heading over a
+    grid of glass cards reads as two designs that met at a merger.
+
+    `--font-display` survives as an alias rather than being deleted, because a
+    dozen modules ask for it by name and "the display face" is still a
+    meaningful thing for them to ask for. It is simply the same family now, and
+    the weight below is what distinguishes it.
+  */
+  --font-sans: 'Geist', 'Inter', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: var(--font-sans);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /*
+   * Tells the browser this document is light, so form controls, scrollbars and
+   * the space above a rubber-band scroll are drawn to match. Stated rather than
+   * left to the default: a visitor whose OS is in dark mode otherwise gets dark
+   * native selects on a white page.
+   */
+  color-scheme: light;
+  scroll-behavior: smooth;
+  /* So an anchor jump does not land under the sticky header — the whole stack,
+     plus a little air under it. */
+  scroll-padding-top: calc(var(--header-stack) + 16px);
+}
+
+/*
+ * The ground.
+ *
+ * Two radial blooms over a three-stop linear gradient, and `fixed` so the wash
+ * belongs to the window rather than to the document — scroll a page of glass
+ * panels over a wash that scrolls with them and the whole effect collapses,
+ * because nothing behind the glass ever changes.
+ *
+ * `min-height: 100vh` matters for the same reason: a short page over a gradient
+ * sized to its content ends in a hard horizontal line partway down the screen.
+ */
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 8% -10%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 42%),
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--brand) 6%, transparent), transparent 45%),
+    linear-gradient(160deg, #ffffff 0%, var(--surface-muted) 55%, var(--surface-sunken) 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.68;
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Every heading, in the one face, heavy.
+ *
+ * 800 rather than the serif's 600. With no change of family left to mark a
+ * heading, weight is doing the entire job, and a semibold grotesque above a 400
+ * paragraph is not a large enough step to read as a title. The tracking goes
+ * slightly negative for the same reason it could not before: a grotesque at 800
+ * wants closing up, where a serif would have welded.
+ */
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---------------------------- shared layout ---------------------------- */
+
+.container {
+  width: 100%;
+  max-width: var(--max-width);
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+.section {
+  padding-block: 88px;
+}
+
+/*
+  The eyebrow. Same role as in the other themes — a small tracked label above
+  every heading — but plain now rather than ruled on both sides.
+
+  The Atelier version drew a hairline out either side of the words, in imitation
+  of the plate under a hung picture. Nothing on this page is a plate any more,
+  and two 22px rules floating beside a gold label on glass read as a rendering
+  artefact. What is left is the tracking, which at 0.28em is doing plenty.
+*/
+.eyebrow {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+.section-title {
+  font-size: clamp(1.9rem, 3.6vw, 2.6rem);
+}
+
+.section-lede {
+  margin-top: 16px;
+  max-width: 62ch;
+  color: var(--text-muted);
+  font-size: 1.02rem;
+}
+
+/*
+ * The block every section opens with. Capped well short of the container so a
+ * heading never runs the full width of a desktop — long measures are what makes
+ * a section read as sparse rather than spacious.
+ */
+.section-head {
+  max-width: 46rem;
+  margin-bottom: 44px;
+}
+
+/* ---------------------------- surfaces ---------------------------- */
+
+/*
+ * One card, everywhere: a sheet of glass over the page's wash, edged with a
+ * white hairline that reads as the lit edge rather than as a border, and lifted
+ * off the ground by a large, soft, brand-tinted shadow.
+ *
+ * What happens on hover is the gesture the whole theme is built on, and it is
+ * deliberately *not* the Atelier one. There, a brass rule appeared along the top
+ * edge and the card rose 5px — a print being picked up off the counter. Here the
+ * card simply rises further and its shadow grows with it, which is the only
+ * hover a floating object can have that does not contradict the fact that it is
+ * already floating.
+ *
+ * Nothing about the border changes on hover, so nothing reflows and no hairline
+ * flickers as the pointer crosses a grid.
+ */
+.card-surface {
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow), var(--glass-sheen);
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
+}
+
+.card-surface:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-hover), var(--glass-sheen);
+}
+
+/*
+ * A band that wants separating from the ones around it.
+ *
+ * On the Atelier theme this was a full-bleed rectangle closed off top and bottom
+ * with double rules and textured with a linen weave. Both are gone: a full-bleed
+ * band is the one shape this theme cannot draw, because a rectangle that touches
+ * the viewport edges has no shadow, and with no shadow it is not floating, and
+ * if it is not floating it is not made of the same material as everything else
+ * on the page.
+ *
+ * So a muted band is a **panel**: the same glass as a card, at panel scale,
+ * inset from the viewport and rounded. It keeps `.section`'s vertical rhythm and
+ * the `.container` inside it still governs the measure — the only thing that
+ * changed is that the band now ends somewhere you can see.
+ */
+.section--muted {
+  position: relative;
+  width: calc(100% - 32px);
+  max-width: calc(var(--max-width) + 32px);
+  margin-inline: auto;
+  border-radius: var(--radius-lg);
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow), var(--glass-sheen);
+  /* Tighter than a full-width band needs to be: the panel's own edges now do the
+     separating that 104px of air used to do. */
+  padding-block: 64px;
+  overflow: hidden;
+}
+
+/*
+ * The one piece of decoration a panel gets: a gold bloom off its top-right
+ * corner, echoing the one the body wash puts in the same place on the page.
+ *
+ * Kept very low and masked to the corner it starts in. A panel tinted evenly
+ * across its whole width has simply been given a different background colour,
+ * which is the thing this is here to avoid.
+ */
+.section--muted::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    38rem 24rem at 100% 0%,
+    color-mix(in srgb, var(--accent) 14%, transparent),
+    transparent 70%
+  );
+}
+
+.section--muted > * {
+  position: relative;
+}
+
+/* The container inside a panel already has the panel's own inset, so it stops
+   adding the full page gutter on top of it. */
+.section--muted > .container {
+  padding-inline: 32px;
+}
+
+/* ---------------------------- buttons ---------------------------- */
+
+/*
+ * Pills, not rectangles — the second decision at the top of this file, applied
+ * to the control it shows on most.
+ *
+ * Set in sentence case at 600, where the Atelier theme set tracked capitals.
+ * Capitals were right for a label cut into a brass plate; on a pill they read as
+ * a system alert, and a shop has far too many buttons on a page — Add to Cart on
+ * every card — for all of them to be shouting.
+ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 26px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  font-weight: 600;
+  font-size: 0.92rem;
+  letter-spacing: 0;
+  line-height: 1;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease,
+    transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+/* Every button on this theme rises when pointed at, which is the same gesture
+   the cards make — one page, one physics. */
+.btn:hover {
+  transform: translateY(-2px);
+}
+
+.btn--primary {
+  background: var(--brand);
+  color: var(--brand-contrast);
+  box-shadow: var(--shadow-brand);
+}
+
+.btn--primary:hover {
+  background: var(--brand-strong);
+  box-shadow: 0 18px 38px color-mix(in srgb, var(--brand) 32%, transparent);
+}
+
+/*
+ * The secondary button is the theme in one control: a pane of glass with a
+ * hairline, holding nothing but its label. On hover the hairline takes the brand
+ * colour and the glass clouds slightly — the same move the primary makes, an
+ * order of magnitude quieter.
+ */
+.btn--ghost {
+  background: rgba(255, 255, 255, 0.55);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.btn--ghost:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+/*
+ * The gold button. One per screen, at most.
+ *
+ * A three-stop gradient rather than a flat fill, because flat gold is mustard:
+ * the band of lighter metal across the middle is what makes the eye read the
+ * shape as something polished. Its label is `--brand` rather than white — white
+ * on `#b08d57` is 2.3:1 and unreadable, and darkening the gold far enough to
+ * carry white type stops it being gold.
+ */
+.btn--gold {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-soft) 50%, var(--accent) 100%);
+  color: var(--brand);
+  font-weight: 700;
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--accent) 38%, transparent);
+}
+
+.btn--gold:hover {
+  box-shadow: 0 18px 38px color-mix(in srgb, var(--accent) 46%, transparent);
+}
+
+/* Screen-reader-only, for the skip link and icon-button labels. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: 16px;
+  top: -60px;
+  z-index: 100;
+  padding: 10px 20px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: var(--brand-contrast);
+  font-weight: 600;
+  transition: top 0.16s ease;
+}
+
+.skip-link:focus {
+  top: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .section {
+    padding-block: 56px;
+  }
+
+  /*
+   * On a phone the panel gives up most of its inset — 10px of gutter either side
+   * of a 390px screen is enough to show that it is a panel, and any more is
+   * width taken off a card that is already at its minimum.
+   */
+  .section--muted {
+    width: calc(100% - 20px);
+    padding-block: 44px;
+    border-radius: var(--radius);
+  }
+
+  .section--muted > .container {
+    padding-inline: 18px;
+  }
+}

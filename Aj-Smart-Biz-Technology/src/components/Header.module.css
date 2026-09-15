@@ -1,0 +1,239 @@
+/*
+ * The header floats rather than sitting flush to the top edge.
+ *
+ * `--header-gap` of real space above it, and the bar inset from both sides, so
+ * it reads as one more sheet of glass on the page rather than as browser chrome
+ * bolted to the window. That is the whole reason `--header-stack` exists as a
+ * separate token — see globals.css.
+ *
+ * The negative bottom margin cancels the top one so the header takes no
+ * vertical space of its own: it is sticky, the hero starts underneath it, and
+ * without this the page would open with 14px of dead band above the fold.
+ */
+.header {
+  position: sticky;
+  top: var(--header-gap);
+  z-index: 50;
+  margin-block: var(--header-gap) calc(var(--header-gap) * -1);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: var(--header-height);
+  padding-inline: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-sm), var(--glass-sheen);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+/*
+ * Once the page moves, the bar brightens its edge and deepens its shadow.
+ *
+ * Not a background change alone: the hero behind it is also glass, and two
+ * panes at 10% and 14% white are the same pane to the eye. The *edge* is what
+ * separates them.
+ */
+.scrolled .inner {
+  background: var(--glass-strong);
+  border-color: var(--hairline-strong);
+  box-shadow: var(--shadow), var(--glass-sheen);
+}
+
+/* ------------------------------- brand ------------------------------- */
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  margin-right: auto;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+}
+
+/* Two letters on the accent ramp in near-black — the same pairing the primary
+   button uses, and for the same contrast reason. */
+.mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--accent-ramp);
+  color: var(--on-accent);
+  font-weight: 800;
+  font-size: 0.86rem;
+  letter-spacing: 0.02em;
+  box-shadow: var(--shadow-accent);
+}
+
+.brandText {
+  font-weight: 700;
+  font-size: 1.02rem;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* -------------------------------- nav -------------------------------- */
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.navLink {
+  padding: 9px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: color 0.18s ease, background 0.18s ease;
+}
+
+.navLink:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/*
+ * The current page.
+ *
+ * Driven by `aria-current="page"` rather than by a class, so what a screen
+ * reader announces and what the eye sees cannot drift apart — there is one
+ * source for both.
+ */
+.navLink[aria-current='page'] {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* The number, in the mobile sheet only. Hidden on desktop, where the bar
+   already carries a call to action and a second one would be clutter. */
+.navPhone {
+  display: none;
+}
+
+.cta {
+  padding: 11px 20px;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+/* ------------------------------- toggle ------------------------------- */
+
+.toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 42px;
+  height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text);
+}
+
+.bar {
+  display: block;
+  height: 1.8px;
+  width: 100%;
+  border-radius: 2px;
+  background: currentColor;
+  transition: transform 0.24s ease, opacity 0.18s ease;
+}
+
+/* The three bars fold into a cross. The middle one fades rather than rotating,
+   because two crossed bars plus a third is a hash, not an X. */
+.barTop {
+  transform: translateY(6.8px) rotate(45deg);
+}
+
+.barMid {
+  opacity: 0;
+}
+
+.barBottom {
+  transform: translateY(-6.8px) rotate(-45deg);
+}
+
+/* ------------------------------ mobile ------------------------------ */
+
+@media (max-width: 940px) {
+  .toggle {
+    display: flex;
+  }
+
+  /* The demo button leaves the bar; the sheet carries the phone number
+     instead, which is the action people take at this width anyway. */
+  .cta {
+    display: none;
+  }
+
+  /*
+   * The sheet: a panel dropped under the bar, not a full-screen overlay. This
+   * is a five-item menu, and covering the whole viewport for five links is a
+   * gesture borrowed from apps with fifty.
+   *
+   * `display: none` when closed rather than opacity or a transform — a
+   * translated-away menu is still in the tab order, and the first Tab from the
+   * logo would land somewhere invisible.
+   */
+  .nav {
+    display: none;
+    position: absolute;
+    top: calc(var(--header-height) + 10px);
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding: 12px;
+    border-radius: var(--radius);
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--hairline-strong);
+    box-shadow: var(--shadow-lg), var(--glass-sheen);
+  }
+
+  .navOpen {
+    display: flex;
+  }
+
+  .navLink {
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 0.98rem;
+  }
+
+  .navPhone {
+    display: block;
+    margin-top: 6px;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.06);
+    text-align: center;
+    font-weight: 700;
+    color: var(--accent-text);
+  }
+}
+
+@media (max-width: 520px) {
+  .inner {
+    gap: 10px;
+  }
+
+  /* The wordmark goes; the AJ mark carries the brand on its own at this width. */
+  .brandText {
+    display: none;
+  }
+}
