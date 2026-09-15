@@ -3,11 +3,13 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import PlanNotice from '@/components/PlanNotice';
 import ServiceUnavailable from '@/components/ServiceUnavailable';
+import CompanyNotFound from '@/components/CompanyNotFound';
 import ServicesSection from '@/components/ServicesSection';
 import CtaBand from '@/components/CtaBand';
 import { SERVICES_COPY } from '@/config/site';
 import { navOf, type CompanyDetails } from '@/lib/company';
 import { getCompanyDetails } from '@/lib/company.server';
+import { anonymousMetadata } from '@/lib/metadata';
 import { flattenCategories, resolveServices } from '@/lib/services';
 import styles from './page.module.css';
 
@@ -33,6 +35,9 @@ const pageLabel = (company: CompanyDetails): string =>
 
 export async function generateMetadata({ searchParams }: { searchParams: Search }): Promise<Metadata> {
   const [company, params] = await Promise.all([getCompanyDetails(), searchParams]);
+
+  const anonymous = anonymousMetadata(company);
+  if (anonymous) return anonymous;
   const services = resolveServices(company);
 
   /* A filtered view is titled by its category - it is what somebody arriving
@@ -78,6 +83,14 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
    * same reason, as the plan check below.
    */
   if (!company.apiReachable) return <ServiceUnavailable />;
+
+  /**
+   * The API answered, and said this host belongs to no company. Same rule as
+   * the check above and the plan check below: the page has to decline to render
+   * as well as the layout, or the site stays readable in the streamed RSC
+   * payload with the platform's placeholder company in it.
+   */
+  if (!company.resolved) return <CompanyNotFound />;
 
   // The plan is what pays for the content — same rule as every other page.
   if (!company.service.active) return <PlanNotice company={company} />;

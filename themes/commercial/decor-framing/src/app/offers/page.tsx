@@ -2,12 +2,14 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import PlanNotice from '@/components/PlanNotice';
 import ServiceUnavailable from '@/components/ServiceUnavailable';
+import CompanyNotFound from '@/components/CompanyNotFound';
 import ProductsSection from '@/components/ProductsSection';
 import CatalogueMasthead from '@/components/CatalogueMasthead';
 import CtaBand from '@/components/CtaBand';
 import { PRODUCTS_COPY } from '@/config/site';
 import { navOf, type CompanyDetails } from '@/lib/company';
 import { getCompanyDetails } from '@/lib/company.server';
+import { anonymousMetadata } from '@/lib/metadata';
 import { resolveCatalogue } from '@/lib/catalogue';
 
 const pageLabel = (company: CompanyDetails): string =>
@@ -15,6 +17,9 @@ const pageLabel = (company: CompanyDetails): string =>
 
 export async function generateMetadata(): Promise<Metadata> {
   const company = await getCompanyDetails();
+
+  const anonymous = anonymousMetadata(company);
+  if (anonymous) return anonymous;
   const catalogue = resolveCatalogue(company);
 
   return {
@@ -49,6 +54,14 @@ export default async function OffersPage() {
   const company = await getCompanyDetails();
 
   if (!company.apiReachable) return <ServiceUnavailable />;
+
+  /**
+   * The API answered, and said this host belongs to no company. Same rule as
+   * the check above and the plan check below: the page has to decline to render
+   * as well as the layout, or the site stays readable in the streamed RSC
+   * payload with the platform's placeholder company in it.
+   */
+  if (!company.resolved) return <CompanyNotFound />;
   if (!company.service.active) return <PlanNotice company={company} />;
 
   const catalogue = resolveCatalogue(company);

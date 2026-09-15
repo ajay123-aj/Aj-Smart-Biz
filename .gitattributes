@@ -1,0 +1,44 @@
+# ------------------------------------------------------------------ #
+# Line endings.
+#
+# This repository is developed on Windows with `core.autocrlf=true`, which
+# converts LF to CRLF on checkout. That is fine for source that only ever gets
+# compiled, and actively breaks the files below, which are *copied onto a Linux
+# server and executed or parsed there*.
+#
+# The deploy workflows already refuse to run against a CRLF env file — they
+# check for it by hand and print a `sed -i 's/\r$//'` to fix it — which tells
+# you how often this has bitten someone. This file is the fix one level up: the
+# affected paths are checked out with LF on every platform, so the file that
+# reaches the server is already correct and the check never has to fire.
+# ------------------------------------------------------------------ #
+
+# Let git decide what is text, and normalise it to LF in the repository.
+* text=auto
+
+# ---------------------------------------------------------- deploy inputs --
+# Copied verbatim to /opt/aj-smart-biz/*.env and handed to `docker run
+# --env-file`, which is not a shell: a trailing carriage return becomes part of
+# every value. API_ORIGIN then ends in a control character, nginx will not
+# start, and the error it prints says nothing about line endings.
+deploy/**/.env      text eol=lf
+
+# ------------------------------------------------------------ executables --
+# Run by the Linux runner and inside the images. CRLF here is a
+# `bad interpreter: /bin/sh^M` that takes a while to recognise.
+*.sh                text eol=lf
+Dockerfile          text eol=lf
+.dockerignore       text eol=lf
+*.yml               text eol=lf
+*.yaml              text eol=lf
+
+# ----------------------------------------------------------------- binary --
+# Never touched, never diffed as text.
+*.png               binary
+*.jpg               binary
+*.jpeg              binary
+*.gif               binary
+*.ico               binary
+*.woff              binary
+*.woff2             binary
+*.pdf               binary

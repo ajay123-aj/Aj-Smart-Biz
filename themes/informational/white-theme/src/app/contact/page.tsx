@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import PlanNotice from '@/components/PlanNotice';
 import ServiceUnavailable from '@/components/ServiceUnavailable';
+import CompanyNotFound from '@/components/CompanyNotFound';
 import EnquiryForm from '@/components/EnquiryForm';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import ShareButton from '@/components/ShareButton';
@@ -17,11 +18,15 @@ import {
   type CompanyBranch,
 } from '@/lib/company';
 import { getCompanyDetails } from '@/lib/company.server';
+import { anonymousMetadata } from '@/lib/metadata';
 import { siteContact } from '@/lib/contact';
 import styles from './page.module.css';
 
 export async function generateMetadata(): Promise<Metadata> {
   const company = await getCompanyDetails();
+
+  const anonymous = anonymousMetadata(company);
+  if (anonymous) return anonymous;
 
   const page = company.contactPage;
 
@@ -58,6 +63,14 @@ export default async function ContactPage() {
    * same reason, as the plan check below.
    */
   if (!company.apiReachable) return <ServiceUnavailable />;
+
+  /**
+   * The API answered, and said this host belongs to no company. Same rule as
+   * the check above and the plan check below: the page has to decline to render
+   * as well as the layout, or the site stays readable in the streamed RSC
+   * payload with the platform's placeholder company in it.
+   */
+  if (!company.resolved) return <CompanyNotFound />;
 
   if (!company.service.active) return <PlanNotice company={company} />;
 

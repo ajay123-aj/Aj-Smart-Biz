@@ -1,0 +1,372 @@
+# ------------------------------------------------------------------ #
+# aj-smart-biz-decor-framing - build the image and roll it out on the server.
+#
+# Push to `aj-smart-biz-decor-framing-deploy` and the console is live: the first
+# job builds that exact commit and pushes it to Docker Hub, the second replaces
+# the running container with it. Nothing else has to happen first.
+#
+# --------------------- how this differs from -live --------------------- #
+#
+# `aj-smart-biz-decor-framing-live.yml` publishes an image and stops. This file
+# publishes one AND deploys it. Use the live branch to cut an image for
+# somewhere else to pull; use this branch to put it in front of users.
+#
+# The two number their builds SEPARATELY, and the tags say so. `run_number` is
+# per workflow, so both files would otherwise mint a
+# `aj-smart-biz-decor-framing-1.0.7` from different commits, and in a shared
+# repository the second would silently overwrite the first. Hence:
+#
+#   ajtechhub/ajtechhub:aj-smart-biz-decor-framing-deploy-1.0.<run number>
+#   ajtechhub/ajtechhub:aj-smart-biz-decor-framing-deploy   what is live now
+#
+# ------------------------------ the server ------------------------------ #
+#
+# What the self-hosted runner needs, once:
+#
+#   * Docker installed, and the runner's user in the `docker` group - the job
+#     never uses `sudo`, so `docker ps` has to work as that user.
+#   * /opt/aj-smart-biz/decor-framing.env - copied from
+#     deploy/aj-smart-biz-decor-framing/.env in this repository and filled in.
+#     Read that file's header before editing it; `--env-file` is not a shell,
+#     and quoting a value there is enough to stop nginx starting.
+#   * Nothing else. The job does not check the repository out on the server. It
+#     pulls an image and starts a container.
+#
+# The console joins the `aj-smart-biz` Docker network, the same one the backend
+# deploy creates. That is the whole reason API_ORIGIN can say
+# `http://aj-smart-biz-backend:4000`: Docker resolves a container name on a
+# user-defined network, and does not on the default bridge.
+#
+# --------------------------- repository secrets -------------------------- #
+#
+#   DOCKERHUB_USERNAME   the Docker Hub account the image is pushed as
+#   DOCKERHUB_TOKEN      an access token with Read & Write scope
+#
+# Optional repository variables, each with the default shown:
+#
+#   DECOR_FRAMING_ENV_FILE   /opt/aj-smart-biz/decor-framing.env
+#   DECOR_FRAMING_HOST_PORT  4600   used only if the env file does not set
+#                                  HOST_PORT; the env file wins.
+# ------------------------------------------------------------------ #
+
+name: aj-smart-biz-decor-framing deploy
+
+on:
+  push:
+    branches: [aj-smart-biz-decor-framing-deploy]
+  # So a deploy can be re-run without an empty commit - after fixing the env
+  # file on the server, or to put the last good build back.
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: build the image
+    runs-on: ubuntu-latest
+
+    # A second push while the first is still building makes the first one's
+    # image pointless. Newest wins. This sits on the job rather than on the
+    # workflow so that it can never cancel a *deploy* that is half-way through
+    # replacing the container.
+    concurrency:
+      group: ${{ github.workflow }}-build-${{ github.ref }}
+      cancel-in-progress: true
+
+    permissions:
+      contents: read
+
+    env:
+      IMAGE: ajtechhub/ajtechhub
+      SERVICE: aj-smart-biz-decor-framing
+
+    outputs:
+      # The digest, not a tag. Two pushes can race, and only the digest names
+      # the exact bytes this run produced - so the deploy below pulls that, and
+      # cannot start an image a later run happened to tag first.
+      digest: ${{ steps.build.outputs.digest }}
+      build_tag: ${{ steps.build_tag.outputs.value }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Deliberately before the build. A missing or expired token fails here in
+      # seconds rather than after a full Angular production build.
+      - name: Sign in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Worked out once and reused by the tag list, the image label and both
+      # job summaries - places that must agree, and would drift the moment the
+      # expression was written out four times. See the header for why this
+      # series carries `-deploy` and the live workflow's does not.
+      - name: Work out the build tag
+        id: build_tag
+        run: echo "value=$SERVICE-deploy-1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Work out the tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=${{ steps.build_tag.outputs.value }}
+            type=raw,value=${{ env.SERVICE }}-deploy
+          labels: |
+            org.opencontainers.image.title=Aj Smart Biz Decor and Framing
+            org.opencontainers.image.description=Next.js commercial storefront theme (decor and custom framing)
+            org.opencontainers.image.version=${{ steps.build_tag.outputs.value }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          # The app directory, not the repository root: the Dockerfile and its
+          # .dockerignore live there, and a root context would ship every other
+          # app on the platform into this build.
+          context: ./themes/commercial/decor-framing
+          file: ./themes/commercial/decor-framing/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Shared with the live workflow on purpose: both build the same app
+          # from the same Dockerfile, so a deploy reuses the `npm ci` layer the
+          # last live build already paid for.
+          cache-from: type=gha,scope=aj-smart-biz-decor-framing
+          cache-to: type=gha,mode=max,scope=aj-smart-biz-decor-framing
+
+      - name: Say what was pushed
+        run: |
+          {
+            echo "### Pushed to Docker Hub"
+            echo ''
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo "${{ env.IMAGE }}@${{ steps.build.outputs.digest }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: deploy to the server
+    # Only if the image actually reached Docker Hub. This is what makes the
+    # file a pipeline rather than two jobs that happen to share a trigger.
+    needs: build
+    # The labels of the self-hosted runner, matching the backend deploy.
+    # `runs-on` matches labels, never the runner's name - if a second Linux
+    # runner is ever registered, give this one a unique label under Settings ->
+    # Actions -> Runners and add that label here.
+    runs-on: [self-hosted, Linux, X64]
+
+    # Deploys queue, they do not cancel each other: a cancelled deploy is a
+    # server with the old container removed and the new one not yet started.
+    concurrency:
+      group: ${{ github.workflow }}-deploy-${{ github.ref }}
+      cancel-in-progress: false
+
+    permissions:
+      contents: read
+
+    env:
+      IMAGE: ajtechhub/ajtechhub
+      DIGEST: ${{ needs.build.outputs.digest }}
+      BUILD_TAG: ${{ needs.build.outputs.build_tag }}
+      CONTAINER: aj-smart-biz-decor-framing
+      ENV_FILE: ${{ vars.DECOR_FRAMING_ENV_FILE || '/opt/aj-smart-biz/decor-framing.env' }}
+      # The same private network the backend deploy creates. Joining it is what
+      # lets API_ORIGIN name the API by container name.
+      NETWORK: aj-smart-biz
+      # Fixed, not configurable: nginx inside the image listens on 80. Only the
+      # host side of the mapping is a choice, and it is made in the env file.
+      APP_PORT: 4600
+      FALLBACK_HOST_PORT: ${{ vars.DECOR_FRAMING_HOST_PORT || '4600' }}
+
+    steps:
+      # Fails in a second, with a sentence that says what to do, rather than
+      # leaving a container crash-looping on a missing env file.
+      - name: Check the server is set up
+        run: |
+          if ! docker info >/dev/null 2>&1; then
+            echo "::error::Docker is not reachable as $(whoami). Run: sudo usermod -aG docker $(whoami), then restart the runner service."
+            exit 1
+          fi
+          if [ ! -r "$ENV_FILE" ]; then
+            echo "::error::$ENV_FILE is missing or unreadable. Copy deploy/aj-smart-biz-decor-framing/.env there, fill it in, and chmod 600 it."
+            exit 1
+          fi
+          if ! grep -qE '^API_URL=.+' "$ENV_FILE"; then
+            echo "::error::$ENV_FILE does not set API_URL. The site would render but could not reach the API, so every visitor would see the service-unavailable page. See the header of deploy/aj-smart-biz-decor-framing/.env."
+            exit 1
+          fi
+          # docker --env-file does not strip quotes: a quoted value arrives
+          # with the quote marks still in it, and every API call fails.
+          if grep -qE "^API_URL=[\"']" "$ENV_FILE"; then
+            echo "::error::API_URL in $ENV_FILE is quoted. docker --env-file takes the value literally, quote marks included. Remove them."
+            exit 1
+          fi
+          if grep -qE '^API_URL=.*/$' "$ENV_FILE"; then
+            echo "::error::API_URL in $ENV_FILE ends in a slash. The request path is appended to it, so every call would go to a doubled // path. Remove the trailing slash."
+            exit 1
+          fi
+          # CRLF line endings, which is what happens when the file is edited on
+          # Windows and copied over. docker --env-file does not strip the
+          # carriage return: every value silently gains a trailing \r, nginx
+          # gets an API_ORIGIN that ends in a control character, and the error
+          # it prints says nothing about line endings. Cheap to detect, very
+          # expensive to debug.
+          if grep -qU $'\r' "$ENV_FILE" 2>/dev/null; then
+            echo "::error::$ENV_FILE has Windows (CRLF) line endings. Every value would end in a stray carriage return. Fix it on the server with: sed -i 's/\r$//' $ENV_FILE"
+            exit 1
+          fi
+
+      # Read out of the env file rather than sourced from it. Sourcing would
+      # execute the file, and this needs exactly one value out of it - the rest
+      # is the container's business and goes straight through via --env-file.
+      # `tail -1` so a duplicated key behaves the way the file reads: last wins.
+      - name: Work out which port to publish on
+        id: port
+        run: |
+          set -euo pipefail
+          # `tail -1` BEFORE stripping whitespace, not after. The other order
+          # deletes the newlines first, so a file that sets HOST_PORT twice
+          # collapses into one line and 4600 followed by 9999 is read as the
+          # port 46009999. Then `tr` for the carriage return a file written on
+          # Windows leaves behind.
+          PORT=$(sed -n 's/^HOST_PORT=//p' "$ENV_FILE" | tail -1 | tr -d '[:space:]')
+          if [ -z "$PORT" ]; then
+            PORT="$FALLBACK_HOST_PORT"
+            echo "$ENV_FILE does not set HOST_PORT - falling back to $PORT."
+          fi
+          case "$PORT" in
+            ''|*[!0-9]*)
+              echo "::error::HOST_PORT in $ENV_FILE is '$PORT', which is not a port number."
+              exit 1 ;;
+          esac
+          echo "value=$PORT" >> "$GITHUB_OUTPUT"
+          echo "Publishing on port $PORT."
+
+      # The image is pulled, not built, on the server, so the runner needs read
+      # access to the repository on Docker Hub.
+      - name: Sign in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # By digest, deliberately, even though this run has a tag of its own. The
+      # tag is echoed so the log stays readable; the pull names the bytes.
+      - name: Pull the image this run built
+        run: |
+          echo "Pulling $IMAGE:$BUILD_TAG ($DIGEST)"
+          docker pull "$IMAGE@$DIGEST"
+
+      - name: Replace the running container
+        id: rollout
+        env:
+          HOST_PORT: ${{ steps.port.outputs.value }}
+        run: |
+          set -euo pipefail
+
+          # A no-op once it exists. The backend deploy creates this too;
+          # whichever service deploys first wins and the other joins it.
+          docker network create "$NETWORK" >/dev/null 2>&1 || true
+
+          # What is serving right now, so a failed roll-out has something to go
+          # back to. Empty on the very first deploy. `tr` because a failed
+          # inspect leaves a blank line on stdout, which would otherwise make
+          # PREVIOUS non-empty and send a rollback chasing a newline.
+          PREVIOUS=$(docker container inspect -f '{{.Image}}' "$CONTAINER" 2>/dev/null | tr -d '[:space:]' || true)
+          echo "Currently running: ${PREVIOUS:-nothing}"
+
+          # Refuse early and clearly rather than letting `docker run` fail with
+          # "port is already allocated" at the bottom of a wall of output. Only
+          # checked on a first deploy: after that the port is busy precisely
+          # because this console is holding it, and it is about to be replaced.
+          if [ -z "$PREVIOUS" ] && command -v ss >/dev/null 2>&1; then
+            if ss -lnt "( sport = :$HOST_PORT )" 2>/dev/null | grep -q ":$HOST_PORT"; then
+              echo "::error::Port $HOST_PORT is already in use on this server by something else. Set HOST_PORT in $ENV_FILE to a free port."
+              exit 1
+            fi
+          fi
+
+          start() {
+            docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+            docker run -d \
+              --name "$CONTAINER" \
+              --restart unless-stopped \
+              --network "$NETWORK" \
+              --env-file "$ENV_FILE" \
+              -p "$HOST_PORT:$APP_PORT" \
+              "$1" >/dev/null
+          }
+
+          # Waits on the HEALTHCHECK baked into the image - it asks nginx for
+          # index.html - rather than on `docker run` returning, which only means
+          # a process was spawned. A console serving a broken config is
+          # otherwise indistinguishable from a healthy one until somebody opens
+          # it in a browser. Two minutes; nginx starts in about one second, so
+          # anything near that bound is a real failure, not a slow boot.
+          wait_healthy() {
+            for _ in $(seq 1 40); do
+              state=$(docker container inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$CONTAINER" 2>/dev/null | tr -d '[:space:]' || true)
+              case "${state:-gone}" in
+                healthy) return 0 ;;
+                unhealthy|exited|dead|gone) return 1 ;;
+              esac
+              sleep 3
+            done
+            return 1
+          }
+
+          start "$IMAGE@$DIGEST"
+
+          if wait_healthy; then
+            echo "New container is healthy."
+            exit 0
+          fi
+
+          echo "::error::The new container never became healthy. Its last 100 log lines:"
+          docker logs --tail 100 "$CONTAINER" 2>&1 || true
+
+          if [ -n "$PREVIOUS" ]; then
+            echo "::warning::Rolling back to $PREVIOUS"
+            start "$PREVIOUS"
+            if wait_healthy; then
+              echo "Rolled back - the previous image is serving again."
+            else
+              echo "::error::The rollback did not come up either. The server needs a look."
+            fi
+          fi
+          exit 1
+
+      # Only the layers nothing points at any more. Not `-a`, which would take
+      # the image we might still need to roll back to - on a machine where the
+      # whole point of keeping it is that it is one `docker run` away.
+      - name: Tidy up old layers
+        if: always()
+        run: docker image prune -f >/dev/null || true
+
+      # The runner is a machine other jobs share. The credential does not stay
+      # in its docker config after the job that needed it.
+      - name: Sign out of Docker Hub
+        if: always()
+        run: docker logout >/dev/null 2>&1 || true
+
+      - name: Say what is running
+        if: always()
+        run: |
+          {
+            echo "### Deploy - ${{ steps.rollout.outcome == 'success' && 'live' || 'FAILED' }}"
+            echo ''
+            echo '```'
+            echo "build     $IMAGE:$BUILD_TAG"
+            echo "image     $IMAGE@$DIGEST"
+            echo "container $CONTAINER"
+            echo "port      ${{ steps.port.outputs.value }} -> $APP_PORT"
+            echo "network   $NETWORK"
+            echo "env file  $ENV_FILE"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,35 @@
+# What never reaches the build context.
+#
+# Mostly size and cache hits: a host `node_modules` would be the largest thing
+# in the context by far, and copying it in would invalidate the very layer that
+# exists so `npm ci` does not run again.
+
+node_modules
+npm-debug.log*
+yarn-error.log
+
+# Build output and its caches. Produced inside the image; a stale host copy
+# copied in and then half-overwritten is worse than useless.
+.next
+out
+tsconfig.tsbuildinfo
+
+# ---------------------------------------------------------------- secrets --
+# Nothing in this app needs an env file at build time — API_URL and
+# TENANT_DOMAIN are read per request — and an image on a public registry is the
+# last place a stray one should end up, where `docker history` would read it
+# straight back out.
+.env
+.env.*
+
+# Not the app.
+.git
+.gitignore
+.github
+Dockerfile
+.dockerignore
+README.md
+coverage
+.vscode
+.idea
+.DS_Store

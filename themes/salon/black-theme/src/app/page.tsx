@@ -1,5 +1,6 @@
 import PlanNotice from '@/components/PlanNotice';
 import ServiceUnavailable from '@/components/ServiceUnavailable';
+import CompanyNotFound from '@/components/CompanyNotFound';
 import Slider from '@/components/Slider';
 import ServicesSection from '@/components/ServicesSection';
 import ServiceCategoriesSection from '@/components/ServiceCategoriesSection';
@@ -47,6 +48,14 @@ export default async function HomePage() {
    * same reason, as the plan check below.
    */
   if (!company.apiReachable) return <ServiceUnavailable />;
+
+  /**
+   * The API answered, and said this host belongs to no company. Same rule as
+   * the check above and the plan check below: the page has to decline to render
+   * as well as the layout, or the site stays readable in the streamed RSC
+   * payload with the platform's placeholder company in it.
+   */
+  if (!company.resolved) return <CompanyNotFound />;
 
   if (!company.service.active) return <PlanNotice company={company} />;
 

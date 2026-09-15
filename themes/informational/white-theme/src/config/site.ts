@@ -185,6 +185,38 @@ export const SERVICE_UNAVAILABLE = {
 } as const;
 
 /* ------------------------------------------------------------------ *
+ * No such tenant
+ * ------------------------------------------------------------------ */
+
+/**
+ * Shown instead of the website when the API answered and said this host belongs
+ * to **no company** — see `CompanyNotFound`.
+ *
+ * Not the same situation as `SERVICE_UNAVAILABLE` above, and the copy is
+ * different because the fix is. That one is a blip and the visitor should try
+ * again; this one is a domain nobody has mapped, and trying again will produce
+ * exactly the same page tomorrow. So there is no "try again" here, and the
+ * instruction names the only person who can actually change it.
+ *
+ * The wording is careful about what it does *not* claim: it does not say the
+ * business has closed, does not say the address is wrong, and does not say
+ * anything about a plan. The API returns none of that, and this page is the one
+ * place on the site where guessing has already caused a problem once.
+ */
+export const COMPANY_NOT_FOUND = {
+  title: 'Company details not found',
+  body:
+    'This web address is not connected to a business yet, so there is nothing to show here. Nothing has gone wrong at your end.',
+  action: 'Please contact the administrator to get this domain connected.',
+  /**
+   * Enough for whoever set the domain up to know where to look, and no more.
+   * The host above is already in their address bar, so naming it costs nothing;
+   * naming an internal service would not be a visitor's business.
+   */
+  note: 'If you are the site owner: this domain is not mapped to a company yet. Add it in the admin console under Domain manager.',
+} as const;
+
+/* ------------------------------------------------------------------ *
  * Holding page
  * ------------------------------------------------------------------ */
 

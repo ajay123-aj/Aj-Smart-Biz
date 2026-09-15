@@ -3,11 +3,13 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import PlanNotice from '@/components/PlanNotice';
 import ServiceUnavailable from '@/components/ServiceUnavailable';
+import CompanyNotFound from '@/components/CompanyNotFound';
 import BlogSection from '@/components/BlogSection';
 import CtaBand from '@/components/CtaBand';
 import { BLOG_COPY, BLOG_PAGE_SIZE } from '@/config/site';
 import { navOf, type CompanyDetails } from '@/lib/company';
 import { getCompanyDetails } from '@/lib/company.server';
+import { anonymousMetadata } from '@/lib/metadata';
 import { getBlogPage } from '@/lib/blog.server';
 import { resolveBlog } from '@/lib/blog';
 import styles from './page.module.css';
@@ -38,6 +40,9 @@ const pageLabel = (company: CompanyDetails): string =>
 
 export async function generateMetadata({ searchParams }: { searchParams: Search }): Promise<Metadata> {
   const [company, params] = await Promise.all([getCompanyDetails(), searchParams]);
+
+  const anonymous = anonymousMetadata(company);
+  if (anonymous) return anonymous;
   const blog = resolveBlog(company);
   const tag = one(params, 'tag');
 
@@ -83,6 +88,14 @@ export default async function BlogPage({ searchParams }: { searchParams: Search 
      has to decline to render it too, or its markup stays readable in the
      streamed RSC payload. Same rule as the plan check below. */
   if (!company.apiReachable) return <ServiceUnavailable />;
+
+  /**
+   * The API answered, and said this host belongs to no company. Same rule as
+   * the check above and the plan check below: the page has to decline to render
+   * as well as the layout, or the site stays readable in the streamed RSC
+   * payload with the platform's placeholder company in it.
+   */
+  if (!company.resolved) return <CompanyNotFound />;
   if (!company.service.active) return <PlanNotice company={company} />;
 
   /*

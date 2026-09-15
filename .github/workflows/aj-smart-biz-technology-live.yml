@@ -1,0 +1,176 @@
+# ------------------------------------------------------------------ #
+# aj-smart-biz-technology image - build the image and push it to Docker Hub.
+#
+# Runs on every push to `aj-smart-biz-technology-live`, which includes the merge commit that
+# a pull request into that branch produces, and on demand from the Actions tab.
+#
+# Two repository secrets are required - Settings -> Secrets and variables ->
+# Actions:
+#
+#   DOCKERHUB_USERNAME   the Docker Hub account the image is pushed as
+#   DOCKERHUB_TOKEN      an access token from Docker Hub -> Account settings ->
+#                        Personal access tokens, with Read & Write scope. An
+#                        account password works and should not be used: a token
+#                        can be revoked on its own.
+#
+# ------------------------------ the image ------------------------------ #
+#
+# Every service on the platform is pushed to ONE Docker Hub repository,
+# `ajtechhub/ajtechhub`, so the tag is the only thing separating one service's
+# images from another's. That is the whole reason the tags below are prefixed
+# with the service name: in a repository of its own a bare `1.0.7` tag is
+# unambiguous, and in a shared one it is a collision waiting to happen.
+#
+#   ajtechhub/ajtechhub:aj-smart-biz-technology-1.0.<run number>   this exact build
+#   ajtechhub/ajtechhub:aj-smart-biz-technology-live               whatever is newest
+#
+# `<run number>` is `github.run_number` - the build number GitHub increments
+# per workflow, the same one shown against the run in the Actions tab. It
+# counts per *workflow*, so each service numbers independently and the backend
+# being on 1.0.40 says nothing about where this one is.
+#
+# It does NOT change when a run is re-run, so re-running a build overwrites
+# that version's tag with the image it should have produced the first time.
+# That is intended rather than accidental: a numbered tag names a commit, and a
+# re-run of the same commit should not consume a new number.
+#
+# There is no `latest`. A single shared repository has one `latest` between
+# four services, so it could only ever be right for one of them.
+#
+# The repository name is fixed here rather than read from the username secret,
+# so the tag a deployment pulls does not change if the pushing account does.
+#
+# No `paths:` filter. On a shared branch one is worth having, but this branch
+# exists to hold releases of this one service - everything that lands on it is
+# meant to produce an image, including a merge that only moves a version
+# number. A filter here is a release that silently did not happen.
+#
+# -------------------------- build-time settings ------------------------- #
+#
+# There are none, and that is worth stating because every other Next.js image
+# in this repository has some.
+#
+# The theme images take API_URL, BACKEND_ORIGIN and NEXT_PUBLIC_FILES_URL as
+# build arguments, because `next.config.ts` freezes a `/uploads` rewrite into
+# the route manifest at build time. This site has no such rewrite and calls no
+# API at all: its plans, capabilities and business types are compiled in from
+# `src/content/`, and the demo form composes a WhatsApp or mail link in the
+# visitor's own browser.
+#
+# So the image is genuinely identical in every environment, there is nothing to
+# configure here, and no repository variables to set.
+# ------------------------------------------------------------------ #
+
+name: aj-smart-biz-technology image
+
+on:
+  push:
+    branches: [aj-smart-biz-technology-live]
+  # So the image can be rebuilt without an empty commit - a rotated base image,
+  # or a re-run after fixing a secret.
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: aj-smart-biz-technology
+    runs-on: ubuntu-latest
+
+    # A second push while the first is still building makes the first one's
+    # image pointless: both would push the same moving `-live` tag, and the
+    # older run could land last. Newest wins, the older build is cancelled.
+    # Keyed on the workflow as well as the ref, so the four services can never
+    # cancel each other.
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+
+    # The job reads the repository and writes to Docker Hub. It has no reason
+    # to be able to write back to GitHub, so it is not given the chance.
+    permissions:
+      contents: read
+
+    env:
+      IMAGE: ajtechhub/ajtechhub
+      SERVICE: aj-smart-biz-technology
+
+    outputs:
+      # The digest, not a tag. The moving tag moves, and anything that pulled it
+      # later could get a different image than the one this run built; a digest
+      # names the exact bytes. Exposed here so a deploy job can be added later
+      # without having to change the build.
+      digest: ${{ steps.build.outputs.digest }}
+      build_tag: ${{ steps.build_tag.outputs.value }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # Buildx is what makes the layer cache below available at all; the
+      # default docker driver supports no cache backend.
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Deliberately before the build rather than after it. A missing or
+      # expired token then fails in seconds, rather than after a full `next build`.
+      - name: Sign in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # The name of this build, worked out once and reused by the tag list, the
+      # image label and the job summary - three places that must agree, and
+      # would drift the moment the expression was written out three times.
+      - name: Work out the build tag
+        id: build_tag
+        run: echo "value=$SERVICE-1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      # Two tags on purpose:
+      #
+      #   <service>-1.0.<run number>  this exact build, so a bad deploy can be
+      #                               rolled back to a numbered one before it
+      #                               rather than to "whatever was newest
+      #                               yesterday"
+      #   <service>-live              the moving tag a deployment pulls
+      - name: Work out the tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=${{ steps.build_tag.outputs.value }}
+            type=raw,value=${{ env.SERVICE }}-live
+          labels: |
+            org.opencontainers.image.title=Aj Smart Biz Technology
+            org.opencontainers.image.description=Next.js product website for the platform itself
+            org.opencontainers.image.version=${{ steps.build_tag.outputs.value }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          # The app directory, not the repository root: the Dockerfile and its
+          # .dockerignore live there, and a root context would ship every other
+          # app on the platform into this build.
+          context: ./Aj-Smart-Biz-Technology
+          file: ./Aj-Smart-Biz-Technology/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Restores the dependency-install layer between runs, so a commit that
+          # only touches source does not reinstall the tree from scratch. The
+          # scope is per service: one shared scope would have four builds
+          # evicting each other's caches all day.
+          cache-from: type=gha,scope=aj-smart-biz-technology
+          cache-to: type=gha,mode=max,scope=aj-smart-biz-technology
+
+      - name: Say what was pushed
+        run: |
+          {
+            echo "### Pushed to Docker Hub"
+            echo ''
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo "${{ env.IMAGE }}@${{ steps.build.outputs.digest }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

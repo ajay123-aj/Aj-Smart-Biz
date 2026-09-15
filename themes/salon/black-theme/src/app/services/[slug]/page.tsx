@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import PlanNotice from '@/components/PlanNotice';
 import ServiceUnavailable from '@/components/ServiceUnavailable';
+import CompanyNotFound from '@/components/CompanyNotFound';
 import ServicesSection from '@/components/ServicesSection';
 import BookingPanel from '@/components/BookingPanel';
 import ServiceEnquiryButton from '@/components/ServiceEnquiryButton';
@@ -11,6 +12,7 @@ import Glyph from '@/components/Glyph';
 import { SERVICES_COPY } from '@/config/site';
 import { navOf, toFileUrl, type CompanyDetails } from '@/lib/company';
 import { getCompanyDetails } from '@/lib/company.server';
+import { anonymousMetadata } from '@/lib/metadata';
 import { getAccount } from '@/lib/session.server';
 import { loadDiary } from '@/app/actions/book-service';
 import { durationLabel, findService, resolveServices, servicePrice } from '@/lib/services';
@@ -24,6 +26,9 @@ const pageLabel = (company: CompanyDetails): string =>
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const [company, { slug }] = await Promise.all([getCompanyDetails(), params]);
+
+  const anonymous = anonymousMetadata(company);
+  if (anonymous) return anonymous;
   const service = findService(company, slug);
 
   if (!service) return { title: company.name, robots: { index: false, follow: false } };
@@ -58,6 +63,14 @@ export default async function ServicePage({ params }: { params: Params }) {
   const [company, { slug }] = await Promise.all([getCompanyDetails(), params]);
 
   if (!company.apiReachable) return <ServiceUnavailable />;
+
+  /**
+   * The API answered, and said this host belongs to no company. Same rule as
+   * the check above and the plan check below: the page has to decline to render
+   * as well as the layout, or the site stays readable in the streamed RSC
+   * payload with the platform's placeholder company in it.
+   */
+  if (!company.resolved) return <CompanyNotFound />;
   if (!company.service.active) return <PlanNotice company={company} />;
 
   const section = resolveServices(company);

@@ -3,10 +3,12 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import PlanNotice from '@/components/PlanNotice';
 import ServiceUnavailable from '@/components/ServiceUnavailable';
+import CompanyNotFound from '@/components/CompanyNotFound';
 import CtaBand from '@/components/CtaBand';
 import { BLOG_COPY } from '@/config/site';
 import { navOf, toFileUrl, type CompanyDetails } from '@/lib/company';
 import { getCompanyDetails } from '@/lib/company.server';
+import { anonymousMetadata } from '@/lib/metadata';
 import { getBlogPost } from '@/lib/blog.server';
 import { paragraphsOf, postDate } from '@/lib/blog';
 import styles from './page.module.css';
@@ -18,6 +20,9 @@ const pageLabel = (company: CompanyDetails): string =>
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const [company, { slug }] = await Promise.all([getCompanyDetails(), params]);
+
+  const anonymous = anonymousMetadata(company);
+  if (anonymous) return anonymous;
   const article = await getBlogPost(slug);
 
   if (!article) {
@@ -71,6 +76,14 @@ export default async function BlogPostPage({ params }: { params: Params }) {
   const [company, { slug }] = await Promise.all([getCompanyDetails(), params]);
 
   if (!company.apiReachable) return <ServiceUnavailable />;
+
+  /**
+   * The API answered, and said this host belongs to no company. Same rule as
+   * the check above and the plan check below: the page has to decline to render
+   * as well as the layout, or the site stays readable in the streamed RSC
+   * payload with the platform's placeholder company in it.
+   */
+  if (!company.resolved) return <CompanyNotFound />;
   if (!company.service.active) return <PlanNotice company={company} />;
 
   const article = await getBlogPost(slug);

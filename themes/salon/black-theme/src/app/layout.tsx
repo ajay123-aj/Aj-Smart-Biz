@@ -10,7 +10,8 @@ import CartPanel from '@/components/CartPanel';
 import { getCompanyDetails } from '@/lib/company.server';
 import { getAccount } from '@/lib/session.server';
 import ServiceUnavailable from '@/components/ServiceUnavailable';
-import { SERVICE_UNAVAILABLE } from '@/config/site';
+import CompanyNotFound from '@/components/CompanyNotFound';
+import { COMPANY_NOT_FOUND, SERVICE_UNAVAILABLE } from '@/config/site';
 import { fillCompany, shareLinkOf, siteCompany, toFileUrl, type CompanyDetails } from '@/lib/company';
 import './globals.css';
 
@@ -41,6 +42,24 @@ export async function generateMetadata(): Promise<Metadata> {
   if (!company.apiReachable) {
     return {
       title: SERVICE_UNAVAILABLE.title,
+      icons: { icon: [{ url: DEFAULT_FAVICON }] },
+      robots: { index: false, follow: false },
+    };
+  }
+
+  /**
+   * The API answered and this host names no company.
+   *
+   * Same reasoning as the branch above, for a different cause: `company.name`
+   * is the platform's placeholder, so putting it in the tab would tell a
+   * visitor they had reached a business nobody confirmed — and would let a
+   * crawler record that name against this domain permanently. `noindex` matters
+   * more here than there, because an unreachable API is a blip and an unmapped
+   * domain can sit like this for weeks.
+   */
+  if (!company.resolved) {
+    return {
+      title: COMPANY_NOT_FOUND.title,
       icons: { icon: [{ url: DEFAULT_FAVICON }] },
       robots: { index: false, follow: false },
     };
@@ -121,6 +140,25 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <html lang="en">
         <body>
           <ServiceUnavailable />
+        </body>
+      </html>
+    );
+  }
+
+  /**
+   * The API answered, and said nobody owns this host.
+   *
+   * The chrome goes with the content, exactly as it does above: a header
+   * carrying the platform's placeholder name and a footer carrying a
+   * placeholder address are the invented content this is here to prevent. No
+   * theme variables either — `themeVariables` reads the tenant's theme, and
+   * there is no tenant.
+   */
+  if (!company.resolved) {
+    return (
+      <html lang="en">
+        <body>
+          <CompanyNotFound />
         </body>
       </html>
     );

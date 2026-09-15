@@ -3,12 +3,14 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import PlanNotice from '@/components/PlanNotice';
 import ServiceUnavailable from '@/components/ServiceUnavailable';
+import CompanyNotFound from '@/components/CompanyNotFound';
 import ProductsSection from '@/components/ProductsSection';
 import CatalogueMasthead from '@/components/CatalogueMasthead';
 import CtaBand from '@/components/CtaBand';
 import { PRODUCTS_COPY } from '@/config/site';
 import { navOf, type CategoryNode, type CompanyDetails } from '@/lib/company';
 import { getCompanyDetails } from '@/lib/company.server';
+import { anonymousMetadata } from '@/lib/metadata';
 import { findCategory, productsInCategory, resolveCatalogue } from '@/lib/catalogue';
 import styles from './page.module.css';
 
@@ -33,6 +35,9 @@ const categoryParam = (params: Awaited<Search>): string | null => {
 
 export async function generateMetadata({ searchParams }: { searchParams: Search }): Promise<Metadata> {
   const [company, params] = await Promise.all([getCompanyDetails(), searchParams]);
+
+  const anonymous = anonymousMetadata(company);
+  if (anonymous) return anonymous;
   const catalogue = resolveCatalogue(company);
 
   const slug = categoryParam(params);
@@ -78,6 +83,14 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
      has to decline to render it too, or its markup stays readable in the
      streamed RSC payload. Same rule as the plan check below. */
   if (!company.apiReachable) return <ServiceUnavailable />;
+
+  /**
+   * The API answered, and said this host belongs to no company. Same rule as
+   * the check above and the plan check below: the page has to decline to render
+   * as well as the layout, or the site stays readable in the streamed RSC
+   * payload with the platform's placeholder company in it.
+   */
+  if (!company.resolved) return <CompanyNotFound />;
   if (!company.service.active) return <PlanNotice company={company} />;
 
   const catalogue = resolveCatalogue(company);

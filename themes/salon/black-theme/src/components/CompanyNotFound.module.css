@@ -1,0 +1,101 @@
+/* ------------------------------------------------------------------ *
+ * The no-such-tenant page.
+ *
+ * Identical in all three themes, and that is the design rather than a
+ * duplication: every value below is a **template token**, and each theme
+ * defines those differently — so the same markup is warm paper on the Gilt
+ * theme, plain white on the white theme and near-black on the black one,
+ * without a line of per-theme CSS.
+ *
+ * It never touches `--brand` or `--accent`. Those are the *tenant's* colours,
+ * overridden at runtime in the layout from whatever the API returned — and this
+ * page exists precisely because the API returned no tenant, so they hold
+ * defaults belonging to nobody. Branding it with them would dress the page in a
+ * company that was never confirmed.
+ *
+ * Deliberately the same shape as `ServiceUnavailable.module.css`. The two are
+ * siblings a visitor will never see together, and a person debugging a
+ * deployment will see both within a minute of each other — making them look
+ * like one family is what lets them tell the *difference* at a glance, which is
+ * the message rather than the decoration.
+ * ------------------------------------------------------------------ */
+
+.page {
+  /* `dvh`, not `vh`: on mobile Safari `100vh` is taller than the visible
+     viewport, which pushes a centred panel permanently off-centre. */
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 32px 24px;
+  background: var(--surface-sunken);
+}
+
+.panel {
+  max-width: 34rem;
+  width: 100%;
+  padding: 48px 40px 40px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  margin: 0 auto 22px;
+  border-radius: 50%;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+}
+
+.mark svg {
+  width: 28px;
+  height: 28px;
+}
+
+.title {
+  font-size: clamp(1.5rem, 3vw, 1.9rem);
+}
+
+.body {
+  margin-top: 14px;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+/*
+ * The instruction — the one thing the visitor is being asked to do.
+ *
+ * Set in `--text` at full weight where `.body` above it is muted, because it is
+ * the sentence the page exists to deliver. There is deliberately **no button**:
+ * every action on this page belongs to somebody the template cannot link to. A
+ * "Try again" would be a lie — nothing about this is temporary — and a mailto
+ * would have to invent an address.
+ */
+.action {
+  margin-top: 18px;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.note {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+@media (max-width: 560px) {
+  .panel {
+    padding: 34px 22px 30px;
+    border-radius: var(--radius);
+  }
+}
