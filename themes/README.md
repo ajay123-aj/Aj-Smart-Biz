@@ -1,12 +1,21 @@
-# Websites
+# Themes
 
-Tenant-facing public websites, one folder per **business type**. A company's
+The **tenant site templates**, one folder per **business type**. A company's
 business type (`business_types` in the API) decides which template it is served,
 and the domain it is served on decides *which company* the template renders —
 resolved at launch through the same public API the admin console already uses.
 
+> This folder was called `websites/` until it was renamed. Nothing about how the
+> templates work changed with the name: `themes` says what is actually in here,
+> which is a set of looks a tenant's site can be served in, not a set of
+> websites the platform owns. The platform's own site — the one that *sells*
+> this — is a separate project at
+> [`Aj-Smart-Biz-Technology/`](../Aj-Smart-Biz-Technology/), and it is
+> deliberately not one of these: it has no tenant, resolves no host, and is
+> nobody's business type.
+
 ```
-websites/
+themes/
 ├── informational/          Brochure sites — who the company is, what it does
 │   └── white-theme/        Next.js · white theme · single page
 ├── salon/                  Salons, studios and spas — treatment menu and diary
@@ -95,7 +104,8 @@ branch-wise. No GST or PAN number, no plan, subscription or admin data.
 | `salon/black-theme` | 4500 |
 | `commercial/decor-framing` | 4600 |
 
-Kept clear of the API (4000) and the two consoles (4200, 4300).
+Kept clear of the API (4000), the two consoles (4200, 4300) and the product
+website (4700).
 
 A port is not what separates two tenants, so two sites on one machine need two
 **hosts** as well: the API's resolver strips the port before it matches, which

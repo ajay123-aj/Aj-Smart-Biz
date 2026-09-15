@@ -37,6 +37,18 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
 
   /**
+   * Trace exactly which files the server needs and emit them, with a minimal
+   * `node_modules`, into `.next/standalone`. This is what the Docker image
+   * ships: the alternative is copying the whole dependency tree and the build
+   * cache into the runtime stage, which is several hundred megabytes of things
+   * that never execute.
+   *
+   * It changes nothing about `next dev` or `next start` locally — it only adds
+   * a directory to the build output.
+   */
+  output: 'standalone',
+
+  /**
    * Serve the API's uploads from this site's own origin.
    *
    * Company logos and favicons are stored as paths like

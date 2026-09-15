@@ -1,0 +1,147 @@
+/*
+ * The footer is a panel, like every other band on this site — inset from the
+ * viewport and rounded, never a full-bleed rectangle.
+ *
+ * It is the one place that rule is tempting to break, because a footer
+ * traditionally closes the window off. But a band touching the viewport edges
+ * casts no shadow, with no shadow it is not floating, and if it is not floating
+ * it is not made of the same material as everything above it. So the page
+ * simply ends, with the aurora showing past the last panel.
+ */
+.footer {
+  margin: 0 16px 16px;
+  padding-block: 56px 20px;
+  border-radius: var(--radius-lg);
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow), var(--glass-sheen);
+}
+
+.inner {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr;
+  gap: 44px;
+  align-items: start;
+}
+
+/* -------------------------------- about -------------------------------- */
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--accent-ramp);
+  color: var(--on-accent);
+  font-weight: 800;
+  font-size: 0.86rem;
+}
+
+.brandText {
+  font-weight: 700;
+  font-size: 1.02rem;
+}
+
+.tagline {
+  margin-top: 16px;
+  max-width: 34ch;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.address {
+  margin-top: 10px;
+  color: var(--text-faint);
+  font-size: 0.88rem;
+}
+
+/* ------------------------------- columns ------------------------------- */
+
+.column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.columnTitle {
+  margin-bottom: 4px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+.link {
+  font-size: 0.93rem;
+  color: var(--text-muted);
+  transition: color 0.18s ease;
+}
+
+.link:hover {
+  color: var(--text);
+}
+
+.hours {
+  margin-top: 6px;
+  max-width: 24ch;
+  color: var(--text-faint);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* --------------------------------- base --------------------------------- */
+
+.base {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 24px;
+  margin-top: 44px;
+  padding-top: 20px;
+  /* A hairline in the glass border's own colour, so the rule reads as part of
+     the sheet rather than as a line drawn on it. */
+  border-top: 1px solid var(--hairline);
+  color: var(--text-faint);
+  font-size: 0.84rem;
+}
+
+.baseNote {
+  color: var(--text-faint);
+}
+
+@media (max-width: 880px) {
+  .inner {
+    grid-template-columns: 1fr 1fr;
+    gap: 36px;
+  }
+
+  /* The about block takes the full width above the two link columns rather
+     than squeezing into half of it — the tagline needs its measure. */
+  .about {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  .footer {
+    margin-inline: 10px;
+    padding-block: 40px 16px;
+    border-radius: var(--radius);
+  }
+
+  .inner {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+}

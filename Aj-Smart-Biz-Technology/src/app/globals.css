@@ -1,0 +1,570 @@
+/* ------------------------------------------------------------------ *
+ * Aurora glass — the product site's theme.
+ *
+ * Glassmorphism done on a dark ground, and the dark is the first decision
+ * rather than a taste: glass reads as glass when the light it catches has
+ * somewhere to come from. On white, a translucent panel is a slightly grey
+ * rectangle; on a lit near-black, the same panel is obviously a sheet with
+ * something glowing behind it.
+ *
+ * It is also deliberately the inverse material of `themes/commercial/decor-framing`,
+ * which is white glass on warm paper. Those two will be open in adjacent tabs
+ * when somebody is deciding whether to buy, and looking alike would make the
+ * whole product look like one template with the colours swapped.
+ *
+ * Three decisions carry everything below:
+ *
+ *   **The ground is dark and it is lit.** Three coloured blooms — violet
+ *   top-left, blue top-right, teal low and centre — over a near-black gradient,
+ *   fixed to the window rather than to the document. Scroll a page of glass
+ *   over a wash that scrolls with it and the effect collapses, because nothing
+ *   behind the glass ever changes.
+ *
+ *   **Every surface is the same sheet.** `--glass` is white at 4–10% alpha over
+ *   a heavy blur, edged with a brighter hairline along the top. One material,
+ *   used for the header, the cards, the panels, the pricing table and the form
+ *   fields. A page with two kinds of surface has to explain the difference;
+ *   this one has nothing to explain.
+ *
+ *   **Colour is a gradient, never a fill.** The accent is a violet→blue→teal
+ *   ramp appearing as text, as a hairline, as a glow, and on one button per
+ *   screen. It is never a large area of colour — at this saturation a filled
+ *   panel stops being a surface and becomes a billboard. The single exception
+ *   is the closing CTA band, which says so where it breaks the rule.
+ *
+ * Contrast, because a dark theme is where that usually goes wrong: `--text` is
+ * near-white, `--text-muted` is the dimmest colour used for a sentence anybody
+ * has to read and holds above 4.5:1 over the glass, and `--text-faint` is for
+ * labels and metadata only — never a paragraph. The accent ramp carries
+ * decoration and large display type, never body copy; `--accent-text` is the
+ * readable blue used wherever the accent has to be a word.
+ * ------------------------------------------------------------------ */
+
+:root {
+  /*
+   * The ground. Near-black with blue in it rather than neutral: a true grey
+   * under coloured blooms goes muddy where they overlap, because there is
+   * nothing in the base for them to agree with.
+   */
+  --ground: #07070e;
+  --ground-deep: #04040a;
+
+  /*
+   * The aurora. Three hues, named because the blooms, the accent ramp, the
+   * button and the focus ring are all built from them — change one here and
+   * the whole site follows.
+   */
+  --aurora-1: #7c6cff; /* violet */
+  --aurora-2: #4aa8ff; /* blue   */
+  --aurora-3: #3ee6c4; /* teal   */
+
+  --accent-ramp: linear-gradient(115deg, var(--aurora-1) 0%, var(--aurora-2) 52%, var(--aurora-3) 100%);
+  /*
+   * The accent as a *readable* colour.
+   *
+   * The ramp's midpoint is the blue, which clears 4.5:1 on this ground; the
+   * violet end does not. Anything that is a word rather than a decoration uses
+   * this and not the gradient.
+   */
+  --accent-text: #8fc4ff;
+  --on-accent: #05050c;
+
+  /*
+   * The glass, named rather than written out at each call site.
+   *
+   * A gradient rather than a flat alpha, and steeper than seems necessary: 10%
+   * white at the top corner falling to 4% at the bottom. On a dark ground a
+   * flat 6% panel is indistinguishable from a slightly lighter rectangle — the
+   * fall-off is the entire reason it reads as a sheet catching light along one
+   * edge.
+   *
+   * `--glass-blur` carries a `saturate()` as well as a blur. Blur alone over
+   * coloured blooms turns them grey; the saturation boost is what keeps the
+   * aurora legible *through* a panel on top of it, which is the effect the
+   * whole theme is buying.
+   */
+  --glass: linear-gradient(155deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+  --glass-strong: linear-gradient(155deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.07));
+  --glass-blur: blur(26px) saturate(150%);
+  /* The lit edge along the top of a panel. Paired with every shadow below. */
+  --glass-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+
+  /*
+   * The card, as three tokens.
+   *
+   * Every component builds its surface out of `--panel` + `--hairline` +
+   * `--shadow` and nothing else, which is what would let this theme change
+   * material without touching a single component — the three tokens *are* the
+   * card, and glass is simply what they resolve to.
+   *
+   * Each component pairs them with the blur, which cannot live in a custom
+   * property: `backdrop-filter` has to be declared on the element doing the
+   * blurring.
+   */
+  --panel: var(--glass);
+  --panel-hover: var(--glass-strong);
+  --hairline: rgba(255, 255, 255, 0.14);
+  --hairline-strong: rgba(255, 255, 255, 0.26);
+
+  /* Form fields — the one surface that sits *below* the page rather than above
+     it. Everything else floats; an input should read as a well you type into,
+     and a raised input is a button that happens to contain a cursor. */
+  --field: rgba(255, 255, 255, 0.04);
+  --field-focus: rgba(255, 255, 255, 0.09);
+
+  --text: #f2f3f8;
+  --text-muted: #b3b6c6;
+  --text-faint: #7f8398;
+
+  /*
+   * Corners. Generous — there is no photography anywhere on this site to supply
+   * hard edges, so nothing wants to be a rectangle. Anything the visitor
+   * *presses* takes `--radius-pill`, stated separately so a button cannot be
+   * accidentally re-cornered by a change to the tile radius.
+   */
+  --radius-sm: 0.7rem;
+  --radius: 1.25rem;
+  --radius-lg: 1.75rem;
+  --radius-pill: 999px;
+
+  /*
+   * Shadows: large, soft and **black** rather than brand-tinted.
+   *
+   * The opposite of what a light theme wants, where a tinted shadow is what
+   * stops a panel looking stamped on. On a dark ground a coloured shadow is
+   * invisible, so depth comes from darkness underneath and the *lift* comes
+   * from the sheen on top instead.
+   */
+  --shadow-sm: 0 6px 20px rgba(0, 0, 0, 0.4);
+  --shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 34px 90px rgba(0, 0, 0, 0.55);
+  /* The one a pressable thing casts in its own colour. */
+  --shadow-accent: 0 14px 38px rgba(74, 168, 255, 0.35);
+
+  /*
+   * The header, in two parts, because it is two things: the floating bar, and
+   * the gutter it floats in. `--header-stack` is the sum, and it is the one a
+   * sticky element wants — anything pinning itself under the header has to
+   * clear the gutter as well as the bar, or it slides under and loses its
+   * first line.
+   */
+  --header-height: 68px;
+  --header-gap: 14px;
+  --header-stack: calc(var(--header-height) + var(--header-gap));
+
+  --max-width: 1200px;
+
+  --font-sans: 'Geist', 'Inter', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /*
+   * Tells the browser this document is dark, so form controls, scrollbars, the
+   * select dropdown and the space above a rubber-band scroll are all drawn to
+   * match. Stated rather than left to the default: without it a visitor whose
+   * OS is in light mode gets white native selects on a black page.
+   */
+  color-scheme: dark;
+  scroll-behavior: smooth;
+  /* So an anchor jump does not land under the sticky header — the whole stack,
+     plus a little air under it. */
+  scroll-padding-top: calc(var(--header-stack) + 16px);
+}
+
+/*
+ * The ground.
+ *
+ * `background-attachment: fixed` so the wash belongs to the window rather than
+ * to the document — see the note at the top. `min-height: 100vh` matters for a
+ * related reason: a short page over a gradient sized to its content ends in a
+ * hard horizontal line partway down the screen.
+ */
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(48rem 34rem at 6% -8%, color-mix(in srgb, var(--aurora-1) 32%, transparent), transparent 62%),
+    radial-gradient(52rem 32rem at 98% 2%, color-mix(in srgb, var(--aurora-2) 26%, transparent), transparent 60%),
+    radial-gradient(44rem 30rem at 50% 42%, color-mix(in srgb, var(--aurora-3) 12%, transparent), transparent 66%),
+    linear-gradient(170deg, var(--ground) 0%, var(--ground-deep) 100%);
+  background-attachment: fixed;
+  background-color: var(--ground-deep);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.68;
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Every heading in the one face, heavy, tracked in.
+ *
+ * There is no second family anywhere on this site: weight alone is marking a
+ * heading, and a semibold grotesque above a 400 paragraph is not a large enough
+ * step to read as a title. 800 is.
+ */
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1.14;
+  letter-spacing: -0.025em;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+/*
+ * The focus ring: the accent, with a dark halo behind it.
+ *
+ * Two rings rather than one because the accent is a mid-blue — on the pale
+ * glass of a hovered card it has barely enough contrast alone, and the halo is
+ * what guarantees the ring is visible on every surface this site has.
+ */
+:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 5px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------------------------- shared layout ---------------------------- */
+
+.container {
+  width: 100%;
+  max-width: var(--max-width);
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+.section {
+  padding-block: 88px;
+}
+
+/*
+ * The eyebrow — a small tracked label above every heading.
+ *
+ * In `--accent-text` rather than the ramp, because it is a word somebody reads.
+ * The gradient is reserved for display type large enough that its lightest stop
+ * is still legible.
+ */
+.eyebrow {
+  display: inline-block;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: clamp(1.9rem, 3.6vw, 2.7rem);
+}
+
+.section-lede {
+  margin-top: 16px;
+  max-width: 62ch;
+  color: var(--text-muted);
+  font-size: 1.02rem;
+}
+
+/* The block every section opens with. Capped well short of the container so a
+   heading never runs the full width of a desktop — long measures are what makes
+   a section read as sparse rather than spacious. */
+.section-head {
+  max-width: 46rem;
+  margin-bottom: 44px;
+}
+
+/*
+ * Display type in the accent ramp.
+ *
+ * `background-clip: text` over a transparent fill. The `color` underneath is
+ * not decoration — it is what shows if the clip is unsupported, and without it
+ * the words would vanish rather than degrade.
+ */
+.gradient-text {
+  color: var(--accent-text);
+  background: var(--accent-ramp);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@media (forced-colors: active) {
+  /* Forced colours discards the gradient; put the fill back so the words stay. */
+  .gradient-text {
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
+/* ---------------------------- surfaces ---------------------------- */
+
+/*
+ * One card, everywhere.
+ *
+ * On hover it rises and its **edge** brightens — not its fill. On a dark theme
+ * a background change of a few percent is almost invisible, where an edge going
+ * from 14% to 26% white is unmistakable at a glance. Nothing about the border
+ * *width* changes, so nothing reflows and no hairline flickers as the pointer
+ * crosses a grid.
+ */
+.card-surface {
+  background: var(--panel);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow), var(--glass-sheen);
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease,
+    border-color 0.3s ease, background 0.3s ease;
+}
+
+.card-surface:hover {
+  transform: translateY(-5px);
+  background: var(--panel-hover);
+  border-color: var(--hairline-strong);
+  box-shadow: var(--shadow-lg), var(--glass-sheen);
+}
+
+/*
+ * A band that wants separating from the ones around it.
+ *
+ * A **panel**, never a full-bleed rectangle — that is the one shape this theme
+ * cannot draw. A band touching the viewport edges has no shadow, with no shadow
+ * it is not floating, and if it is not floating it is not made of the same
+ * material as everything else on the page.
+ */
+.section--panel {
+  position: relative;
+  width: calc(100% - 32px);
+  max-width: calc(var(--max-width) + 32px);
+  margin-inline: auto;
+  border-radius: var(--radius-lg);
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow), var(--glass-sheen);
+  /* Tighter than a full-width band needs to be: the panel's own edges now do
+     the separating that 100px of air used to do. */
+  padding-block: 64px;
+  overflow: hidden;
+}
+
+/*
+ * The one piece of decoration a panel gets: a bloom off its top-right corner,
+ * echoing the one the body wash puts in the same place on the page. Kept low
+ * and masked to that corner — a panel tinted evenly across its whole width has
+ * simply been given a different background colour, which is the thing this
+ * exists to avoid.
+ */
+.section--panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    36rem 22rem at 100% 0%,
+    color-mix(in srgb, var(--aurora-1) 22%, transparent),
+    transparent 70%
+  );
+}
+
+.section--panel > * {
+  position: relative;
+}
+
+/* The container inside a panel already has the panel's own inset, so it stops
+   adding the full page gutter on top of it. */
+.section--panel > .container {
+  padding-inline: 32px;
+}
+
+/* ---------------------------- buttons ---------------------------- */
+
+/*
+ * Pills, in sentence case at 600.
+ *
+ * Not tracked capitals: there is a call to action in almost every section, and
+ * a screen of shouting labels reads as a system alert rather than an invitation.
+ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 26px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  font-weight: 600;
+  font-size: 0.92rem;
+  line-height: 1;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease,
+    transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+/* Every button rises when pointed at — the same gesture the cards make. One
+   page, one physics. */
+.btn:hover {
+  transform: translateY(-2px);
+}
+
+/*
+ * The gradient button. One per screen, at most.
+ *
+ * Its label is near-black rather than white: white on this ramp is about 2.4:1
+ * at the teal end and unreadable there, and darkening the ramp far enough to
+ * carry white type stops it being the aurora.
+ */
+.btn--primary {
+  background: var(--accent-ramp);
+  color: var(--on-accent);
+  font-weight: 700;
+  box-shadow: var(--shadow-accent);
+}
+
+.btn--primary:hover {
+  box-shadow: 0 20px 46px rgba(74, 168, 255, 0.45);
+}
+
+/*
+ * The secondary button is the theme in one control: a pane of glass with a
+ * hairline, holding nothing but its label. On hover the hairline brightens and
+ * the glass clouds — the same move the primary makes, an order of magnitude
+ * quieter.
+ */
+.btn--ghost {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-color: var(--hairline);
+  color: var(--text);
+}
+
+.btn--ghost:hover {
+  background: var(--glass-strong);
+  border-color: var(--hairline-strong);
+}
+
+.btn[aria-disabled='true'],
+.btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* ---------------------------- small parts ---------------------------- */
+
+/*
+ * A pill of glass carrying one fact — a capability name, a count, a label.
+ * Shares the card's material rather than introducing a fourth surface, which is
+ * the rule the whole theme runs on.
+ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px;
+  border-radius: var(--radius-pill);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--hairline);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+/* Screen-reader-only, for the skip link and icon-button labels. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: 16px;
+  top: -60px;
+  z-index: 100;
+  padding: 10px 20px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-ramp);
+  color: var(--on-accent);
+  font-weight: 700;
+  transition: top 0.16s ease;
+}
+
+.skip-link:focus {
+  top: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .section {
+    padding-block: 56px;
+  }
+
+  /*
+   * On a phone the panel gives up most of its inset — 10px either side of a
+   * 390px screen is enough to show that it *is* a panel, and any more is width
+   * taken off a card that is already at its minimum.
+   */
+  .section--panel {
+    width: calc(100% - 20px);
+    padding-block: 44px;
+    border-radius: var(--radius);
+  }
+
+  .section--panel > .container {
+    padding-inline: 18px;
+  }
+}

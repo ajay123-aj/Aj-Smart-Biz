@@ -5,7 +5,7 @@
  *
  *     npm run db:seed:salon
  *
- * The company that the `websites/salon/black-theme` template was built against.
+ * The company that the `themes/salon/black-theme` template was built against.
  * Everything that template renders arrives from the API, so everything that
  * template renders has to exist as **rows**: the salon itself, its plan, its
  * domain, its service menu, its retail shelf, its people, its reviews and its
@@ -89,7 +89,7 @@ const COMPANY = {
 /**
  * The business type, which is what decides that this tenant is served the salon
  * template rather than the informational one. A row, not a branch in any code —
- * see `websites/README.md`.
+ * see `themes/README.md`.
  */
 const BUSINESS_TYPE = { name: 'Salon & Spa', slug: 'salon-spa' };
 
@@ -1746,7 +1746,7 @@ async function seedBlog(companyId, created) {
       logger.info('Every content section is live on this tenant’s website.');
     }
 
-    logger.info(`Serve it: cd websites/salon/black-theme && npm run dev  →  http://localhost:4500`);
+    logger.info(`Serve it: cd themes/salon/black-theme && npm run dev  →  http://localhost:4500`);
     logger.info(`The site resolves this tenant from TENANT_DOMAIN=${DOMAIN} in its .env.local`);
 
     process.exit(0);

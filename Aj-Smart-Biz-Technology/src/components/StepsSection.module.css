@@ -1,0 +1,81 @@
+/*
+ * Four cards in a row on a desktop, and they are a sequence rather than a set.
+ *
+ * `auto-fit` with a floor rather than `repeat(4, 1fr)`: at the width where four
+ * cards would each be 190px the body copy breaks to seven lines and the row
+ * stops being readable, so it drops to two and then to one on its own.
+ */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(248px, 1fr));
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  position: relative;
+  padding: 30px 26px 28px;
+  overflow: hidden;
+}
+
+/*
+ * The step number, set large and very faint in the top-right corner.
+ *
+ * Decoration doing a real job: it is the only thing carrying the *order* of the
+ * four visually, and at 8% white it never competes with the heading under it.
+ */
+.number {
+  position: absolute;
+  top: 14px;
+  right: 20px;
+  font-family: var(--font-display);
+  font-size: 3.4rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 20px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--hairline);
+  color: var(--accent-text);
+}
+
+.icon svg {
+  width: 23px;
+  height: 23px;
+}
+
+.title {
+  /* Room for the faint numeral, so a two-line heading never runs under it. */
+  padding-right: 42px;
+  font-size: 1.1rem;
+  letter-spacing: -0.015em;
+}
+
+.body {
+  margin-top: 11px;
+  color: var(--text-muted);
+  font-size: 0.93rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 26px 22px 24px;
+  }
+
+  .number {
+    font-size: 2.8rem;
+  }
+}

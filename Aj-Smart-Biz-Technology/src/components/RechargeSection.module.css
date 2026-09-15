@@ -1,0 +1,56 @@
+/*
+ * Two columns of two on a desktop, one column below.
+ *
+ * Not a four-across row: these are paragraphs, and four paragraphs side by side
+ * at 280px each is four columns of a newspaper — the eye has to travel down and
+ * back up three times to read them in the order they were written.
+ */
+.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 30px 44px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.point {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+/*
+ * A numbered disc, outlined in the accent rather than filled with it.
+ *
+ * Filled, four of these become four coloured dots down the page and start
+ * competing with the one gradient button the section is leading towards.
+ */
+.number {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--aurora-2) 45%, transparent);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--accent-text);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.title {
+  font-size: 1.06rem;
+  letter-spacing: -0.012em;
+}
+
+.body {
+  margin-top: 9px;
+  max-width: 44ch;
+  color: var(--text-muted);
+  font-size: 0.94rem;
+  line-height: 1.62;
+}

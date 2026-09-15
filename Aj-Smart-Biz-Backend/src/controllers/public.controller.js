@@ -289,7 +289,7 @@ const platformDetails = (host) => ({
  *
  * The whole public profile of the tenant that owns a host: name, tagline, logo,
  * favicon, theme, contact details, address and branches. This is what the
- * customer-facing websites in `websites/` launch with — they pass the domain they
+ * customer-facing websites in `themes/` launch with — they pass the domain they
  * were served on and render whatever comes back.
  *
  * Unauthenticated, like `/public/branding`, and bound by the same two rules:

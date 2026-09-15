@@ -1,0 +1,264 @@
+/*
+ * The cards stretch to a common height so the buttons line up across the row.
+ *
+ * `align-items: stretch` is the grid default and is only half of it: each card
+ * is also a flex column with `margin-top: auto` on its button slot, which is
+ * what actually pins the four calls to action to one baseline when the feature
+ * lists are different lengths. See `.ctaSlot`.
+ */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(276px, 1fr));
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  padding: 30px 26px 28px;
+}
+
+/*
+ * The popular plan.
+ *
+ * A brighter edge and a coloured ring, and it does **not** grow or lift above
+ * the others. The usual trick — scaling the middle card up — breaks the row's
+ * shared baseline and makes the comparison harder to read, which is the one
+ * thing a pricing table exists to make easy.
+ */
+.popular {
+  border-color: var(--hairline-strong);
+  box-shadow: var(--shadow), var(--glass-sheen),
+    0 0 0 1px color-mix(in srgb, var(--aurora-2) 30%, transparent);
+}
+
+.flag {
+  align-self: flex-start;
+  margin-bottom: 14px;
+  padding: 5px 13px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-ramp);
+  color: var(--on-accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.name {
+  font-size: 1.28rem;
+}
+
+.tagline {
+  margin-top: 9px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+/* -------------------------------- price -------------------------------- */
+
+.priceRow {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.price {
+  font-family: var(--font-display);
+  font-size: 2.3rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  /*
+   * Plain `--text`, not the gradient.
+   *
+   * This is the number the whole card is about and it has to be the most
+   * legible thing on it. A ramp that fades towards teal is decoration, and a
+   * price is not decoration.
+   */
+  color: var(--text);
+}
+
+.unit {
+  color: var(--text-faint);
+  font-size: 0.88rem;
+}
+
+.saving {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.wasPrice {
+  color: var(--text-faint);
+  font-size: 0.92rem;
+  text-decoration-thickness: 1px;
+}
+
+.savingBadge {
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--aurora-3) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--aurora-3) 34%, transparent);
+  color: var(--aurora-3);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* -------------------------------- limits -------------------------------- */
+
+/*
+ * Three facts in a row, on their own strip.
+ *
+ * Hairlines above and below rather than a filled band: the card is already
+ * translucent, and a solid strip inside it would be the only opaque thing on
+ * the page.
+ */
+.limits {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 22px 0 0;
+  padding: 16px 0;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.limits dt {
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.limits dd {
+  margin: 5px 0 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+/* ------------------------------- features ------------------------------- */
+
+.features {
+  display: grid;
+  gap: 10px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* A bare tick, not the ringed one: there are five per card and twenty per row,
+   and twenty rings read as a page of targets. */
+.tick {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  color: var(--aurora-3);
+}
+
+/* ------------------------------- includes ------------------------------- */
+
+.includes {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+}
+
+.includesTitle {
+  margin-bottom: 11px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chipIcon {
+  width: 14px;
+  height: 14px;
+  color: var(--accent-text);
+}
+
+/* --------------------------------- cta --------------------------------- */
+
+/*
+ * The slot the button sits in, rather than the button itself.
+ *
+ * `margin-top: auto` is what pins every card's call to action to one baseline
+ * across the row — it eats whatever vertical slack a shorter list left behind.
+ * It has to live on a wrapper and not on the `.btn`, because the gap above the
+ * button would otherwise have to be a second `margin-top`, and a second
+ * `margin-top` overrides the `auto`: the alignment would silently stop working
+ * and there would be nothing in the rule to say why.
+ *
+ * Here the push and the gap are separate properties on separate boxes, and the
+ * pill keeps its own padding untouched.
+ */
+.ctaSlot {
+  margin-top: auto;
+  padding-top: 26px;
+  width: 100%;
+}
+
+.cta {
+  width: 100%;
+}
+
+/* --------------------------------- rest --------------------------------- */
+
+.footnote {
+  margin-top: 26px;
+  max-width: 68ch;
+  color: var(--text-faint);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+.allLink {
+  margin-top: 26px;
+}
+
+.allIcon {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 26px 22px 24px;
+  }
+
+  /* Three columns of limits at 320px gives each label eight characters and a
+     hyphen. Two is the last honest arrangement. */
+  .limits {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px 10px;
+  }
+}

@@ -12,7 +12,7 @@ import type { SubmitState, SubmitValues, TestimonialField } from '@/lib/testimon
  * and a route handler would be one. It also keeps `API_URL` where it belongs.
  * The browser never learns the API's address, never calls it, and cannot be
  * given a `localhost` origin that means the visitor's own machine, which is the
- * rule the whole deployment story rests on (see the README in `websites/`).
+ * rule the whole deployment story rests on (see the README in `themes/`).
  *
  * The action validates nothing beyond what it takes to give the person in front
  * of it a useful message. The API is the authority — it decides whether this

@@ -1,0 +1,136 @@
+# ------------------------------------------------------------------ #
+# The server block for the Company Admin console.
+#
+# `.template` is not decoration: the official nginx image runs every file in
+# /etc/nginx/templates through `envsubst` on start-up and writes the result to
+# /etc/nginx/conf.d. That is what makes ${API_ORIGIN} below a *runtime*
+# setting — the same image can be pointed at a different API without a rebuild.
+#
+# Only names matching NGINX_ENVSUBST_FILTER (set in the Dockerfile) are
+# substituted, so nginx's own $uri, $host and $request_uri survive untouched.
+# ------------------------------------------------------------------ #
+
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # ------------------------- resolving the API ------------------------- #
+    #
+    # Docker's embedded DNS, discovered from /etc/resolv.conf by the image's own
+    # 15-local-resolvers script. Hardcoding 127.0.0.11 would work on a
+    # user-defined Docker network and nowhere else.
+    #
+    # This exists because of how nginx resolves upstreams, which is worth
+    # spelling out. A literal hostname in `proxy_pass` is resolved ONCE, at
+    # start-up, and nginx refuses to start at all if it does not resolve. Two
+    # consequences, both of which bite in exactly this deployment:
+    #
+    #   * Start this console before the API container exists and nginx exits
+    #     with "host not found in upstream" — a crash loop caused purely by
+    #     boot order.
+    #   * Redeploy the API and its container gets a new IP, while this one goes
+    #     on proxying to the old one until someone restarts it.
+    #
+    # Going through a variable defers resolution to request time, and `valid`
+    # caps how long an answer is trusted. Both problems disappear: a console
+    # that starts before the API simply 502s until the API is up, and then
+    # recovers on its own.
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=10s;
+    set $api_origin ${API_ORIGIN};
+
+    # The console is one HTML file and a pile of hashed assets; anything
+    # compressible is text. Images are already compressed and are left alone.
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_proxied any;
+    gzip_types text/plain text/css text/javascript application/javascript application/json application/manifest+json image/svg+xml;
+
+    # The app builds with outputHashing=all, so every JS and CSS filename
+    # changes when its contents do. They can be cached forever precisely
+    # because a changed file is a different URL.
+    #
+    # This is a REGEX location, and nginx tries every one of those before it
+    # settles for a prefix match. So this block would otherwise also swallow
+    # /uploads/company/logo.png and the .css and .js that swagger-ui serves
+    # under /api/v1/docs — matching here, finding no such file on disk, and
+    # returning 404 for every logo on the platform. The two proxy blocks below
+    # carry `^~` for exactly that reason; see the note on them.
+    location ~* \.(?:js|css|woff2?|ttf|eot|otf|png|jpe?g|gif|svg|ico|webp|avif)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    # index.html is the one file whose name never changes, so caching it is how
+    # a browser ends up asking for last release's bundles and getting a 404.
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        expires 0;
+    }
+
+    # ------------------------------ the API ------------------------------ #
+    #
+    # `environment.ts` ships apiUrl='/api/v1' and filesUrl='' — the production
+    # build calls the API on its *own* origin, deliberately, so the console
+    # needs no CORS and no per-deployment rebuild. This block is the other half
+    # of that decision: without it the built app has nothing to talk to.
+    #
+    # `$request_uri` is explicit rather than implied. With a literal upstream,
+    # `proxy_pass http://host:4000;` forwards the path unchanged; once the
+    # upstream is a variable that shorthand no longer applies, and leaving it
+    # off is how /api/v1/me quietly arrives at the API as /.
+    #
+    # `^~` is load-bearing. Without it nginx would still prefer the regex
+    # location above for anything ending in .css or .js — which is every asset
+    # swagger-ui serves under /api/v1/docs — and answer 404 from the filesystem
+    # instead of proxying. `^~` says: once this prefix is the longest match,
+    # stop, do not consider the regexes at all.
+    location ^~ /api/v1/ {
+        proxy_pass $api_origin$request_uri;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade           $http_upgrade;
+        proxy_set_header Connection        "upgrade";
+
+        # Logo and favicon uploads go through the same route as everything
+        # else; multer's limit is set on the API, and a 413 from nginx first
+        # would turn a clear error message into a blank one.
+        client_max_body_size 25m;
+
+        # Long enough for a report endpoint, short enough that a wedged
+        # backend does not hold connections open all afternoon.
+        proxy_read_timeout 120s;
+    }
+
+    # Company logos and favicons, served by the API off its uploads volume.
+    #
+    # `^~` for the same reason as above, and it matters more here: uploads are
+    # images by definition, so *every* path this block exists to serve ends in
+    # .png, .svg or .ico and would otherwise be claimed by the regex location
+    # and 404. This was a real bug, caught by a smoke test, not a hypothetical.
+    location ^~ /uploads/ {
+        proxy_pass $api_origin$request_uri;
+        proxy_http_version 1.1;
+        proxy_set_header Host            $host;
+        proxy_set_header X-Real-IP       $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        expires 7d;
+        add_header Cache-Control "public";
+    }
+
+    # -------------------------- the Angular router ------------------------- #
+    #
+    # Every other path is a client-side route. Without this, a reload on
+    # /companies/12 asks nginx for a file that was never built and gets a 404 —
+    # the single most common way an SPA looks broken in production.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

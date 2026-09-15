@@ -1,0 +1,32 @@
+# What never reaches the build context.
+#
+# Mostly about size and cache hits: a host `node_modules` would be the largest
+# thing in the context by an order of magnitude, and copying it in would
+# invalidate the layer that exists to avoid reinstalling it.
+
+# Installed in the build stage by `npm ci`, from the lockfile. A host copy is
+# the wrong platform's binaries as often as not.
+node_modules
+npm-debug.log*
+yarn-error.log
+
+# Build output. Produced inside the image; a stale host copy being copied in
+# and then overwritten is pure waste, and worse when the overwrite is partial.
+dist
+tmp
+out-tsc
+.angular
+
+# Not the app.
+.git
+.gitignore
+.github
+Dockerfile
+.dockerignore
+README.md
+coverage
+.vscode
+.idea
+.editorconfig
+.prettierrc
+.DS_Store

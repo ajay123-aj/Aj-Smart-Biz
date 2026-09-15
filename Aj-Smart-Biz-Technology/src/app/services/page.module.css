@@ -1,0 +1,80 @@
+/*
+ * The heading block every inner page opens with: eyebrow, h1, lede, on the
+ * aurora rather than on a panel.
+ *
+ * It lives here and is imported by the other pages rather than being promoted
+ * to globals.css. The classes in globals are for things *every* surface uses —
+ * the card, the button, the container. A heading block shared by four pages is
+ * shared by four pages, and saying so with an import is more honest than
+ * putting it in the global sheet where anything could reach it.
+ */
+.head {
+  padding-block: 64px 12px;
+}
+
+.title {
+  max-width: 20ch;
+  font-size: clamp(2.2rem, 5vw, 3.2rem);
+  line-height: 1.06;
+  letter-spacing: -0.032em;
+}
+
+.lede {
+  margin-top: 18px;
+  max-width: 60ch;
+  color: var(--text-muted);
+  font-size: 1.06rem;
+  line-height: 1.66;
+}
+
+/* ------------------------- in every plan ------------------------- */
+
+.always {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(258px, 1fr));
+  gap: 28px 34px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Rows rather than cards — this band already sits on a panel, and glass inside
+   glass makes the material stop meaning anything. */
+.alwaysItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.alwaysIcon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--aurora-1) 28%, transparent),
+    color-mix(in srgb, var(--aurora-3) 20%, transparent)
+  );
+  border: 1px solid var(--hairline-strong);
+  color: var(--text);
+}
+
+.alwaysIcon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.alwaysTitle {
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.alwaysBody {
+  margin-top: 7px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.58;
+}

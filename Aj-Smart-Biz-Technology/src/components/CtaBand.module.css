@@ -1,0 +1,77 @@
+/*
+ * The one place on the site where a surface is allowed to carry colour.
+ *
+ * Everywhere else the accent ramp is text, a hairline or a single button — see
+ * the note at the top of globals.css. Here the panel itself takes a low-opacity
+ * wash of it, because this band closes the page and has to stop the eye. It is
+ * kept to a tint *over* the glass rather than a fill: at full saturation it
+ * would stop being a surface and become a billboard, and it would also be the
+ * only opaque thing on the page.
+ */
+.band {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 30px;
+  padding: 46px 44px;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--aurora-1) 24%, transparent),
+      color-mix(in srgb, var(--aurora-2) 14%, transparent) 55%,
+      color-mix(in srgb, var(--aurora-3) 16%, transparent)
+    ),
+    var(--glass-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--hairline-strong);
+  box-shadow: var(--shadow-lg), var(--glass-sheen);
+  overflow: hidden;
+}
+
+.copy {
+  max-width: 40rem;
+}
+
+.title {
+  font-size: clamp(1.7rem, 3.4vw, 2.3rem);
+}
+
+.body {
+  margin-top: 14px;
+  max-width: 46ch;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 760px) {
+  .band {
+    padding: 34px 26px;
+    gap: 24px;
+  }
+
+  /* Full width once they stack, so the pair reads as one decision with two
+     answers rather than as two stray pills. */
+  .actions {
+    width: 100%;
+  }
+
+  .actions > * {
+    flex: 1 1 200px;
+  }
+}

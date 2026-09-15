@@ -49,7 +49,7 @@ npm run db:seed:salon            # Aj Salon — a whole tenant, end to end
 that already exists, it writes **one complete tenant** — the business type, the
 theme, the plan, the company, its domain (`salon.localhost`), its treatment
 menu, its retail shelf, its people, its reviews and its articles. It is the
-company `websites/salon/black-theme` was built against, and it writes through
+company `themes/salon/black-theme` was built against, and it writes through
 the same models and the same `createCompany` service the super-admin console
 does. All four are idempotent, and all four write their images as `seed-*.svg`
 placeholders under `uploads/`.
@@ -97,7 +97,7 @@ something it may call, and everything it may call is under that prefix.
 
 | Prefix | Consumer | Auth | Scope |
 | --- | --- | --- | --- |
-| `/website` | A tenant's public site (`websites/`) | None | The tenant is resolved from the request **host** |
+| `/website` | A tenant's public site (`themes/`) | None | The tenant is resolved from the request **host** |
 | `/admin` | The company workspace (`Aj-Smart-Biz-Admin`) | `POST /auth/admin/login` | The token's own company, always |
 | `/super-admin` | The platform console (`Aj-Smart-Biz-Supper-Admin`) | `POST /auth/super-admin/login` | Every tenant |
 
@@ -291,7 +291,7 @@ returns **only what a company publishes about itself** — no GST or PAN number,
 plan, subscription, transaction or admin data, no counts — and, like
 `/branding`, answers an unknown *or inactive* tenant with platform defaults
 rather than an error, so neither route can be walked to enumerate tenants. It is
-what the websites in [`../websites/`](../websites/) launch with.
+what the websites in [`../themes/`](../themes/) launch with.
 
 When the matched domain is pinned to a branch, the response carries that
 branch's `logo` and `favicon` (falling back to the company's when the branch has

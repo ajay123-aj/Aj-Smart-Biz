@@ -20,10 +20,10 @@
 # public registry is the last place any of that should be.
 # ------------------------------------------------------------------ #
 
-# Node 22, matching the version the project is developed against. Alpine
+# Node 24 — the version the live image is built and supported on. Alpine
 # because this service compiles nothing: `sqlite3` is the only native
 # dependency and it is a devDependency, dropped by `--omit=dev` below.
-ARG NODE_VERSION=22-alpine
+ARG NODE_VERSION=24-alpine
 
 # ------------------------------ dependencies ------------------------------ #
 FROM node:${NODE_VERSION} AS deps

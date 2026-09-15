@@ -1,13 +1,14 @@
 # Aj Smart Biz
 
-A multi-tenant business platform in three projects.
+A multi-tenant business platform, plus the website that sells it.
 
 | Project | Stack | Port | What it is |
 | --- | --- | --- | --- |
 | [Aj-Smart-Biz-Backend](Aj-Smart-Biz-Backend/) | Node.js · Express · Sequelize · MySQL | 4000 | One API serving both consoles |
 | [Aj-Smart-Biz-Supper-Admin](Aj-Smart-Biz-Supper-Admin/) | Angular 22 | 4200 | Platform console — companies, plans, billing, masters |
 | [Aj-Smart-Biz-Admin](Aj-Smart-Biz-Admin/) | Angular 22 | 4300 | Company workspace — branches, roles, permissions, admins |
-| [websites](websites/) | Next.js 15 | 4400+ | Tenant-facing public websites, one template per business type |
+| [themes](themes/) | Next.js 15 | 4400+ | Tenant-facing site templates, one folder per business type |
+| [Aj-Smart-Biz-Technology](Aj-Smart-Biz-Technology/) | Next.js 15 | 4700 | The product website — what we sell, what it costs, book a demo |
 
 ---
 
@@ -224,7 +225,7 @@ look different. The endpoint is public but returns branding fields only, and an
 unknown *or inactive* tenant gets platform defaults rather than an error, so it
 cannot be used to enumerate tenants.
 
-The public websites in [`websites/`](websites/) resolve their tenant the same
+The public websites in [`themes/`](themes/) resolve their tenant the same
 way, through a second endpoint built for them: `GET
 /website/company-details?domain=<host>`. Where `/branding` returns just enough to
 paint a login screen, this one returns the whole public profile — legal name,

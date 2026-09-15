@@ -1,0 +1,60 @@
+/*
+ * Six items, and deliberately **not** cards.
+ *
+ * This band already sits on a panel. Putting a card inside a panel gives the
+ * page glass on glass on glass, and at that point the material stops meaning
+ * anything — every surface is raised, so nothing is. So these are plain rows:
+ * an icon tile, a heading and a line, separated by space rather than by edges.
+ */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 30px 34px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+/*
+ * The icon tile is the one raised thing in the row, and it takes the accent
+ * ramp at low opacity rather than the plain glass the step cards use — on a
+ * panel, a 6% white tile is nearly invisible.
+ */
+.icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--aurora-1) 28%, transparent),
+    color-mix(in srgb, var(--aurora-3) 20%, transparent)
+  );
+  border: 1px solid var(--hairline-strong);
+  color: var(--text);
+}
+
+.icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.title {
+  font-size: 1.02rem;
+  letter-spacing: -0.012em;
+}
+
+.body {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
