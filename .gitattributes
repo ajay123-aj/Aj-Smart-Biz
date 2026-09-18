@@ -32,6 +32,15 @@ Dockerfile          text eol=lf
 *.yml               text eol=lf
 *.yaml              text eol=lf
 
+# ------------------------------------------------------ nginx vhost files --
+# Shipped verbatim to /etc/nginx/conf.d on the Ubuntu host. nginx treats a
+# stray carriage return as part of the token before it, so `listen 80;^M`
+# fails to parse and the error names the line without saying why it is wrong.
+# `* text=auto` already normalises these in the repository; this pins the
+# working tree too, so a config edited on Windows tests the same bytes the
+# server will get.
+nginx-domains/domains/*.conf  text eol=lf
+
 # ----------------------------------------------------------------- binary --
 # Never touched, never diffed as text.
 *.png               binary
