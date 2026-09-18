@@ -185,14 +185,50 @@ jobs:
         run: |
           set -euo pipefail
 
+          # A usable A record target: an IPv4 address that is routable on the
+          # public internet. Everything rejected here would be accepted by
+          # Cloudflare and then be unreachable from outside, which is a far
+          # more confusing failure than this one.
+          is_public_ipv4() {
+            local ip="$1"
+            [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || { block="not an IPv4 address"; return 1; }
+            case "$ip" in
+              10.*)                                  block="10.0.0.0/8 (RFC1918 private)" ;;
+              192.168.*)                             block="192.168.0.0/16 (RFC1918 private)" ;;
+              172.1[6-9].*|172.2[0-9].*|172.3[01].*) block="172.16.0.0/12 (RFC1918 private)" ;;
+              127.*)                                 block="127.0.0.0/8 (loopback)" ;;
+              169.254.*)                             block="169.254.0.0/16 (link-local)" ;;
+              100.6[4-9].*|100.[7-9][0-9].*|100.1[0-1][0-9].*|100.12[0-7].*)
+                                                     block="100.64.0.0/10 (carrier-grade NAT)" ;;
+              0.*)                                   block="0.0.0.0/8 (unusable)" ;;
+              *)                                     block=""; return 0 ;;
+            esac
+            return 1
+          }
+
+          # A configured value wins, but only if it could actually work. A
+          # private address here is always a mistake - usually the output of
+          # `ip addr` or `hostname -I`, which report the NIC rather than the
+          # address the internet uses - and failing the deploy over a stale
+          # value when the right one can simply be measured helps nobody.
+          #
+          # So it warns and falls through to detection rather than exiting. The
+          # warning names the block rather than the address, because a value set
+          # as a SECRET is masked to *** in this log and an error about a value
+          # you cannot see is not much of an error.
           if [ -n "${CONFIGURED_IP:-}" ]; then
-            echo "value=$CONFIGURED_IP" >> "$GITHUB_OUTPUT"
-            echo "Using the configured NGINX_SERVER_IP."
-            exit 0
+            if is_public_ipv4 "$CONFIGURED_IP"; then
+              echo "value=$CONFIGURED_IP" >> "$GITHUB_OUTPUT"
+              echo "Using the configured NGINX_SERVER_IP."
+              exit 0
+            fi
+            echo "::warning::NGINX_SERVER_IP is $block, which cannot be reached from the"
+            echo "::warning::internet. Ignoring it and measuring this host's public address"
+            echo "::warning::instead. Delete the NGINX_SERVER_IP secret/variable to silence"
+            echo "::warning::this - auto-detection is the better answer on this runner,"
+            echo "::warning::because it runs on the server itself."
           fi
 
-          # Two services, because one of them being down should not stop a
-          # deploy. Both return a bare address and nothing else.
           # Two services, because one being down should not stop a deploy. Both
           # return a bare address and nothing else. `-4` forces IPv4: an A
           # record needs one, and a dual-stacked host would otherwise sometimes
