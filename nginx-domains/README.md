@@ -36,6 +36,7 @@ repository/
 ├── .github/workflows/
 │   └── deploy-nginx-domains.yml          runs on the self-hosted runner
 └── nginx-domains/
+    ├── install-server.sh                 one-time setup, run by hand as root
     ├── setup-cloudflare-dns.sh           A records, runs on the runner
     ├── deploy-nginx-domains.sh           backup → sync → nginx -t → reload
     ├── setup-ssl.sh                      certbot issuance and renewal
@@ -97,8 +98,38 @@ The rule is mechanical and needs no state file:
 
 ## 2. One-time server installation
 
-Run once, as a user with sudo. The self-hosted runner must already be installed
-and online on this server - it is the same one your other deploys use.
+There is a script for this. Run it once, on the server, as root:
+
+```bash
+sudo ./nginx-domains/install-server.sh
+```
+
+It detects the runner user, installs `nginx`, `certbot`,
+`python3-certbot-nginx`, `jq` and `curl`, creates `/opt/nginx-domains` owned by
+the runner, opens 80/443 in ufw if ufw is active, and writes the sudoers rule.
+It is safe to run again — every step checks before it acts.
+
+If it cannot work out which account the runner uses, pass it:
+
+```bash
+sudo ./nginx-domains/install-server.sh my-runner-user
+```
+
+> **Why a script rather than a list of commands.** One step writes a file into
+> `/etc/sudoers.d/`, and a syntax error there does not fail politely: sudo
+> refuses to parse the whole directory and every `sudo` on the machine stops
+> working, including the one you would use to fix it. The script writes the
+> rule to a temporary file, checks it with `visudo -c`, and installs it only
+> once it has passed. A bad rule leaves the system exactly as it was.
+
+It finishes by verifying the result — sudo entries, directory ownership, the
+certbot nginx plugin, and that `nginx -t` already passes — and exits non-zero
+if any of that is wrong.
+
+### What it does, if you would rather do it by hand
+
+The self-hosted runner must already be installed and online on this server —
+it is the same one your other deploys use.
 
 ```bash
 # the account the runner executes as; everything below is granted to it

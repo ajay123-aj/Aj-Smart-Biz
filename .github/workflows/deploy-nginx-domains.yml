@@ -301,14 +301,23 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ ! -d "$ROOT" ]; then
-            echo "::error::$ROOT does not exist. Run the one-time installation from"
-            echo "::error::nginx-domains/README.md section 2."
-            exit 1
-          fi
-          if [ ! -w "$ROOT" ]; then
-            echo "::error::$(id -un) cannot write to $ROOT. Fix with:"
-            echo "::error::  sudo chown -R $(id -un):$(id -gn) $ROOT"
+          # Both of these are the one-time server setup not having been done.
+          # install-server.sh does all of it - packages, directories, ownership
+          # and the sudoers rule - and is safe to run more than once.
+          if [ ! -d "$ROOT" ] || [ ! -w "$ROOT" ]; then
+            if [ ! -d "$ROOT" ]; then
+              echo "::error::$ROOT does not exist."
+            else
+              echo "::error::$(id -un) cannot write to $ROOT."
+            fi
+            echo "::error::"
+            echo "::error::Run the one-time server setup, ON THIS SERVER, as root:"
+            echo "::error::"
+            echo "::error::    sudo $GITHUB_WORKSPACE/nginx-domains/install-server.sh"
+            echo "::error::"
+            echo "::error::It installs nginx, certbot, the certbot nginx plugin and jq,"
+            echo "::error::creates $ROOT owned by $(id -un), and writes the sudoers rule"
+            echo "::error::this job needs. Safe to run again. See README.md section 2."
             exit 1
           fi
 
