@@ -39,7 +39,7 @@ const config = {
   isDev: NODE_ENV === 'development',
   port: int(process.env.PORT, 4000),
   apiPrefix: process.env.API_PREFIX || '/api/v1',
-  corsOrigins: list(process.env.CORS_ORIGINS, ['http://localhost:4200', 'http://localhost:4300']),
+  corsOrigins: list(process.env.CORS_ORIGINS, ['*', 'http://localhost:4200', 'http://localhost:4300']),
   bcryptSaltRounds: int(process.env.BCRYPT_SALT_ROUNDS, 10),
   defaultCompanyAdminPassword: process.env.DEFAULT_COMPANY_ADMIN_PASSWORD || 'Company@123',
 
