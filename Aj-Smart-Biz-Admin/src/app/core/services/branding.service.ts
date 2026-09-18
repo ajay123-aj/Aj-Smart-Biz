@@ -87,7 +87,7 @@ export class BrandingService {
   load(): Observable<CompanyBranding> {
     this.loading.set(true);
     return this.http
-      .get<ApiResponse<CompanyBranding>>(`${environment.apiUrl}/public/branding`, {
+      .get<ApiResponse<CompanyBranding>>(`${environment.apiUrl}/website/branding`, {
         params: { domain: this.resolveHost() },
       })
       .pipe(
