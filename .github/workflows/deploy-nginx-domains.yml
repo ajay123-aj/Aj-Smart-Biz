@@ -1,74 +1,78 @@
 # ------------------------------------------------------------------ #
-# nginx domains deploy - push the contents of nginx-domains/ to the Ubuntu
-# host and reload nginx.
+# nginx domains deploy - publish nginx-domains/ to this Ubuntu host, reload
+# nginx, and get a certificate for every domain.
 #
 # Runs on every push to `nginx-domain-live`, which includes the merge commit a
 # pull request into that branch produces, and on demand from the Actions tab.
+#
+# ------------------------- where this runs ------------------------- #
+#
+# On the SELF-HOSTED runner, which is the server itself - the same runner every
+# other deploy on this platform uses. Not on a GitHub-hosted runner.
+#
+# That is what makes the whole thing work on a server with no inbound public
+# access. The runner polls GitHub outbound and does the work locally, so there
+# is no SSH, no deploy key, no host-key pinning, and no need for anything to be
+# reachable from the internet in order to DEPLOY.
+#
+# It also means these secrets are NOT used and can be deleted if nothing else
+# wants them:
+#
+#     NGINX_SERVER_HOST   NGINX_SERVER_USER
+#     NGINX_SERVER_SSH_KEY   NGINX_SERVER_PORT   NGINX_SERVER_KNOWN_HOSTS
 #
 # ------------------------------ secrets ------------------------------ #
 #
 # Settings -> Secrets and variables -> Actions -> Secrets:
 #
-#   NGINX_SERVER_HOST         hostname or IP of the Ubuntu server
-#   NGINX_SERVER_USER         the deploy user to SSH in as (NOT root)
-#   NGINX_SERVER_SSH_KEY      the PRIVATE half of the deploy key, whole file
-#                             including the BEGIN/END lines
-#   NGINX_SERVER_PORT         SSH port. Optional - defaults to 22
-#   NGINX_SERVER_KNOWN_HOSTS  optional but strongly recommended: the output of
-#                             `ssh-keyscan -p <port> <host>` on a machine you
-#                             trust. See "host key" below
-#   CLOUDFLARE_API_TOKEN      a SCOPED token - Zone | DNS | Edit, restricted to
-#                             the one zone. NOT the Global API Key, which
-#                             cannot be scoped and can do anything to the
-#                             account. See "the token" in
-#                             nginx-domains/setup-cloudflare-dns.sh
-#   CLOUDFLARE_ZONE_ID        optional; looked up from the zone name if absent
+#   CLOUDFLARE_API_TOKEN   a SCOPED token - Zone | DNS | Edit, restricted to
+#                          the one zone. NOT the Global API Key, which cannot
+#                          be scoped and can do anything to the account. See
+#                          "the token" in nginx-domains/setup-cloudflare-dns.sh
+#   CLOUDFLARE_ZONE_ID     optional; looked up from the zone name if absent
 #
-# Variables (same page, Variables tab) - both optional:
+# That is the only secret this workflow needs.
 #
-#   NGINX_SYNC_SCRIPT   `false` stops this workflow updating the scripts on the
-#                       server, so they are changed only by hand as root. See
-#                       "how much power the deploy key has" below. Defaults to
-#                       `true`
-#   NGINX_AUTO_SSL      `false` stops the workflow issuing and renewing
-#                       certificates after a deploy. Defaults to `true`
-#   NGINX_AUTO_DNS      `false` stops the workflow creating Cloudflare DNS
-#                       records. Defaults to `true`
-#   NGINX_SERVER_IP     the server's PUBLIC IPv4, the address the A records
-#                       point at. Required unless NGINX_AUTO_DNS is `false`
+# Variables (same page, Variables tab) - all optional:
+#
+#   NGINX_SERVER_IP     the public IPv4 the A records point at. Leave it unset
+#                       and the runner asks the internet what this host's
+#                       public address is, which is the right answer more often
+#                       than a value typed by hand - see "the public address"
 #   CLOUDFLARE_ZONE     the zone to manage. Defaults to `ajtechhub.com`
-#   NGINX_DOMAINS_ROOT  where the system lives on the server. Defaults to
-#                       /opt/nginx-domains
+#   NGINX_AUTO_DNS      `false` skips the Cloudflare step entirely
+#   NGINX_AUTO_SSL      `false` skips certificate issuance
+#   NGINX_SYNC_SCRIPT   `false` stops this job updating the two scripts on the
+#                       server, so they are changed only by hand as root. See
+#                       the comment on the install step
+#   NGINX_DOMAINS_ROOT  where the system lives. Defaults to /opt/nginx-domains
 #
-# ----------------------------- host key ----------------------------- #
+# -------------------------- the public address -------------------------- #
 #
-# If NGINX_SERVER_KNOWN_HOSTS is set, the runner pins the server's host key and
-# `StrictHostKeyChecking=yes` will refuse to connect to anything else. That is
-# the difference between "encrypted" and "encrypted to the right machine".
+# Deploying needs no inbound access. Being REACHED does, and so does getting a
+# certificate: Let's Encrypt validates a domain by resolving it and connecting
+# to it on port 80 from the outside.
 #
-# Without it the workflow falls back to `ssh-keyscan`, which trusts whatever
-# answers on the first connection. That is convenient and it is also exactly
-# the window a man-in-the-middle needs, so the fallback prints a warning on
-# every run rather than passing quietly.
+# So the A record has to point at whatever address the internet uses to reach
+# this host - the router, the NAT gateway, the elastic IP - which is not the
+# address the host sees on its own NIC. `ip addr` and `hostname -I` report the
+# private one; this job asks an outside service instead, from the server, which
+# is the only place that gets the right answer.
 #
-# ------------------ how much power the deploy key has ------------------ #
+# If nothing forwards port 80 to this host, DNS is still created and the
+# certificate step reports each domain as unreachable and skips it. The sites
+# come up on plain HTTP and nothing is broken - there is simply no certificate
+# until inbound 80 exists.
 #
-# Worth being explicit about, because it is easy to believe this setup is more
-# locked down than it is.
+# ---------------------- what the runner user needs ---------------------- #
 #
-# The sudoers rule grants the deploy user one command: the deploy script. But
-# by default this workflow also OVERWRITES that script on every run. Anyone who
-# can push to `nginx-domain-live` can therefore put arbitrary commands in it
-# and have the server run them as root. In practice the deploy key is a root
-# key, guarded by GitHub branch protection rather than by sudo.
+# One sudoers rule, and write access to the deploy directory:
 #
-# For most teams that is a reasonable trade and it is why `NGINX_SYNC_SCRIPT`
-# defaults to `true`. If it is not the right trade for you, set the variable to
-# `false`: the workflow then syncs only `domains/`, the script stays root-owned
-# and unwritable by the deploy user, and sudo genuinely limits the blast radius
-# to "whatever the current script does with the .conf files it is given".
-# Updating the script becomes a manual root action. The sudoers file documents
-# the digest-pinned form that makes that guarantee enforceable.
+#     sudo chown -R "$(whoami):$(whoami)" /opt/nginx-domains
+#     sudo visudo -f /etc/sudoers.d/nginx-domains     # see README.md section 3
+#
+# The sudo rule covers exactly two commands - the deploy script and the ssl
+# script - and nothing else.
 # ------------------------------------------------------------------ #
 
 name: nginx domains deploy
@@ -83,40 +87,39 @@ on:
 jobs:
   deploy:
     name: deploy nginx domains
-    runs-on: ubuntu-latest
+    # The labels of the self-hosted runner, matching every other deploy in this
+    # repository. `runs-on` matches labels, never the runner's name.
+    runs-on: [self-hosted, Linux, X64]
 
-    # Deliberately NOT cancel-in-progress. Everywhere else on this platform a
-    # superseded build is worth cancelling; here a cancelled run could be
-    # killed between writing /etc/nginx/conf.d and reloading, and the script's
-    # rollback would be racing the next run's backup. Two pushes in a minute
-    # queue instead, and the second one simply re-applies the newer files.
+    # Deliberately NOT cancel-in-progress. A cancelled run could be killed
+    # between writing /etc/nginx/conf.d and reloading, and the script's rollback
+    # would be racing the next run's backup. Two pushes in a minute queue
+    # instead, and the second simply re-applies the newer files.
     concurrency:
       group: nginx-domains-${{ github.ref }}
       cancel-in-progress: false
 
-    # The job reads the repository and talks to one server over SSH. It has no
-    # reason to be able to write back to GitHub, so it is not given the chance.
+    # Reads the repository, talks to Cloudflare, and writes to this host. It has
+    # no reason to write back to GitHub, so it is not given the chance.
     permissions:
       contents: read
 
     env:
       SRC: nginx-domains
-      REMOTE_ROOT: ${{ vars.NGINX_DOMAINS_ROOT || '/opt/nginx-domains' }}
-      SYNC_SCRIPT: ${{ vars.NGINX_SYNC_SCRIPT || 'true' }}
+      ROOT: ${{ vars.NGINX_DOMAINS_ROOT || '/opt/nginx-domains' }}
       AUTO_SSL: ${{ vars.NGINX_AUTO_SSL || 'true' }}
       MANAGE_DNS: ${{ vars.NGINX_AUTO_DNS || 'true' }}
-      SSH_PORT: ${{ secrets.NGINX_SERVER_PORT || '22' }}
+      SYNC_SCRIPT: ${{ vars.NGINX_SYNC_SCRIPT || 'true' }}
 
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
 
-      # A cheap read of the files before a single byte leaves the runner. This
-      # is NOT a substitute for `nginx -t` - it cannot be, since nginx is not
-      # installed here and half of what nginx validates depends on the rest of
-      # the server's configuration tree. It catches the mistakes that are
-      # obvious from the text alone, so an unbalanced brace fails in five
-      # seconds here instead of on the server after a backup and a rollback.
+      # A cheap read of the files before anything is touched. This is NOT a
+      # substitute for `nginx -t` - half of what nginx validates depends on the
+      # rest of the server's configuration tree - but it catches the mistakes
+      # that are obvious from the text alone, so an unbalanced brace fails in
+      # five seconds instead of after a backup and a rollback.
       - name: Sanity-check the configuration files
         run: |
           set -euo pipefail
@@ -170,281 +173,183 @@ jobs:
           [ "$bad" -eq 0 ] || exit 1
           echo "${#files[@]} configuration file(s) look structurally sound."
 
-      # FIRST, before the deploy and long before certbot, because the order is
-      # load-bearing: Let's Encrypt validates a domain by resolving it and
-      # connecting to it. No A record means no certificate, means no HTTPS.
-      #
-      #     DNS (here) -> deploy the vhost -> certbot issues and installs
-      #
-      # Idempotent. A record that already points at the server is reported and
-      # left alone; one pointing somewhere else is corrected; a name outside
-      # the managed zone - a tenant's own domain - is skipped, because we have
-      # no business editing a customer's DNS.
-      #
-      # It never deletes. Removing a .conf takes the vhost off the server and
-      # leaves the record pointing at a host that no longer answers for that
-      # name, which is recoverable; an automatic delete is not.
+      # Asked from the server, because the server is the only place that can be
+      # asked. A value in NGINX_SERVER_IP wins, for a host whose public address
+      # is not discoverable this way - behind an outbound proxy, or where the
+      # inbound address deliberately differs from the outbound one.
+      - name: Work out the public address
+        if: env.MANAGE_DNS == 'true'
+        id: ip
+        env:
+          CONFIGURED_IP: ${{ vars.NGINX_SERVER_IP || secrets.NGINX_SERVER_IP }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${CONFIGURED_IP:-}" ]; then
+            echo "value=$CONFIGURED_IP" >> "$GITHUB_OUTPUT"
+            echo "Using the configured NGINX_SERVER_IP."
+            exit 0
+          fi
+
+          # Two services, because one of them being down should not stop a
+          # deploy. Both return a bare address and nothing else.
+          # Two services, because one being down should not stop a deploy. Both
+          # return a bare address and nothing else. `-4` forces IPv4: an A
+          # record needs one, and a dual-stacked host would otherwise sometimes
+          # answer with its IPv6 address.
+          for url in https://ifconfig.me https://api.ipify.org; do
+            ip="$(curl -4 -sS --max-time 10 "$url" 2>/dev/null | tr -d '[:space:]' || true)"
+            # A real regex rather than a glob. `[0-9]*.[0-9]*` would happily
+            # accept "1x.2x.3x.4x", and a captive portal or an error page is
+            # exactly the sort of thing that returns not-an-address here.
+            if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+              echo "value=$ip" >> "$GITHUB_OUTPUT"
+              echo "This host's public address, according to $url, is $ip."
+              exit 0
+            fi
+            [ -n "$ip" ] && echo "$url returned something that is not an IPv4 address; trying the next one."
+          done
+
+          echo "::error::Could not work out this host's public IPv4 address."
+          echo "::error::Both ifconfig.me and api.ipify.org failed - the runner may have"
+          echo "::error::no outbound internet access, which would also stop it reaching"
+          echo "::error::Cloudflare."
+          echo "::error::Set the repository variable NGINX_SERVER_IP to the address the"
+          echo "::error::internet uses to reach this host, or set NGINX_AUTO_DNS to false"
+          echo "::error::to manage DNS by hand."
+          exit 1
+
+      # Before the deploy, because a domain cannot get a certificate until it
+      # resolves. Idempotent: a record already pointing here is reported and
+      # left alone, one pointing elsewhere is corrected, and a name outside the
+      # managed zone - a tenant's own domain - is skipped. It never deletes.
       - name: Create the Cloudflare DNS records
         if: env.MANAGE_DNS == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ZONE: ${{ vars.CLOUDFLARE_ZONE || 'ajtechhub.com' }}
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          # Accepted from either tab. A variable is preferable - GitHub masks
-          # secret values in logs, so an IP set as a secret prints as
-          # "created A -> ***", which is exactly the line you want to read when
-          # a record looks wrong. A server's public IP is in DNS by definition
-          # and is not a secret. But putting it in the wrong tab should not
-          # cost a failed run, so both work.
-          SERVER_IP: ${{ vars.NGINX_SERVER_IP || secrets.NGINX_SERVER_IP }}
+          SERVER_IP: ${{ steps.ip.outputs.value }}
           DOMAINS_DIR: nginx-domains/domains
         run: |
           set -euo pipefail
 
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
-            echo "::error::Secret CLOUDFLARE_API_TOKEN is not set. Create a scoped"
-            echo "::error::token (Zone | DNS | Edit, restricted to $CLOUDFLARE_ZONE) and"
-            echo "::error::add it under Settings -> Secrets and variables -> Actions."
-            echo "::error::Set the repository variable NGINX_AUTO_DNS to false to skip"
-            echo "::error::this step and manage DNS by hand."
+            echo "::error::Secret CLOUDFLARE_API_TOKEN is not set. Create a scoped token"
+            echo "::error::(Zone | DNS | Edit, restricted to $CLOUDFLARE_ZONE) under"
+            echo "::error::Settings -> Secrets and variables -> Actions."
+            echo "::error::Set NGINX_AUTO_DNS to false to manage DNS by hand instead."
             exit 1
           fi
-          if [ -z "${SERVER_IP:-}" ]; then
-            echo "::error::NGINX_SERVER_IP is not set - there is no address to point the"
-            echo "::error::records at. It is the server's PUBLIC IPv4 (on the server:"
-            echo "::error::curl -s ifconfig.me)."
-            echo "::error::"
-            echo "::error::Settings -> Secrets and variables -> Actions. Either tab works;"
-            echo "::error::the Variables tab is preferable, because a value set as a secret"
-            echo "::error::is masked and the DNS log then reads 'created A -> ***'."
-            echo "::error::"
-            echo "::error::Set NGINX_AUTO_DNS to false to skip this step and manage DNS by hand."
+
+          # jq is not on a stock Ubuntu server the way curl is, and this is the
+          # only step that needs it.
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "::error::jq is not installed on this runner. Install it once:"
+            echo "::error::  sudo apt-get update && sudo apt-get install -y jq"
             exit 1
           fi
 
           chmod +x nginx-domains/setup-cloudflare-dns.sh
           ./nginx-domains/setup-cloudflare-dns.sh
 
-      - name: Set up the SSH key
-        env:
-          SSH_KEY: ${{ secrets.NGINX_SERVER_SSH_KEY }}
-          SSH_HOST: ${{ secrets.NGINX_SERVER_HOST }}
-          SSH_USER: ${{ secrets.NGINX_SERVER_USER }}
-          KNOWN_HOSTS: ${{ secrets.NGINX_SERVER_KNOWN_HOSTS }}
-        run: |
-          set -euo pipefail
-
-          # Checked one at a time rather than in a loop, so the message names
-          # the secret you actually have to go and set. A missing secret is an
-          # empty string here, not an error, so without this the job would fail
-          # much later with something unrelated-looking from ssh.
-          missing=0
-          [ -n "$SSH_HOST" ] || { echo "::error::Secret NGINX_SERVER_HOST is not set."; missing=1; }
-          [ -n "$SSH_USER" ] || { echo "::error::Secret NGINX_SERVER_USER is not set."; missing=1; }
-          [ -n "$SSH_KEY"  ] || { echo "::error::Secret NGINX_SERVER_SSH_KEY is not set."; missing=1; }
-          [ "$missing" -eq 0 ] || exit 1
-
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-
-          # The key is written with the mode already restrictive, because ssh
-          # refuses a private key that is readable by anyone else. The runner
-          # is single-tenant and thrown away after the job, but the key also
-          # never needs to be more readable than this.
-          umask 077
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-
-          # A key pasted into the GitHub UI with the trailing newline lost is
-          # the single most common failure here, and ssh's error for it
-          # ("invalid format") says nothing useful. Check it while we can still
-          # say something useful about it.
-          if ! ssh-keygen -y -f ~/.ssh/deploy_key >/dev/null 2>&1; then
-            echo "::error::NGINX_SERVER_SSH_KEY is not a usable private key. Paste the whole"
-            echo "::error::file - the BEGIN and END lines included - and make sure it is the"
-            echo "::error::private half, not the .pub. No passphrase: this job cannot type one."
-            exit 1
-          fi
-
-          if [ -n "$KNOWN_HOSTS" ]; then
-            printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-            echo "Host key pinned from NGINX_SERVER_KNOWN_HOSTS."
-          else
-            echo "::warning::NGINX_SERVER_KNOWN_HOSTS is not set, so this run trusts whatever"
-            echo "::warning::host answers on the first connection. Set it to the output of"
-            echo "::warning::'ssh-keyscan -p $SSH_PORT <host>' run from a machine you trust."
-            ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          fi
-          chmod 600 ~/.ssh/known_hosts
-
-          # One place that defines how every later step connects, so the flags
-          # cannot drift apart between steps.
-          #   BatchMode           never prompt; fail instead of hanging forever
-          #   StrictHostKeyChecking=yes  refuse an unrecognised host key
-          #   ConnectTimeout      fail in 15s rather than the default ~2min
-          cat > ~/.ssh/config <<EOF
-          Host deploy-target
-            HostName $SSH_HOST
-            User $SSH_USER
-            Port $SSH_PORT
-            IdentityFile ~/.ssh/deploy_key
-            IdentitiesOnly yes
-            BatchMode yes
-            StrictHostKeyChecking yes
-            ConnectTimeout 15
-            ServerAliveInterval 20
-            ServerAliveCountMax 6
-          EOF
-          chmod 600 ~/.ssh/config
-
-      # Separate from the copy so that an unreachable host, a wrong user or a
-      # key the server does not know fails here, in one line, instead of inside
-      # a pipeline where the error would be attributed to tar.
-      - name: Check the connection and the server layout
-        run: |
-          set -euo pipefail
-          ssh deploy-target "REMOTE_ROOT='$REMOTE_ROOT' bash -s" <<'REMOTE'
-          set -euo pipefail
-
-          if [ ! -d "$REMOTE_ROOT" ]; then
-            echo "::error::$REMOTE_ROOT does not exist on the server. Run the one-time"
-            echo "::error::installation commands from nginx-domains/README.md first."
-            exit 1
-          fi
-          if [ ! -w "$REMOTE_ROOT" ]; then
-            echo "::error::$(id -un) cannot write to $REMOTE_ROOT. Fix with:"
-            echo "::error::  sudo chown -R $(id -un):$(id -gn) $REMOTE_ROOT"
-            exit 1
-          fi
-          if ! command -v nginx >/dev/null 2>&1; then
-            echo "::error::nginx is not installed on the server."
-            exit 1
-          fi
-
-          echo "connected as $(id -un)@$(hostname) - $REMOTE_ROOT is writable, nginx $(nginx -v 2>&1 | sed 's|.*/||')"
-          REMOTE
-
-      # tar over the existing SSH connection rather than scp or rsync: it needs
-      # nothing installed on the server beyond tar, it preserves modes, and it
-      # is one stream, so a partial transfer cannot leave half the files
-      # updated and half not. pipefail makes a tar failure fail the step -
-      # without it the exit status would be ssh's, and ssh would be perfectly
-      # happy having written a truncated file.
-      - name: Copy the configuration to the server
-        run: |
-          set -euo pipefail
-          tar -czf - -C "$SRC" domains deploy-nginx-domains.sh setup-ssl.sh \
-            | ssh deploy-target 'cat > ~/.nginx-domains-upload.tgz'
-          echo "Uploaded $(find "$SRC/domains" -name '*.conf' | wc -l) config file(s) and the deploy script."
-
+      # A plain copy now that the runner is on the server. The directory is
+      # replaced rather than copied over the top: copying into the existing one
+      # would leave behind a .conf deleted from git, and the deploy script would
+      # keep publishing a domain no commit describes. Swapping the directory is
+      # what makes "delete the file, push, the domain goes away" true.
+      #
+      # Two renames inside one filesystem, so the window in which domains/ does
+      # not exist is microseconds, and the deploy has not started yet.
       - name: Install into the deploy directory
         run: |
           set -euo pipefail
-          ssh deploy-target "REMOTE_ROOT='$REMOTE_ROOT' SYNC_SCRIPT='$SYNC_SCRIPT' bash -s" <<'REMOTE'
-          set -euo pipefail
 
-          STAGE="$HOME/.nginx-domains-staging"
-          UPLOAD="$HOME/.nginx-domains-upload.tgz"
-
-          test -s "$UPLOAD" || { echo "::error::upload missing or empty on the server."; exit 1; }
-
-          rm -rf "$STAGE"
-          mkdir -p "$STAGE"
-          tar -xzf "$UPLOAD" -C "$STAGE"
-          rm -f "$UPLOAD"
-
-          test -d "$STAGE/domains" || { echo "::error::the upload contains no domains/ directory."; exit 1; }
-
-          # The whole directory is replaced rather than copied over the top.
-          # Copying into the existing directory would leave behind a .conf that
-          # had been deleted from git, and the deploy script would then keep
-          # publishing a domain nobody has a source for any more. Swapping the
-          # directory is what makes "delete the file, push, the domain goes
-          # away" true.
-          #
-          # The swap is two renames inside one filesystem, so the window in
-          # which domains/ does not exist is microseconds, and the deploy
-          # script has not started yet.
-          rm -rf "$REMOTE_ROOT/domains.new" "$REMOTE_ROOT/domains.old"
-          cp -a "$STAGE/domains" "$REMOTE_ROOT/domains.new"
-          chmod 755 "$REMOTE_ROOT/domains.new"
-          find "$REMOTE_ROOT/domains.new" -type f -name '*.conf' -exec chmod 644 {} +
-
-          if [ -d "$REMOTE_ROOT/domains" ]; then
-            mv "$REMOTE_ROOT/domains" "$REMOTE_ROOT/domains.old"
+          if [ ! -d "$ROOT" ]; then
+            echo "::error::$ROOT does not exist. Run the one-time installation from"
+            echo "::error::nginx-domains/README.md section 2."
+            exit 1
           fi
-          mv "$REMOTE_ROOT/domains.new" "$REMOTE_ROOT/domains"
-          rm -rf "$REMOTE_ROOT/domains.old"
-
-          if [ "$SYNC_SCRIPT" = "true" ]; then
-            install -m 0750 "$STAGE/deploy-nginx-domains.sh" "$REMOTE_ROOT/deploy-nginx-domains.sh"
-            install -m 0750 "$STAGE/setup-ssl.sh"            "$REMOTE_ROOT/setup-ssl.sh"
-            echo "deploy and ssl scripts updated from the repository."
-          else
-            echo "NGINX_SYNC_SCRIPT=false - leaving the server's scripts alone."
-          fi
-
-          rm -rf "$STAGE"
-
-          if [ ! -x "$REMOTE_ROOT/deploy-nginx-domains.sh" ]; then
-            echo "::error::$REMOTE_ROOT/deploy-nginx-domains.sh is missing or not executable."
+          if [ ! -w "$ROOT" ]; then
+            echo "::error::$(id -un) cannot write to $ROOT. Fix with:"
+            echo "::error::  sudo chown -R $(id -un):$(id -gn) $ROOT"
             exit 1
           fi
 
+          rm -rf "$ROOT/domains.new" "$ROOT/domains.old"
+          cp -a "$SRC/domains" "$ROOT/domains.new"
+          chmod 755 "$ROOT/domains.new"
+          find "$ROOT/domains.new" -type f -name '*.conf' -exec chmod 644 {} +
+
+          if [ -d "$ROOT/domains" ]; then
+            mv "$ROOT/domains" "$ROOT/domains.old"
+          fi
+          mv "$ROOT/domains.new" "$ROOT/domains"
+          rm -rf "$ROOT/domains.old"
+
+          # The scripts run as root through sudo, so whoever can change them can
+          # run anything as root. By default the repository is the source of
+          # truth for them, which means anyone who can push to this branch has
+          # root here - guarded by branch protection rather than by sudo.
+          #
+          # NGINX_SYNC_SCRIPT=false is the other trade: the scripts stay
+          # root-owned and unwritable by the runner user, sudo genuinely limits
+          # the blast radius, and updating them becomes a manual root action.
+          # README.md section 3 has the digest-pinned sudoers form that makes
+          # that guarantee enforceable.
+          if [ "$SYNC_SCRIPT" = "true" ]; then
+            install -m 0750 "$SRC/deploy-nginx-domains.sh" "$ROOT/deploy-nginx-domains.sh"
+            install -m 0750 "$SRC/setup-ssl.sh"            "$ROOT/setup-ssl.sh"
+            echo "scripts updated from the repository."
+          else
+            echo "NGINX_SYNC_SCRIPT=false - leaving the installed scripts alone."
+            for f in deploy-nginx-domains.sh setup-ssl.sh; do
+              if [ ! -x "$ROOT/$f" ]; then
+                echo "::error::$ROOT/$f is missing or not executable, and"
+                echo "::error::NGINX_SYNC_SCRIPT=false stops this job installing it."
+                echo "::error::Install it once by hand:"
+                echo "::error::  sudo install -o root -g root -m 0755 $SRC/$f $ROOT/$f"
+                exit 1
+              fi
+            done
+          fi
+
           echo "installed:"
-          ls -l "$REMOTE_ROOT/domains"
-          REMOTE
+          ls -l "$ROOT/domains"
 
-      # Runs as the deploy user, not root, and changes nothing. Its only job is
+      # Runs as the runner user, not root, and changes nothing. Its only job is
       # to put the plan - what will be deployed, what will be removed, how many
-      # unmanaged files are being left alone - into the job log BEFORE the
-      # change, so a surprising removal is visible above the thing that did it.
+      # unmanaged files are being left alone - into the log BEFORE the change,
+      # so a surprising removal is visible above the thing that did it.
       - name: Preview what will change
-        run: |
-          set -euo pipefail
-          ssh deploy-target "'$REMOTE_ROOT/deploy-nginx-domains.sh' --dry-run"
+        run: "'${{ env.ROOT }}/deploy-nginx-domains.sh' --dry-run"
 
-      # The real thing. `sudo -n` never prompts: if the sudoers rule is missing
-      # or misspelled this fails immediately with "a password is required"
-      # rather than hanging until the job times out.
+      # `sudo -n` never prompts: a missing or misspelled sudoers rule fails
+      # immediately with "a password is required" rather than hanging until the
+      # job times out.
       #
-      # ssh returns the remote command's exit status, and this step has no
-      # `continue-on-error`, so a non-zero exit from the script - a failed
-      # `nginx -t`, a failed reload, a rollback - fails the job. That is
-      # requirement 7 and it needs no extra plumbing.
+      # A non-zero exit - a failed `nginx -t`, a failed reload, a rollback -
+      # fails the job with no extra plumbing.
       - name: Deploy and reload nginx
-        run: |
-          set -euo pipefail
-          ssh deploy-target "sudo -n '$REMOTE_ROOT/deploy-nginx-domains.sh'"
+        run: sudo -n "$ROOT/deploy-nginx-domains.sh"
 
-      # This step is not optional decoration - without it the deploy above
-      # leaves every domain on plain HTTP.
-      #
       # The .conf files in git describe a domain on port 80 and its proxy, and
-      # nothing else. certbot owns the TLS half: `certbot --nginx` reads the
-      # server block the deploy just wrote, clones it into a 443 block with the
-      # certificate, and turns the port 80 block into a redirect.
+      # nothing else; certbot owns the TLS half and writes the 443 block into
+      # the deployed file.
       #
-      # Which is also why it runs on EVERY push rather than once. The deploy
-      # replaces the deployed file with the one from git, so it strips the 443
-      # block certbot added last time; this step puts it back. That is the
-      # trade for keeping git authoritative about the proxy and certbot
-      # authoritative about TLS - see nginx-domains/README.md section 10.
+      # Which is why this runs on EVERY push rather than once: the deploy above
+      # replaced the deployed file with the one from git, stripping the 443
+      # block certbot added last time. This puts it back. See README.md
+      # section 10.
       #
-      # Cheap to repeat. `--keep-until-expiring` keeps a certificate with more
-      # than 30 days left, so a re-run re-installs the configuration without
-      # asking Let's Encrypt for anything. A domain whose DNS is not pointed
-      # here is detected and skipped BEFORE certbot runs, rather than burning
-      # one of the five failed validations per hour.
-      #
-      # It exits non-zero only on a real certbot failure, which fails the job.
-      # A skipped domain prints a ::warning:: and the job stays green - that is
-      # a DNS record you have not created, not a broken deploy.
+      # Cheap to repeat - `--keep-until-expiring` means a certificate with more
+      # than 30 days left is kept and Let's Encrypt is not contacted. A domain
+      # that is not reachable from outside is detected and skipped with a
+      # ::warning::, and the job stays green: that is a port-forward or a DNS
+      # record you have not created, not a broken deploy.
       - name: Issue or renew certificates
         if: env.AUTO_SSL == 'true'
-        run: |
-          set -euo pipefail
-          ssh deploy-target "sudo -n '$REMOTE_ROOT/setup-ssl.sh'"
+        run: sudo -n "$ROOT/setup-ssl.sh"
 
       - name: Say what is live
         if: success()
@@ -456,13 +361,11 @@ jobs:
             echo "Commit \`${GITHUB_SHA:0:7}\` on \`${GITHUB_REF_NAME}\`."
             echo ''
             echo '```'
-            ssh deploy-target "ls -1 /etc/nginx/conf.d/managed-*.conf 2>/dev/null | xargs -r -n1 basename"
+            for f in /etc/nginx/conf.d/managed-*.conf; do
+              [ -e "$f" ] || continue
+              tls=$(grep -c '^[[:space:]]*listen 443' "$f" || true)
+              printf '%-52s %s\n' "$(basename "$f")" \
+                "$([ "$tls" -gt 0 ] && echo 'https' || echo 'http only')"
+            done
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-
-      # `always`, so the key is gone even when the deploy failed or the job was
-      # cancelled. The runner is discarded either way; this is belt and braces,
-      # and it costs a second.
-      - name: Remove the SSH key
-        if: always()
-        run: rm -rf ~/.ssh

@@ -7,28 +7,34 @@ certificate — or rolls back and fails the build.
 
 ```
 git push origin nginx-domain-live
-  └─ .github/workflows/deploy-nginx-domains.yml
+  └─ GitHub notifies the SELF-HOSTED runner, which IS the server
        │
-       ├─ 1. setup-cloudflare-dns.sh          on the runner
+       ├─ 1. setup-cloudflare-dns.sh
        │       └─ create the A records, or report they already exist
        │
-       ├─ 2. ssh → deploy-nginx-domains.sh    as root, via sudo
+       ├─ 2. sudo deploy-nginx-domains.sh
        │       ├─ back up  /etc/nginx/conf.d/*.conf
        │       ├─ sync     domains/*.conf → conf.d/managed-*.conf
        │       ├─ nginx -t ─ fails → restore backup, no reload, exit 1
        │       └─         ─ passes → systemctl reload nginx
        │
-       └─ 3. ssh → setup-ssl.sh               as root, via sudo
+       └─ 3. sudo setup-ssl.sh
                └─ certbot --nginx: issue, write the 443 block, redirect
 ```
 
 The order matters: a domain cannot get a certificate until it resolves *and*
 answers on port 80, so DNS comes first and TLS comes last.
 
+**There is no SSH.** The job runs on the self-hosted runner — the same one
+every other deploy in this repository uses — which polls GitHub outbound and
+does the work locally. Nothing about this server has to be reachable from the
+internet in order to *deploy*. Being **reached**, and getting a certificate,
+are separate matters: see section 9.
+
 ```text
 repository/
 ├── .github/workflows/
-│   └── deploy-nginx-domains.yml          trigger, SSH, fail the build
+│   └── deploy-nginx-domains.yml          runs on the self-hosted runner
 └── nginx-domains/
     ├── setup-cloudflare-dns.sh           A records, runs on the runner
     ├── deploy-nginx-domains.sh           backup → sync → nginx -t → reload
@@ -91,11 +97,13 @@ The rule is mechanical and needs no state file:
 
 ## 2. One-time server installation
 
-Run once, as a user with sudo. `DEPLOY_USER` is the account GitHub Actions will
-SSH in as — **not root**, and ideally not a person's login either.
+Run once, as a user with sudo. The self-hosted runner must already be installed
+and online on this server - it is the same one your other deploys use.
 
 ```bash
-DEPLOY_USER=deploy        # change to your account name
+# the account the runner executes as; everything below is granted to it
+RUNNER_USER=$(systemctl show 'actions.runner.*' -p User --value | head -1)
+echo "runner user: ${RUNNER_USER:?could not detect - set it by hand}"
 
 # nginx, certbot, and certbot's nginx PLUGIN - a separate package, and the
 # most common thing missing. Without it `certbot --nginx` cannot write the 443
@@ -103,17 +111,17 @@ DEPLOY_USER=deploy        # change to your account name
 sudo apt-get update
 sudo apt-get install -y nginx certbot python3-certbot-nginx curl
 
-# the deploy user, if it does not exist. --disabled-password: it is reached by
-# key only, so there is no password to guess or to leak.
-sudo adduser --disabled-password --gecos "" "$DEPLOY_USER"
+# jq, for the Cloudflare step. Not on a stock Ubuntu server.
+sudo apt-get install -y jq
+
 
 # the directory tree
 sudo mkdir -p /opt/nginx-domains/domains
 sudo mkdir -p /opt/nginx-domains/backup
 
-# owned by the deploy user so CI can write domains/ without sudo; 750 so the
+# owned by the runner user so CI can write domains/ without sudo; 750 so the
 # rest of the machine's accounts cannot read or list it.
-sudo chown -R "$DEPLOY_USER:$DEPLOY_USER" /opt/nginx-domains
+sudo chown -R "$RUNNER_USER:$RUNNER_USER" /opt/nginx-domains
 sudo chmod 750 /opt/nginx-domains
 sudo chmod 750 /opt/nginx-domains/domains
 sudo chmod 700 /opt/nginx-domains/backup
@@ -127,38 +135,44 @@ sudo chmod 700 /opt/nginx-domains/backup
 sudo ufw allow 80/tcp && sudo ufw allow 443/tcp   # if ufw is in use
 ```
 
-### The deploy key
+### The runner user
 
-Generate it on your own machine, **not** on the server, and give the server
-only the public half:
-
-```bash
-ssh-keygen -t ed25519 -C "github-actions nginx deploy" -f ~/.ssh/nginx_deploy -N ""
-```
+There is no deploy key. The self-hosted runner already runs on this server as
+some user — find out which, because that is the account everything below is
+granted to:
 
 ```bash
-# on the server, as the deploy user
-sudo -u "$DEPLOY_USER" mkdir -p "/home/$DEPLOY_USER/.ssh"
-sudo -u "$DEPLOY_USER" chmod 700 "/home/$DEPLOY_USER/.ssh"
-# paste the contents of ~/.ssh/nginx_deploy.pub on one line:
-sudo -u "$DEPLOY_USER" tee -a "/home/$DEPLOY_USER/.ssh/authorized_keys"
-sudo -u "$DEPLOY_USER" chmod 600 "/home/$DEPLOY_USER/.ssh/authorized_keys"
+systemctl show 'actions.runner.*' -p User --value | head -1
+# or, if the runner was set up under a login shell:
+ps -o user= -C Runner.Listener | sort -u
 ```
 
-The **private** half (`~/.ssh/nginx_deploy`, whole file including the
-`BEGIN`/`END` lines) becomes the `NGINX_SERVER_SSH_KEY` secret. It must have no
-passphrase — the workflow has no way to type one.
+Call it `$RUNNER_USER` and give it the deploy directory:
+
+```bash
+sudo chown -R "$RUNNER_USER:$RUNNER_USER" /opt/nginx-domains
+```
+
+It also needs `jq`, which the Cloudflare step uses and a stock Ubuntu server
+does not have:
+
+```bash
+sudo apt-get install -y jq
+```
+
+Everything else it needs comes from the one sudoers rule in section 3.
+
 
 ### Expected permissions
 
 | Path | Owner | Mode | Why |
 | --- | --- | --- | --- |
-| `/opt/nginx-domains` | `deploy:deploy` | `750` | CI writes here without sudo |
-| `/opt/nginx-domains/domains` | `deploy:deploy` | `750` | replaced wholesale on each deploy |
-| `/opt/nginx-domains/domains/*.conf` | `deploy:deploy` | `644` | |
-| `/opt/nginx-domains/deploy-nginx-domains.sh` | `deploy:deploy` | `750` | run as root via sudo |
-| `/opt/nginx-domains/setup-ssl.sh` | `deploy:deploy` | `750` | run as root via sudo |
-| `/opt/nginx-domains/backup` | `deploy:deploy` | `700` | |
+| `/opt/nginx-domains` | runner user | `750` | CI writes here without sudo |
+| `/opt/nginx-domains/domains` | runner user | `750` | replaced wholesale on each deploy |
+| `/opt/nginx-domains/domains/*.conf` | runner user | `644` | |
+| `/opt/nginx-domains/deploy-nginx-domains.sh` | runner user | `750` | run as root via sudo |
+| `/opt/nginx-domains/setup-ssl.sh` | runner user | `750` | run as root via sudo |
+| `/opt/nginx-domains/backup` | runner user | `700` | |
 | `/etc/nginx/conf.d/managed-*.conf` | `root:root` | `644` | nginx reads config as root, then drops privileges; workers must not be able to rewrite it |
 | `/etc/letsencrypt/**` | `root:root` | certbot's own | do not chmod it; certbot manages these and checks them |
 
@@ -174,7 +188,7 @@ ls -l  /etc/nginx/conf.d/
 
 ## 3. Sudoers
 
-The deploy user needs root only to write `/etc/nginx/conf.d` and reload nginx.
+The runner user needs root only to write `/etc/nginx/conf.d` and reload nginx.
 Never give it `ALL=(ALL) NOPASSWD: ALL`.
 
 ```bash
@@ -185,12 +199,13 @@ sudo chmod 440 /etc/sudoers.d/nginx-domains
 ```sudoers
 # /etc/sudoers.d/nginx-domains
 #
-# Lets the CI deploy user publish nginx configuration without a password, and
+# Lets the runner user publish nginx configuration without a password, and
 # nothing else. NOPASSWD is required, not a convenience: the GitHub job runs
 # with no TTY and calls `sudo -n`, so a password prompt is an immediate failure
 # rather than a hang.
 #
-# Replace `deploy` with your deploy user.
+# Replace $RUNNER_USER with the account the self-hosted runner runs as.
+# Find it with: systemctl show 'actions.runner.*' -p User --value
 
 Cmnd_Alias NGINX_DEPLOY = /opt/nginx-domains/deploy-nginx-domains.sh
 Cmnd_Alias NGINX_SSL    = /opt/nginx-domains/setup-ssl.sh
@@ -198,7 +213,7 @@ Cmnd_Alias NGINX_CHECK  = /usr/sbin/nginx -t
 Cmnd_Alias NGINX_RELOAD = /bin/systemctl reload nginx, \
                           /usr/bin/systemctl reload nginx
 
-deploy ALL=(root) NOPASSWD: NGINX_DEPLOY, NGINX_SSL, NGINX_CHECK, NGINX_RELOAD
+$RUNNER_USER ALL=(root) NOPASSWD: NGINX_DEPLOY, NGINX_SSL, NGINX_CHECK, NGINX_RELOAD
 
 # Do not add a wildcard. `/opt/nginx-domains/deploy-nginx-domains.sh *` would
 # let any argument through, and a sudo rule ending in * is a classic way to
@@ -213,7 +228,7 @@ Check the rule parses and is what you meant:
 
 ```bash
 sudo visudo -c -f /etc/sudoers.d/nginx-domains
-sudo -l -U deploy
+sudo -l -U "$RUNNER_USER"
 ```
 
 `NGINX_CHECK` and `NGINX_RELOAD` are not used by the deploy script — it already
@@ -224,15 +239,16 @@ root shell.
 
 By default the workflow also **overwrites the deploy script** on every run.
 Anyone who can push to `nginx-domain-live` can therefore put arbitrary commands
-in it and have the server run them as root. The sudo rule narrows *what command
-runs*; it does not narrow *what that command does*. In practice the deploy key
-is a root key, guarded by GitHub branch protection.
+in them and have the server run them as root. The sudo rule narrows *what
+command runs*; it does not narrow *what that command does*. In practice push
+access to this branch is root on this server, guarded by GitHub branch
+protection rather than by sudo.
 
 To close that gap, set the repository variable `NGINX_SYNC_SCRIPT` to `false`
 and pin the script:
 
 ```bash
-# install the script by hand, root-owned and not writable by the deploy user
+# install the script by hand, root-owned and not writable by the runner user
 sudo install -o root -g root -m 0755 \
   nginx-domains/deploy-nginx-domains.sh /opt/nginx-domains/deploy-nginx-domains.sh
 ```
@@ -257,30 +273,25 @@ trade; pick deliberately.
 
 | Secret | Required | Value |
 | --- | --- | --- |
-| `NGINX_SERVER_HOST` | yes | hostname or IP of the Ubuntu server |
-| `NGINX_SERVER_USER` | yes | the deploy user (not root) |
-| `NGINX_SERVER_SSH_KEY` | yes | the **private** key, whole file, no passphrase |
-| `NGINX_SERVER_PORT` | no | SSH port; defaults to `22` |
-| `NGINX_SERVER_KNOWN_HOSTS` | strongly recommended | output of `ssh-keyscan -p 22 <host>` |
-| `CLOUDFLARE_API_TOKEN` | for DNS | a **scoped** token — Zone / DNS / Edit, one zone |
+| `CLOUDFLARE_API_TOKEN` | for DNS | a **scoped** token: Zone / DNS / Edit, one zone |
 | `CLOUDFLARE_ZONE_ID` | no | looked up from the zone name if absent |
 
-Without `NGINX_SERVER_KNOWN_HOSTS` the runner trusts whatever host answers
-first. The workflow still runs, and prints a warning on every run. Get the
-value from a machine you trust:
+That is the whole list. The job runs **on** the server, so there is nothing to
+authenticate to and no deploy key to manage.
 
-```bash
-ssh-keyscan -p 22 your.server.example.com
-```
-
-**Variables** tab — both optional:
+> **These secrets are no longer used** and can be deleted unless something else
+> in the repository wants them: `NGINX_SERVER_HOST`, `NGINX_SERVER_USER`,
+> `NGINX_SERVER_SSH_KEY`, `NGINX_SERVER_PORT`, `NGINX_SERVER_KNOWN_HOSTS`.
+>
+> An unused deploy key is not harmless — it is a credential nobody rotates and
+> nobody would notice being used.
 
 | Variable | Default | Effect |
 | --- | --- | --- |
-| `NGINX_SYNC_SCRIPT` | `true` | `false` stops CI updating the scripts |
+| `NGINX_SYNC_SCRIPT` | `true` | `false` stops CI updating the two scripts on the server |
 | `NGINX_AUTO_SSL` | `true` | `false` stops CI issuing and renewing certificates |
 | `NGINX_AUTO_DNS` | `true` | `false` stops CI creating Cloudflare records |
-| `NGINX_SERVER_IP` | — | the server's **public IPv4**; required unless `NGINX_AUTO_DNS` is `false`. Also read from the Secrets tab if you put it there, though a variable keeps it readable in the log |
+| `NGINX_SERVER_IP` | *auto-detected* | the public IPv4 the A records point at. **Leave it unset**: the runner asks the internet what this host's public address is, which beats a value typed by hand. Read from either tab |
 | `CLOUDFLARE_ZONE` | `ajtechhub.com` | the zone the token may edit |
 | `NGINX_DOMAINS_ROOT` | `/opt/nginx-domains` | where the system lives |
 
@@ -494,11 +505,16 @@ cat /etc/nginx/conf.d/zz-operator-note.conf     # still there, unchanged
 sudo rm /etc/nginx/conf.d/zz-operator-note.conf
 ```
 
-**Check the SSH path from your own machine** before trusting CI with it:
+**Check the runner user can do what CI will ask of it.** Run this *as the
+runner user*, not as yourself — `sudo -l` answers differently per account, and
+that difference is the whole failure mode:
 
 ```bash
-ssh -i ~/.ssh/nginx_deploy -o BatchMode=yes deploy@your.server \
-  'sudo -n /opt/nginx-domains/deploy-nginx-domains.sh --dry-run'
+sudo -u "$RUNNER_USER" -H bash -c '
+  sudo -n /opt/nginx-domains/deploy-nginx-domains.sh --dry-run &&
+  command -v jq >/dev/null && echo "jq ok" &&
+  test -w /opt/nginx-domains && echo "deploy dir writable"
+'
 ```
 
 ---
@@ -793,10 +809,11 @@ running `setup-ssl.sh`; the script still works by hand.
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| `sudo: a password is required` | sudoers rule missing or the path does not match | `sudo -l -U deploy`; check the path in `/etc/sudoers.d/nginx-domains` is exactly the script's |
-| `Permission denied (publickey)` | public key not in the deploy user's `authorized_keys`, or `~/.ssh` modes wrong | `chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys` |
-| `NGINX_SERVER_SSH_KEY is not a usable private key` | the `BEGIN`/`END` lines or trailing newline were lost on paste, or the `.pub` was pasted | re-paste the whole private key file |
-| `Host key verification failed` | the server was rebuilt, or `NGINX_SERVER_KNOWN_HOSTS` is stale | re-run `ssh-keyscan` and update the secret |
+| `sudo: a password is required` | sudoers rule missing, or the runner user is not the one named in it | `sudo -l -U $RUNNER_USER`; check the paths in `/etc/sudoers.d/nginx-domains` |
+| `cannot write to /opt/nginx-domains` | wrong owner | `sudo chown -R $RUNNER_USER:$RUNNER_USER /opt/nginx-domains` |
+| `jq is not installed on this runner` | stock Ubuntu has no jq | `sudo apt-get install -y jq` |
+| `Could not work out this host's public IPv4` | runner has no outbound internet | fix that first — it also stops Cloudflare and Let's Encrypt working — or set `NGINX_SERVER_IP` |
+| Job never starts, stays queued | the self-hosted runner is offline | `systemctl status 'actions.runner.*'` on the server |
 | `/opt/nginx-domains does not exist` | section 2 was not run | run it |
 | `cannot write to /opt/nginx-domains` | wrong owner | `sudo chown -R deploy:deploy /opt/nginx-domains` |
 | `another deploy is already running` | two pushes overlapped | re-run the job; the lock clears when the first finishes |
