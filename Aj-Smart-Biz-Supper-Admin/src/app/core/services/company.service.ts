@@ -4,6 +4,7 @@ import { ListQuery, PagedResult } from '../models/api.model';
 import {
   Branch,
   Company,
+  CompanyAdmin,
   CompanyCreateResult,
   QuotaView,
   Status,
@@ -117,5 +118,18 @@ export class CompanyService {
 
   removeBranch(companyId: number, branchId: number): Observable<{ id: number }> {
     return this.api.delete<{ id: number }>(`/super-admin/companies/${companyId}/branches/${branchId}`);
+  }
+
+  /* ------------------------------- admins ------------------------------ */
+
+  /**
+   * Edits one of the company's admin logins.
+   *
+   * The same handler the company reaches at `/admin/admins/:id`, addressed here
+   * through the company in the path — so which of the two consoles made the
+   * change is the only difference between them.
+   */
+  updateAdmin(companyId: number, adminId: number, payload: Record<string, unknown>): Observable<CompanyAdmin> {
+    return this.api.put<CompanyAdmin>(`/super-admin/companies/${companyId}/admins/${adminId}`, payload);
   }
 }

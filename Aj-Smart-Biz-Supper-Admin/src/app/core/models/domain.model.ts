@@ -330,6 +330,8 @@ export interface Company extends AuditFields {
   subscriptions?: Subscription[];
   transactions?: Transaction[];
   admins?: CompanyAdmin[];
+  /** The company's own roles, for the admin edit form. */
+  roles?: CompanyRole[];
   activeSubscription?: Subscription | null;
   /** A renewal queued to start when the running term ends. */
   scheduledSubscription?: Subscription | null;
@@ -606,10 +608,27 @@ export interface CompanyAdmin {
   name: string;
   email: string;
   phone?: string | null;
+  /** NULL = every branch of the company. */
+  branchId?: number | null;
+  roleId?: number | null;
   isCompanyAdmin: boolean;
   status: Status;
   lastLoginAt?: string | null;
   role?: Option | null;
+}
+
+/**
+ * A role the company defined, as the detail payload carries it.
+ *
+ * `isSystem` marks the auto-created "Company Admin" role: the main admin has to
+ * keep it and nobody else may be given it, which the API enforces and the edit
+ * form reflects rather than re-decides.
+ */
+export interface CompanyRole {
+  id: number;
+  name: string;
+  isSystem: boolean;
+  status: Status;
 }
 
 /** Returned once when a company is created; carries the generated password. */

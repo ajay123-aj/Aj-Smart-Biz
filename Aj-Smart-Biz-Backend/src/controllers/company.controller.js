@@ -91,7 +91,7 @@ const list = asyncHandler(async (req, res) => {
 const getById = asyncHandler(async (req, res) => {
   const company = await findCompanyOrFail(req.params.id, { include: companyService.companyDetailInclude() });
 
-  const [transactions, admins, totals] = await Promise.all([
+  const [transactions, admins, roles, totals] = await Promise.all([
     db.Transaction.findAll({
       where: { companyId: company.id },
       include: [{ model: db.Plan, as: 'plan', attributes: ['id', 'name'] }],
@@ -100,9 +100,26 @@ const getById = asyncHandler(async (req, res) => {
     }),
     db.Admin.findAll({
       where: { companyId: company.id },
-      attributes: ['id', 'name', 'email', 'phone', 'isCompanyAdmin', 'status', 'lastLoginAt'],
+      // `roleId` and `branchId` are the raw ids the Edit admin form prefills
+      // from; the included `role` is the name the table column renders.
+      attributes: [
+        'id', 'name', 'email', 'phone', 'roleId', 'branchId',
+        'isCompanyAdmin', 'status', 'lastLoginAt',
+      ],
       include: [{ model: db.Role, as: 'role', attributes: ['id', 'name'] }],
       order: [['isCompanyAdmin', 'DESC'], ['id', 'ASC']],
+    }),
+    /**
+     * The roles this company defined, for the Edit admin form's dropdown.
+     *
+     * Read here rather than from a second endpoint because there is no
+     * `/super-admin/companies/:id/roles`, and the detail screen is the only
+     * place the platform console needs them.
+     */
+    db.Role.findAll({
+      where: { companyId: company.id },
+      attributes: ['id', 'name', 'isSystem', 'status'],
+      order: [['isSystem', 'DESC'], ['name', 'ASC']],
     }),
     db.Transaction.findOne({
       where: { companyId: company.id, status: TRANSACTION_STATUS.SUCCESS },
@@ -121,6 +138,7 @@ const getById = asyncHandler(async (req, res) => {
     plain.subscriptions.find((s) => s.status === SUBSCRIPTION_STATUS.PENDING) || null;
   plain.transactions = transactions;
   plain.admins = admins;
+  plain.roles = roles;
   plain.summary = {
     totalBranches: (plain.branches || []).length,
     activeBranches: (plain.branches || []).filter((b) => b.status === STATUS.ACTIVE).length,

@@ -8,10 +8,34 @@ const { success, created, paginated } = require('../utils/response');
 const { getPagination, buildSearch, getSort, mergeWhere } = require('../utils/query');
 const passwordUtil = require('../utils/password');
 const quota = require('../services/quota.service');
-const { STATUS } = require('../constants');
+const { AUTH_SCOPE, STATUS } = require('../constants');
+
+/**
+ * Super admins address a company through the URL; company admins are pinned to
+ * their own tenant by the token, so `:companyId` is ignored for them.
+ *
+ * The same shape `companyDomain.controller` uses, and for the same reason: one
+ * controller serves `/admin/admins` and `/super-admin/companies/:companyId/admins`
+ * without either mount being able to read the other's tenant.
+ */
+const resolveCompanyId = (req) => {
+  if (req.auth?.scope === AUTH_SCOPE.ADMIN) return req.auth.companyId;
+  const companyId = Number(req.params.companyId);
+  if (!Number.isInteger(companyId) || companyId <= 0) throw ApiError.badRequest('A valid companyId is required');
+  return companyId;
+};
+
+/**
+ * Whether this request is the admin editing their own row.
+ *
+ * Scope-checked, not just an id comparison: super admins live in another table
+ * and number from 1 too, so a bare `req.auth.id === admin.id` would refuse a
+ * super admin the moment the two ids happened to match.
+ */
+const isSelf = (req, admin) => req.auth?.scope === AUTH_SCOPE.ADMIN && req.auth.id === admin.id;
 
 const findOrFail = async (req, options = {}) => {
-  const admin = await db.Admin.findOne({ where: { id: req.params.id, companyId: req.auth.companyId }, ...options });
+  const admin = await db.Admin.findOne({ where: { id: req.params.id, companyId: resolveCompanyId(req) }, ...options });
   if (!admin) throw ApiError.notFound('Admin not found');
   return admin;
 };
@@ -24,14 +48,14 @@ const assertAdminQuota = (companyId) => quota.assertCanCreate(companyId, 'admins
 
 /** GET /admins/quota - what the list screen disables its button with. */
 const adminQuota = asyncHandler(async (req, res) => {
-  const data = await quota.getQuota(req.auth.companyId);
+  const data = await quota.getQuota(resolveCompanyId(req));
   return success(res, { message: 'Quota fetched successfully', data });
 });
 
 const list = asyncHandler(async (req, res) => {
   const { page, limit, offset } = getPagination(req.query);
   const where = mergeWhere(
-    { companyId: req.auth.companyId },
+    { companyId: resolveCompanyId(req) },
     req.query.status ? { status: req.query.status } : null,
     req.query.roleId ? { roleId: req.query.roleId } : null,
     req.query.branchId ? { branchId: req.query.branchId } : null,
@@ -64,7 +88,7 @@ const getById = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const companyId = req.auth.companyId;
+  const companyId = resolveCompanyId(req);
   await assertAdminQuota(companyId);
 
   const email = req.body.email.toLowerCase();
@@ -97,7 +121,7 @@ const create = asyncHandler(async (req, res) => {
 
 const update = asyncHandler(async (req, res) => {
   const admin = await findOrFail(req);
-  const companyId = req.auth.companyId;
+  const companyId = resolveCompanyId(req);
 
   if (req.body.email && req.body.email.toLowerCase() !== admin.email) {
     const clash = await db.Admin.findOne({
@@ -127,7 +151,7 @@ const update = asyncHandler(async (req, res) => {
 const toggleStatus = asyncHandler(async (req, res) => {
   const admin = await findOrFail(req);
   if (admin.isCompanyAdmin) throw ApiError.badRequest('The main admin cannot be deactivated');
-  if (admin.id === req.auth.id) throw ApiError.badRequest('You cannot change your own status');
+  if (isSelf(req, admin)) throw ApiError.badRequest('You cannot change your own status');
 
   const next = req.body?.status || (admin.status === STATUS.ACTIVE ? STATUS.INACTIVE : STATUS.ACTIVE);
   await admin.update({ status: next, updatedBy: req.auth.id });
@@ -137,7 +161,7 @@ const toggleStatus = asyncHandler(async (req, res) => {
 const remove = asyncHandler(async (req, res) => {
   const admin = await findOrFail(req);
   if (admin.isCompanyAdmin) throw ApiError.badRequest('The main admin cannot be deleted');
-  if (admin.id === req.auth.id) throw ApiError.badRequest('You cannot delete your own account');
+  if (isSelf(req, admin)) throw ApiError.badRequest('You cannot delete your own account');
 
   await admin.destroy();
   return success(res, { message: 'Admin deleted successfully', data: { id: admin.id } });
@@ -146,7 +170,7 @@ const remove = asyncHandler(async (req, res) => {
 /** PATCH /admins/:id/reset-password */
 const resetPassword = asyncHandler(async (req, res) => {
   const admin = await db.Admin.scope('withPassword').findOne({
-    where: { id: req.params.id, companyId: req.auth.companyId },
+    where: { id: req.params.id, companyId: resolveCompanyId(req) },
   });
   if (!admin) throw ApiError.notFound('Admin not found');
 

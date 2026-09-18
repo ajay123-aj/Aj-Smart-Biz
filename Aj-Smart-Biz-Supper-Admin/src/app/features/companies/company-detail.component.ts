@@ -13,6 +13,7 @@ import { SubscriptionService } from '../../core/services/subscription.service';
 import { ToastService } from '../../core/services/toast.service';
 import { messageOf } from '../../core/interceptors/auth.interceptor';
 import { Branch, Company, Option, Plan, QuotaView, Subscription,
+  CompanyAdmin,
   CompanyInsights,
   PlatformCustomer,
 } from '../../core/models/domain.model';
@@ -139,6 +140,10 @@ export class CompanyDetailComponent {
   readonly paymentModalOpen = signal(false);
   readonly savingPayment = signal(false);
 
+  readonly adminModalOpen = signal(false);
+  readonly editingAdmin = signal<CompanyAdmin | null>(null);
+  readonly savingAdmin = signal(false);
+
   readonly companyId = computed(() => Number(this.id()));
   /** Branches a domain can be pinned to. */
   readonly branchOptions = computed(() =>
@@ -155,6 +160,15 @@ export class CompanyDetailComponent {
     stateId: [null as number | null],
     city: [''],
     pincode: [''],
+    status: ['active'],
+  });
+
+  readonly adminForm = this.fb.nonNullable.group({
+    name: ['', [Validators.required, Validators.minLength(2)]],
+    email: ['', [Validators.required, Validators.email]],
+    phone: [''],
+    roleId: [null as number | null],
+    branchId: [null as number | null],
     status: ['active'],
   });
 
@@ -333,6 +347,81 @@ export class CompanyDetailComponent {
         this.refresh();
       },
       error: (error: HttpErrorResponse) => this.toast.error('Could not delete the branch', messageOf(error)),
+    });
+  }
+
+  /* ------------------------------- admins ------------------------------ */
+
+  /**
+   * The roles this admin may be moved to.
+   *
+   * The company-admin role is a system role: the main admin has to keep it and
+   * nobody else may be given it. Filtering the list here means the dropdown
+   * cannot offer a choice the API would refuse — the rule still lives in the
+   * API, this only stops the operator finding out by being rejected.
+   */
+  readonly assignableRoles = computed(() => {
+    const roles = this.company()?.roles ?? [];
+    const main = this.editingAdmin()?.isCompanyAdmin ?? false;
+    return roles.filter((role) => (main ? role.isSystem : !role.isSystem));
+  });
+
+  /** NULL means the admin is not pinned to one branch. */
+  branchNameOf(branchId: number | null | undefined): string {
+    if (!branchId) return 'All branches';
+    return this.company()?.branches?.find((branch) => branch.id === branchId)?.name ?? '—';
+  }
+
+  openAdminModal(admin: CompanyAdmin): void {
+    this.editingAdmin.set(admin);
+    this.adminForm.reset({
+      name: admin.name ?? '',
+      email: admin.email ?? '',
+      phone: admin.phone ?? '',
+      roleId: admin.roleId ?? null,
+      branchId: admin.branchId ?? null,
+      status: admin.status ?? 'active',
+    });
+
+    // The main admin keeps its role and stays active — the API refuses both
+    // changes, so the fields are shown (they are worth reading) but locked.
+    const controls = this.adminForm.controls;
+    if (admin.isCompanyAdmin) {
+      controls.roleId.disable();
+      controls.status.disable();
+    } else {
+      controls.roleId.enable();
+      controls.status.enable();
+    }
+
+    this.adminModalOpen.set(true);
+  }
+
+  saveAdmin(): void {
+    if (this.adminForm.invalid) {
+      touchAll(this.adminForm);
+      return;
+    }
+
+    const admin = this.editingAdmin();
+    if (!admin) return;
+
+    // `getRawValue` rather than `value`: the locked fields still have to be sent,
+    // and sending what is already stored is a no-op the API accepts.
+    const payload = cleanPayload(this.adminForm.getRawValue() as Record<string, unknown>);
+    this.savingAdmin.set(true);
+
+    this.companies.updateAdmin(this.companyId(), admin.id, payload as Record<string, unknown>).subscribe({
+      next: () => {
+        this.savingAdmin.set(false);
+        this.toast.success('Admin updated');
+        this.adminModalOpen.set(false);
+        this.refresh();
+      },
+      error: (error: HttpErrorResponse) => {
+        this.savingAdmin.set(false);
+        this.toast.error('Could not save the admin', messageOf(error));
+      },
     });
   }
 

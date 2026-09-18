@@ -5,6 +5,7 @@ const controller = require('../controllers/company.controller');
 const branchRoutes = require('./branch.routes');
 const domainRoutes = require('./companyDomain.routes');
 const sliderRoutes = require('./slider.routes');
+const adminRoutes = require('./admin.routes');
 const subscriptionController = require('../controllers/subscription.controller');
 const validate = require('../middlewares/validate');
 const schema = require('../validators/company.validator');
@@ -47,5 +48,15 @@ router.post('/:id/transactions', validate(schema.transactionCreate), controller.
 router.use('/:companyId/branches', branchRoutes);
 router.use('/:companyId/domains', domainRoutes);
 router.use('/:companyId/sliders', sliderRoutes);
+
+/**
+ * The company's admin logins, from the platform console.
+ *
+ * The same router the tenant reaches at `/admin/admins`, so the two consoles
+ * cannot drift on what editing an admin means — the main admin keeps its role,
+ * cannot be deactivated or deleted, and an email stays unique across tenants,
+ * because those rules live in the controller rather than in either UI.
+ */
+router.use('/:companyId/admins', adminRoutes);
 
 module.exports = router;

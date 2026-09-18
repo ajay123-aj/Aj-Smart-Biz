@@ -1,6 +1,17 @@
 'use strict';
 
-const router = require('express').Router();
+/**
+ * Mounted twice: under `/admin/admins` for the company workspace, and under
+ * `/super-admin/companies/:companyId/admins` for the platform console — the
+ * same pairing branches, domains and sliders already use.
+ *
+ * `mergeParams` is what carries `:companyId` through to the controller, which
+ * reads it only for a super-admin token; an admin token is pinned to its own
+ * tenant regardless of what the path says. `requirePermission` lets a super
+ * admin straight through, so the tenant's own menu matrix stays the gate for
+ * the tenant's own staff and nothing more.
+ */
+const router = require('express').Router({ mergeParams: true });
 const controller = require('../controllers/admin.controller');
 const validate = require('../middlewares/validate');
 const schema = require('../validators/identity.validator');
