@@ -17,7 +17,7 @@ import { Branch, Company, Option, Plan, QuotaView, Subscription,
   CompanyInsights,
   PlatformCustomer,
 } from '../../core/models/domain.model';
-import { cleanPayload, formatMoney, initials, touchAll } from '../../shared/utils';
+import { cleanPayload, formatMoney, initials, strongPassword, touchAll } from '../../shared/utils';
 import { DomainManagerComponent } from '../../shared/domain-manager.component';
 import { FieldErrorComponent } from '../../shared/ui/field-error.component';
 import { ModalComponent } from '../../shared/ui/modal.component';
@@ -144,6 +144,9 @@ export class CompanyDetailComponent {
   readonly editingAdmin = signal<CompanyAdmin | null>(null);
   readonly savingAdmin = signal(false);
 
+  readonly passwordTarget = signal<CompanyAdmin | null>(null);
+  readonly resettingPassword = signal(false);
+
   readonly companyId = computed(() => Number(this.id()));
   /** Branches a domain can be pinned to. */
   readonly branchOptions = computed(() =>
@@ -170,6 +173,11 @@ export class CompanyDetailComponent {
     roleId: [null as number | null],
     branchId: [null as number | null],
     status: ['active'],
+  });
+
+  readonly passwordForm = this.fb.nonNullable.group({
+    newPassword: ['', [Validators.required, strongPassword]],
+    mustChangePassword: [true],
   });
 
   readonly planForm = this.fb.nonNullable.group({
@@ -395,6 +403,35 @@ export class CompanyDetailComponent {
     }
 
     this.adminModalOpen.set(true);
+  }
+
+  openPasswordModal(admin: CompanyAdmin): void {
+    this.passwordForm.reset({ newPassword: '', mustChangePassword: true });
+    this.passwordTarget.set(admin);
+  }
+
+  submitPassword(): void {
+    const admin = this.passwordTarget();
+    if (!admin) return;
+    if (this.passwordForm.invalid) {
+      touchAll(this.passwordForm);
+      return;
+    }
+
+    this.resettingPassword.set(true);
+    this.companies.resetAdminPassword(this.companyId(), admin.id, this.passwordForm.getRawValue()).subscribe({
+      next: () => {
+        this.resettingPassword.set(false);
+        // The password is not read back afterwards, so this is the only moment
+        // it exists anywhere outside the operator's own screen.
+        this.toast.success(`Password set for ${admin.name}`, 'Hand it over now — it cannot be read again.');
+        this.passwordTarget.set(null);
+      },
+      error: (error: HttpErrorResponse) => {
+        this.resettingPassword.set(false);
+        this.toast.error('Could not set the password', messageOf(error));
+      },
+    });
   }
 
   saveAdmin(): void {

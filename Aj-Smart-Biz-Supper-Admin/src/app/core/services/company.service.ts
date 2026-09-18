@@ -132,4 +132,25 @@ export class CompanyService {
   updateAdmin(companyId: number, adminId: number, payload: Record<string, unknown>): Observable<CompanyAdmin> {
     return this.api.put<CompanyAdmin>(`/super-admin/companies/${companyId}/admins/${adminId}`, payload);
   }
+
+  /**
+   * Sets a new password on one of the company's admin logins.
+   *
+   * The platform's only way back into a tenant whose admin is locked out: there
+   * is no forgot-password flow, and the company's own reset needs somebody
+   * already signed in to that company.
+   *
+   * `mustChangePassword` decides whether what is set here is a handover
+   * password the admin is made to replace, or their actual new one.
+   */
+  resetAdminPassword(
+    companyId: number,
+    adminId: number,
+    payload: { newPassword: string; mustChangePassword?: boolean }
+  ): Observable<{ id: number }> {
+    return this.api.patch<{ id: number }>(
+      `/super-admin/companies/${companyId}/admins/${adminId}/reset-password`,
+      payload
+    );
+  }
 }

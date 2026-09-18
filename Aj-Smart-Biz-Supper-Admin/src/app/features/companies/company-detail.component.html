@@ -659,6 +659,9 @@
                     <td>
                       <div class="row-end">
                         <button type="button" class="btn btn-sm btn-ghost" (click)="openAdminModal(admin)">Edit</button>
+                        <button type="button" class="btn btn-sm btn-ghost" (click)="openPasswordModal(admin)">
+                          Password
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -818,6 +821,51 @@
         <button type="button" class="btn btn-ghost" (click)="adminModalOpen.set(false)">Cancel</button>
         <button type="submit" form="admin-form" class="btn btn-primary" [disabled]="savingAdmin()">
           {{ savingAdmin() ? 'Saving…' : 'Save changes' }}
+        </button>
+      </ng-container>
+    </app-modal>
+  }
+
+  @if (passwordTarget(); as target) {
+    <app-modal
+      title="Set a new password"
+      [subtitle]="target.name + ' · ' + target.email"
+      size="sm"
+      [closeOnBackdrop]="false"
+      (closed)="passwordTarget.set(null)"
+    >
+      <form [formGroup]="passwordForm" (ngSubmit)="submitPassword()" id="admin-password-form">
+        <div class="field">
+          <label for="anewpass">New password <span class="req">*</span></label>
+          <input
+            id="anewpass"
+            class="input"
+            type="text"
+            formControlName="newPassword"
+            autocomplete="new-password"
+          />
+          <span class="hint">Min 8 characters with an uppercase, a lowercase and a number.</span>
+          <app-field-error [control]="passwordForm.controls.newPassword" label="New password" />
+        </div>
+        <label class="check">
+          <input type="checkbox" formControlName="mustChangePassword" />
+          Make them choose their own password at the next sign-in
+        </label>
+        <p class="tiny muted" style="margin:12px 0 0">
+          Shown in plain text on purpose — it is stored hashed, so this screen is the only place it
+          can be read. Copy it before closing.
+        </p>
+      </form>
+
+      <ng-container footer>
+        <button type="button" class="btn btn-ghost" (click)="passwordTarget.set(null)">Cancel</button>
+        <button
+          type="submit"
+          form="admin-password-form"
+          class="btn btn-primary"
+          [disabled]="resettingPassword()"
+        >
+          {{ resettingPassword() ? 'Saving…' : 'Set password' }}
         </button>
       </ng-container>
     </app-modal>
