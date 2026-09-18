@@ -166,14 +166,39 @@ if [[ ! "$SERVER_IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
   err "It must be the server's public address, not a hostname."
   exit 1
 fi
+# Naming the block rather than only the address, because when SERVER_IP comes
+# from a GitHub secret the address is masked to *** in the log and the operator
+# is left with an error about a value they cannot see. "10.0.0.0/8" is not the
+# secret, and it is the part that tells you what went wrong.
 case "$SERVER_IP" in
-  10.*|127.*|169.254.*|192.168.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*|0.*)
-    err "SERVER_IP is $SERVER_IP, which is a private or loopback address."
-    err "Cloudflare will accept it and nothing on the internet will reach it."
-    err "Use the server's PUBLIC IPv4 - on the server: curl -s ifconfig.me"
-    exit 1
-    ;;
+  10.*)                                  block="10.0.0.0/8 (RFC1918 private)" ;;
+  192.168.*)                             block="192.168.0.0/16 (RFC1918 private)" ;;
+  172.1[6-9].*|172.2[0-9].*|172.3[01].*) block="172.16.0.0/12 (RFC1918 private)" ;;
+  127.*)                                 block="127.0.0.0/8 (loopback)" ;;
+  169.254.*)                             block="169.254.0.0/16 (link-local)" ;;
+  100.6[4-9].*|100.[7-9][0-9].*|100.1[0-1][0-9].*|100.12[0-7].*)
+                                         block="100.64.0.0/10 (carrier-grade NAT)" ;;
+  0.*)                                   block="0.0.0.0/8 (unusable)" ;;
+  *)                                     block="" ;;
 esac
+
+if [ -n "$block" ]; then
+  err "SERVER_IP is in $block, so it is not reachable from the internet."
+  err "Cloudflare will accept the record and nothing outside will ever reach it,"
+  err "and Let's Encrypt will not be able to validate the domain."
+  err ""
+  err "A cloud VM shows its PRIVATE address to commands run on the box - 'ip addr'"
+  err "and 'hostname -I' both report it, which is where this usually comes from."
+  err "Ask the outside world instead, ON THE SERVER:"
+  err ""
+  err "    curl -s ifconfig.me; echo"
+  err ""
+  err "If that prints the same private address, the server is behind NAT and has"
+  err "no public address of its own. Use the public address of whatever fronts it"
+  err "- the router, the load balancer, the elastic IP - and make sure ports 80"
+  err "and 443 are forwarded to this host. Port 80 in particular: certbot needs it."
+  exit 1
+fi
 
 # --------------------------- API helpers --------------------------- #
 #
