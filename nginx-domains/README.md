@@ -280,7 +280,7 @@ ssh-keyscan -p 22 your.server.example.com
 | `NGINX_SYNC_SCRIPT` | `true` | `false` stops CI updating the scripts |
 | `NGINX_AUTO_SSL` | `true` | `false` stops CI issuing and renewing certificates |
 | `NGINX_AUTO_DNS` | `true` | `false` stops CI creating Cloudflare records |
-| `NGINX_SERVER_IP` | — | the server's **public IPv4**; required unless `NGINX_AUTO_DNS` is `false` |
+| `NGINX_SERVER_IP` | — | the server's **public IPv4**; required unless `NGINX_AUTO_DNS` is `false`. Also read from the Secrets tab if you put it there, though a variable keeps it readable in the log |
 | `CLOUDFLARE_ZONE` | `ajtechhub.com` | the zone the token may edit |
 | `NGINX_DOMAINS_ROOT` | `/opt/nginx-domains` | where the system lives |
 
@@ -624,12 +624,17 @@ catastrophe. Never paste either into a chat, an issue, or a commit.
 
 ### The server IP
 
-Set the repository variable `NGINX_SERVER_IP` to the server's **public** IPv4.
-On the server:
+Set `NGINX_SERVER_IP` to the server's **public** IPv4. On the server:
 
 ```bash
 curl -s ifconfig.me; echo
 ```
+
+It is read from the **Variables** tab first and the **Secrets** tab second, so
+either works. Prefer the variable: GitHub masks secret values in logs, so an IP
+set as a secret makes the DNS step print `created A -> ***` — exactly the line
+you want to read when a record looks wrong. A server's public address is in DNS
+by definition and is not a secret.
 
 The script refuses a hostname and refuses a private or loopback address —
 Cloudflare would accept `192.168.x.x` happily and nothing on the internet would

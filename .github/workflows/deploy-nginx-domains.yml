@@ -190,7 +190,13 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ZONE: ${{ vars.CLOUDFLARE_ZONE || 'ajtechhub.com' }}
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          SERVER_IP: ${{ vars.NGINX_SERVER_IP }}
+          # Accepted from either tab. A variable is preferable - GitHub masks
+          # secret values in logs, so an IP set as a secret prints as
+          # "created A -> ***", which is exactly the line you want to read when
+          # a record looks wrong. A server's public IP is in DNS by definition
+          # and is not a secret. But putting it in the wrong tab should not
+          # cost a failed run, so both work.
+          SERVER_IP: ${{ vars.NGINX_SERVER_IP || secrets.NGINX_SERVER_IP }}
           DOMAINS_DIR: nginx-domains/domains
         run: |
           set -euo pipefail
@@ -204,8 +210,15 @@ jobs:
             exit 1
           fi
           if [ -z "${SERVER_IP:-}" ]; then
-            echo "::error::Repository variable NGINX_SERVER_IP is not set - there is no"
-            echo "::error::address to point the records at. It is the server's PUBLIC IPv4."
+            echo "::error::NGINX_SERVER_IP is not set - there is no address to point the"
+            echo "::error::records at. It is the server's PUBLIC IPv4 (on the server:"
+            echo "::error::curl -s ifconfig.me)."
+            echo "::error::"
+            echo "::error::Settings -> Secrets and variables -> Actions. Either tab works;"
+            echo "::error::the Variables tab is preferable, because a value set as a secret"
+            echo "::error::is masked and the DNS log then reads 'created A -> ***'."
+            echo "::error::"
+            echo "::error::Set NGINX_AUTO_DNS to false to skip this step and manage DNS by hand."
             exit 1
           fi
 
