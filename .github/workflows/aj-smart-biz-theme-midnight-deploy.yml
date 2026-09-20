@@ -1,23 +1,23 @@
 # ------------------------------------------------------------------ #
-# aj-smart-biz-technology - build the image and roll it out on the server.
+# aj-smart-biz-theme-midnight - build the image and roll it out on the server.
 #
-# Push to `aj-smart-biz-technology-deploy` and the console is live: the first
+# Push to `aj-smart-biz-theme-midnight-deploy` and the console is live: the first
 # job builds that exact commit and pushes it to Docker Hub, the second replaces
 # the running container with it. Nothing else has to happen first.
 #
 # --------------------- how this differs from -live --------------------- #
 #
-# `aj-smart-biz-technology-live.yml` publishes an image and stops. This file
+# `aj-smart-biz-theme-midnight-live.yml` publishes an image and stops. This file
 # publishes one AND deploys it. Use the live branch to cut an image for
 # somewhere else to pull; use this branch to put it in front of users.
 #
 # The two number their builds SEPARATELY, and the tags say so. `run_number` is
 # per workflow, so both files would otherwise mint a
-# `aj-smart-biz-technology-1.0.7` from different commits, and in a shared
+# `aj-smart-biz-theme-midnight-1.0.7` from different commits, and in a shared
 # repository the second would silently overwrite the first. Hence:
 #
-#   ajtechhub/ajtechhub:aj-smart-biz-technology-deploy-1.0.<run number>
-#   ajtechhub/ajtechhub:aj-smart-biz-technology-deploy   what is live now
+#   ajtechhub/ajtechhub:aj-smart-biz-theme-midnight-deploy-1.0.<run number>
+#   ajtechhub/ajtechhub:aj-smart-biz-theme-midnight-deploy   what is live now
 #
 # ------------------------------ the server ------------------------------ #
 #
@@ -25,14 +25,14 @@
 #
 #   * Docker installed, and the runner's user in the `docker` group - the job
 #     never uses `sudo`, so `docker ps` has to work as that user.
-#   * /opt/aj-smart-biz/technology.env - copied from
-#     deploy/aj-smart-biz-technology/.env in this repository and filled in.
+#   * /opt/aj-smart-biz/theme-midnight.env - copied from
+#     deploy/aj-smart-biz-theme-midnight/.env in this repository and filled in.
 #     Read that file's header before editing it; `--env-file` is not a shell,
 #     and quoting a value there is enough to stop nginx starting.
 #   * Nothing else. The job does not check the repository out on the server. It
 #     pulls an image and starts a container.
 #
-# The site joins the `aj-smart-biz` Docker network, the same one the backend
+# The console joins the `aj-smart-biz` Docker network, the same one the backend
 # deploy creates. That is the whole reason API_ORIGIN can say
 # `http://aj-smart-biz-backend:4000`: Docker resolves a container name on a
 # user-defined network, and does not on the default bridge.
@@ -44,16 +44,16 @@
 #
 # Optional repository variables, each with the default shown:
 #
-#   TECHNOLOGY_ENV_FILE   /opt/aj-smart-biz/technology.env
-#   TECHNOLOGY_HOST_PORT  4700   used only if the env file does not set
+#   THEME_MIDNIGHT_ENV_FILE   /opt/aj-smart-biz/theme-midnight.env
+#   THEME_MIDNIGHT_HOST_PORT  4500   used only if the env file does not set
 #                                  HOST_PORT; the env file wins.
 # ------------------------------------------------------------------ #
 
-name: aj-smart-biz-technology deploy
+name: aj-smart-biz-theme-midnight deploy
 
 on:
   push:
-    branches: [aj-smart-biz-technology-deploy]
+    branches: [aj-smart-biz-theme-midnight-deploy]
   # So a deploy can be re-run without an empty commit - after fixing the env
   # file on the server, or to put the last good build back.
   workflow_dispatch:
@@ -76,7 +76,7 @@ jobs:
 
     env:
       IMAGE: ajtechhub/ajtechhub
-      SERVICE: aj-smart-biz-technology
+      SERVICE: aj-smart-biz-theme-midnight
 
     outputs:
       # The digest, not a tag. Two pushes can race, and only the digest names
@@ -117,8 +117,8 @@ jobs:
             type=raw,value=${{ steps.build_tag.outputs.value }}
             type=raw,value=${{ env.SERVICE }}-deploy
           labels: |
-            org.opencontainers.image.title=Aj Smart Biz Technology
-            org.opencontainers.image.description=Next.js product website for the platform itself
+            org.opencontainers.image.title=Aj Smart Biz Salon (black theme)
+            org.opencontainers.image.description=Next.js salon tenant theme (black)
             org.opencontainers.image.version=${{ steps.build_tag.outputs.value }}
 
       - name: Build and push
@@ -128,16 +128,16 @@ jobs:
           # The app directory, not the repository root: the Dockerfile and its
           # .dockerignore live there, and a root context would ship every other
           # app on the platform into this build.
-          context: ./Aj-Smart-Biz-Technology
-          file: ./Aj-Smart-Biz-Technology/Dockerfile
+          context: ./themes/midnight
+          file: ./themes/midnight/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Shared with the live workflow on purpose: both build the same app
           # from the same Dockerfile, so a deploy reuses the `npm ci` layer the
           # last live build already paid for.
-          cache-from: type=gha,scope=aj-smart-biz-technology
-          cache-to: type=gha,mode=max,scope=aj-smart-biz-technology
+          cache-from: type=gha,scope=aj-smart-biz-theme-midnight
+          cache-to: type=gha,mode=max,scope=aj-smart-biz-theme-midnight
 
       - name: Say what was pushed
         run: |
@@ -174,15 +174,15 @@ jobs:
       IMAGE: ajtechhub/ajtechhub
       DIGEST: ${{ needs.build.outputs.digest }}
       BUILD_TAG: ${{ needs.build.outputs.build_tag }}
-      CONTAINER: aj-smart-biz-technology
-      ENV_FILE: ${{ vars.TECHNOLOGY_ENV_FILE || '/opt/aj-smart-biz/technology.env' }}
+      CONTAINER: aj-smart-biz-theme-midnight
+      ENV_FILE: ${{ vars.THEME_MIDNIGHT_ENV_FILE || '/opt/aj-smart-biz/theme-midnight.env' }}
       # The same private network the backend deploy creates. Joining it is what
       # lets API_ORIGIN name the API by container name.
       NETWORK: aj-smart-biz
       # Fixed, not configurable: nginx inside the image listens on 80. Only the
       # host side of the mapping is a choice, and it is made in the env file.
-      APP_PORT: 4700
-      FALLBACK_HOST_PORT: ${{ vars.TECHNOLOGY_HOST_PORT || '4700' }}
+      APP_PORT: 4500
+      FALLBACK_HOST_PORT: ${{ vars.THEME_MIDNIGHT_HOST_PORT || '4500' }}
 
     steps:
       # Fails in a second, with a sentence that says what to do, rather than
@@ -194,18 +194,15 @@ jobs:
             exit 1
           fi
           if [ ! -r "$ENV_FILE" ]; then
-            echo "::error::$ENV_FILE is missing or unreadable. Copy deploy/aj-smart-biz-technology/.env there, fill it in, and chmod 600 it."
+            echo "::error::$ENV_FILE is missing or unreadable. Copy deploy/aj-smart-biz-theme-midnight/.env there, fill it in, and chmod 600 it."
             exit 1
           fi
-          # API_URL is required now that every word on this site is read from
-          # the API at request time. Unset, the site renders an error instead
-          # of a home page -- there is no content compiled in any more and no
-          # fallback copy, which is deliberate but makes this check the
-          # difference between a fast failure here and a dead marketing site.
           if ! grep -qE '^API_URL=.+' "$ENV_FILE"; then
-            echo "::error::$ENV_FILE does not set API_URL. Every page on this site is read from the API, so it would render an error instead of content. See the header of deploy/aj-smart-biz-technology/.env."
+            echo "::error::$ENV_FILE does not set API_URL. The site would render but could not reach the API, so every visitor would see the service-unavailable page. See the header of deploy/aj-smart-biz-theme-midnight/.env."
             exit 1
           fi
+          # docker --env-file does not strip quotes: a quoted value arrives
+          # with the quote marks still in it, and every API call fails.
           if grep -qE "^API_URL=[\"']" "$ENV_FILE"; then
             echo "::error::API_URL in $ENV_FILE is quoted. docker --env-file takes the value literally, quote marks included. Remove them."
             exit 1
@@ -235,8 +232,8 @@ jobs:
           set -euo pipefail
           # `tail -1` BEFORE stripping whitespace, not after. The other order
           # deletes the newlines first, so a file that sets HOST_PORT twice
-          # collapses into one line and 4700 followed by 9999 is read as the
-          # port 47009999. Then `tr` for the carriage return a file written on
+          # collapses into one line and 4500 followed by 9999 is read as the
+          # port 45009999. Then `tr` for the carriage return a file written on
           # Windows leaves behind.
           PORT=$(sed -n 's/^HOST_PORT=//p' "$ENV_FILE" | tail -1 | tr -d '[:space:]')
           if [ -z "$PORT" ]; then

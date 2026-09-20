@@ -1,0 +1,65 @@
+/*
+ * The footer's social icons.
+ *
+ * Deliberately plain: they take the footer's own colour through
+ * `currentColor`, so this file sets shape and spacing and nothing else. A
+ * template that wants them branded overrides `.icon` and leaves the rest.
+ */
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * 40px, which is above the 24px minimum but below the 44px a primary control
+ * would get: these are secondary links sitting in a dense footer, and a row of
+ * 44px targets there reads as a button bar.
+ */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  /* Inherited, so the icon follows whatever the footer sets. */
+  color: inherit;
+  opacity: 0.75;
+  transition: opacity 0.18s ease, transform 0.18s ease, background-color 0.18s ease;
+}
+
+.icon svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.icon:hover,
+.icon:focus-visible {
+  opacity: 1;
+  transform: translateY(-1px);
+  /* `color-mix` on `currentColor` keeps this working whatever the footer is. */
+  background-color: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+/* The focus ring has to be visible against a footer of any colour. */
+.icon:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon {
+    transition: none;
+  }
+  .icon:hover,
+  .icon:focus-visible {
+    transform: none;
+  }
+}
