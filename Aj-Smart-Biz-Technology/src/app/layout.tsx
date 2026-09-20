@@ -20,6 +20,36 @@ import './globals.css';
  */
 
 /**
+ * Rendered per request, never prerendered at build.
+ *
+ * **Every word on this site comes from the API**, so a build-time prerender
+ * needs the backend reachable from the build container -- which it is not, and
+ * should not have to be: the image is built once in CI and run in environments
+ * that each talk to a different API. Without this the build fails on
+ * `/services` and `/_not-found` with ECONNREFUSED, which is exactly what
+ * happened the first time this shipped.
+ *
+ * It costs nothing that matters. The API response is still cached for
+ * `REVALIDATE_SECONDS` in the data cache, and `getSite` is deduped within a
+ * render, so the difference is only *when* the first render happens -- not how
+ * often the API is asked.
+ *
+ * Declared on the root layout so it covers every route beneath it, including
+ * the `/_not-found` page Next generates itself and which nothing else can
+ * annotate.
+ */
+export const dynamic = 'force-dynamic';
+
+/**
+ * ...but keep the data cache.
+ *
+ * `force-dynamic` otherwise implies no-store for every fetch in the tree, which
+ * would turn the shared `revalidate` on `getSite` into a call to the API on
+ * every single page view.
+ */
+export const fetchCache = 'default-cache';
+
+/**
  * The title and description, from the API rather than from a constant.
  *
  * `generateMetadata` instead of a static `metadata` export because the values
