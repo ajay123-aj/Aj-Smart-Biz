@@ -42,6 +42,7 @@ const FEATURE_SCREENS: Partial<Record<FunctionalityKey, string>> = {
   features_benefits: '/company/features',
   testimonials: '/company/testimonials',
   figures: '/company/figures',
+  social_media: '/company/social',
 };
 
 const SHARE_CHANNELS: { key: ShareChannel; name: string; hint: string }[] = [

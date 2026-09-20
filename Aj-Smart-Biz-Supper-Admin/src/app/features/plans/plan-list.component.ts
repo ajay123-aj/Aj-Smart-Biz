@@ -108,6 +108,7 @@ export class PlanListComponent {
      */
     functionalities: [[] as FunctionalityKey[]],
     isPopular: [false],
+    isPublic: [false],
     sequence: [0],
     status: ['active'],
   });
@@ -135,6 +136,7 @@ export class PlanListComponent {
       features: (row?.features ?? []).join('\n'),
       functionalities: [...(row?.functionalities ?? [])],
       isPopular: row?.isPopular ?? false,
+      isPublic: row?.isPublic ?? false,
       sequence: row?.sequence ?? 0,
       status: row?.status ?? 'active',
     }),

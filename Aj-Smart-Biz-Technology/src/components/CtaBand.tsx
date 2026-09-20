@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Glyph from './Glyph';
-import { CONTACT, CTA } from '@/config/site';
+import { getSite } from '@/lib/api';
 import styles from './CtaBand.module.css';
 
 /**
@@ -14,26 +14,39 @@ import styles from './CtaBand.module.css';
  * people who have read this far would rather call than fill anything in, and
  * making them hunt through the footer for it loses them.
  */
-export default function CtaBand() {
+export default async function CtaBand() {
+  const { content } = await getSite();
+  const cta = content.cta;
+  const contact = content.contact;
+
+  if (!cta?.title) return null;
+
   return (
     <section className="section">
       <div className="container">
         <div className={styles.band}>
           <div className={styles.copy}>
-            <span className="eyebrow">{CTA.eyebrow}</span>
-            <h2 className={styles.title}>{CTA.title}</h2>
-            <p className={styles.body}>{CTA.body}</p>
+            <span className="eyebrow">{cta.eyebrow}</span>
+            <h2 className={styles.title}>{cta.title}</h2>
+            <p className={styles.body}>{cta.body}</p>
           </div>
 
           <div className={styles.actions}>
-            <Link className="btn btn--primary" href={CTA.primary.href}>
-              {CTA.primary.label}
-              <Glyph name="arrow-right" className={styles.icon} />
-            </Link>
-            <a className="btn btn--ghost" href={`tel:${CONTACT.phoneHref}`}>
-              <Glyph name="phone" className={styles.icon} />
-              {CONTACT.phone}
-            </a>
+            {cta.primary?.href ? (
+              <Link className="btn btn--primary" href={cta.primary.href}>
+                {cta.primary.label}
+                <Glyph name="arrow-right" className={styles.icon} />
+              </Link>
+            ) : null}
+
+            {/* Dropped rather than rendered as `tel:` with nothing after it —
+                a button that dials silence is worse than no button. */}
+            {contact?.phoneHref ? (
+              <a className="btn btn--ghost" href={`tel:${contact.phoneHref}`}>
+                <Glyph name="phone" className={styles.icon} />
+                {contact.phone ?? contact.phoneHref}
+              </a>
+            ) : null}
           </div>
         </div>
       </div>

@@ -50,11 +50,33 @@ async function findWarehouse(companyId, id, transaction) {
 async function assertProduct(companyId, productId, transaction) {
   const product = await db.CompanyProduct.findOne({
     where: { id: productId, companyId },
-    attributes: ['id', 'name'],
+    attributes: ['id', 'name', 'trackInventory'],
     transaction,
   });
   if (!product) throw ApiError.badRequest('That product is not one of yours');
   return product;
+}
+
+/**
+ * Counting stock into a warehouse is the statement that this product is
+ * counted. So say so, rather than leaving a switch on another screen between
+ * the tenant and the thing they plainly meant.
+ *
+ * Without this, booking in a thousand units did nothing at all: `trackedLines`
+ * in the stock service only looks at products where `trackInventory` is true,
+ * so an order for an untracked product reserved nothing on confirm, issued
+ * nothing on dispatch, and left the levels exactly as they were. The shelf said
+ * 1000 for ever and nobody could see why.
+ *
+ * Only ever turns it **on**, and only as a side effect of a deliberate
+ * movement. Turning it off stays a decision somebody makes on the product
+ * screen: a tenant who books stock in and then decides not to enforce
+ * availability should not have that undone by the next receipt.
+ */
+async function ensureTracked(product, transaction) {
+  if (product.trackInventory) return false;
+  await product.update({ trackInventory: true }, { transaction });
+  return true;
 }
 
 /* ------------------------------------------------------------------ *
@@ -354,7 +376,9 @@ const updateStockSettings = asyncHandler(async (req, res) => {
 
   const row = await db.sequelize.transaction(async (transaction) => {
     await findWarehouse(companyId, req.body.warehouseId, transaction);
-    await assertProduct(companyId, req.body.productId, transaction);
+    const product = await assertProduct(companyId, req.body.productId, transaction);
+    /* Setting a level is the same statement as a movement. See `ensureTracked`. */
+    await ensureTracked(product, transaction);
 
     const level = await stockService.levelFor(
       companyId,
@@ -409,7 +433,9 @@ const createMovement = asyncHandler(async (req, res) => {
     if (warehouse.status !== STATUS.ACTIVE) {
       throw ApiError.badRequest(`${warehouse.name} is switched off, so nothing can be booked into it`);
     }
-    await assertProduct(companyId, req.body.productId, transaction);
+    const product = await assertProduct(companyId, req.body.productId, transaction);
+    /* Booking stock in means "count this". See `ensureTracked`. */
+    await ensureTracked(product, transaction);
 
     const direction = DIRECTION.get(req.body.reason);
 
@@ -446,7 +472,9 @@ const createTransfer = asyncHandler(async (req, res) => {
     if (to.status !== STATUS.ACTIVE) {
       throw ApiError.badRequest(`${to.name} is switched off, so nothing can be moved into it`);
     }
-    await assertProduct(companyId, req.body.productId, transaction);
+    const product = await assertProduct(companyId, req.body.productId, transaction);
+    /* Moving it between shelves is also a statement that it is counted. */
+    await ensureTracked(product, transaction);
 
     return stockService.transfer(
       {

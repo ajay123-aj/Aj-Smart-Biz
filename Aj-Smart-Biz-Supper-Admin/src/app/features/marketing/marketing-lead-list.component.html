@@ -1,0 +1,245 @@
+<app-page-header
+  title="Website leads"
+  subtitle="Everyone who has visited the Aj Smart Biz Technology site — one row per device, not per page view."
+/>
+
+<!--
+  The counters. `enquired` and the rate next to it are the two that matter:
+  everything else says how busy the site was, those two say whether it worked.
+-->
+@if (summary(); as s) {
+  <div class="stat-row">
+    <div class="stat-card">
+      <span class="stat-label">Leads</span>
+      <span class="stat-value">{{ s.total }}</span>
+      <span class="tiny muted">{{ s.totalVisits }} visits</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Today</span>
+      <span class="stat-value">{{ s.today }}</span>
+      <span class="tiny muted">{{ s.thisWeek }} this week</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Enquired</span>
+      <span class="stat-value">{{ s.enquired }}</span>
+      <span class="tiny muted">sent the demo or contact form</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Conversion</span>
+      <span class="stat-value">{{ s.conversionRate }}%</span>
+      <span class="tiny muted">of leads wrote in</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">New</span>
+      <span class="stat-value">{{ s.stages.new }}</span>
+      <span class="tiny muted">not yet contacted</span>
+    </div>
+  </div>
+}
+
+<div class="card">
+  <div class="card-body">
+    <div class="row-end" style="margin-bottom:12px; gap:8px">
+      <a class="btn btn-ghost" routerLink="/website/analytics">Campaign analysis →</a>
+    </div>
+
+    <form [formGroup]="filters" class="filter-bar" (ngSubmit)="applyFilters()">
+      <input
+        class="input"
+        formControlName="search"
+        placeholder="Search name, email, phone, device, city or campaign"
+      />
+      <select class="select" formControlName="stage">
+        <option value="">Any stage</option>
+        @for (stage of stages; track stage) {
+          <option [value]="stage">{{ stage }}</option>
+        }
+      </select>
+      <select class="select" formControlName="days">
+        <option value="">All time</option>
+        <option value="1">Last 24 hours</option>
+        <option value="7">Last 7 days</option>
+        <option value="30">Last 30 days</option>
+        <option value="90">Last 90 days</option>
+      </select>
+      <label class="check">
+        <input type="checkbox" formControlName="enquiredOnly" />
+        Only those who wrote in
+      </label>
+      <label class="check">
+        <input type="checkbox" formControlName="includeBots" />
+        Include crawlers
+      </label>
+      <button type="submit" class="btn btn-primary">Filter</button>
+      <button type="button" class="btn btn-ghost" (click)="clearFilters()">Clear</button>
+    </form>
+
+    @if (failed()) {
+      <div class="empty-state">
+        <div class="empty-icon">⚠️</div>
+        <h3>Could not load the leads</h3>
+        <p class="muted">The API did not answer. Nothing has been changed.</p>
+        <button type="button" class="btn btn-primary" (click)="load()">Try again</button>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Who</th>
+              <th>Came from</th>
+              <th class="text-right">Visits</th>
+              <th class="text-right">Pages</th>
+              <th>Device</th>
+              <th>Where</th>
+              <th>Last seen</th>
+              <th>Stage</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.id) {
+              <tr>
+                <td>
+                  <span class="strong">{{ whoOf(row) }}</span>
+                  <!-- The join that makes this table worth keeping. -->
+                  @if (row.enquiryId) {
+                    <span class="badge badge-success" style="margin-left:6px">Enquired</span>
+                  }
+                  @if (row.isBot) {
+                    <span class="badge" style="margin-left:6px">Bot</span>
+                  }
+                  <div class="tiny muted">{{ row.deviceId }}</div>
+                </td>
+                <!-- First touch: the campaign that won them, not the last link. -->
+                <td class="tiny muted">{{ campaignOf(row) }}</td>
+                <td class="text-right">{{ row.visitCount }}</td>
+                <td class="text-right muted">{{ row.pageViewCount }}</td>
+                <td class="tiny muted">
+                  {{ row.deviceType }}
+                  @if (row.os || row.browser) {
+                    <div>{{ row.browser }} · {{ row.os }}</div>
+                  }
+                </td>
+                <td class="tiny muted">{{ row.city || row.country || '—' }}</td>
+                <td class="tiny muted nowrap">{{ row.lastSeenAt | date: 'd MMM, h:mm a' }}</td>
+                <td><span [class]="stageClass(row.stage)">{{ row.stage }}</span></td>
+                <td>
+                  <div class="row-end">
+                    <button type="button" class="btn btn-sm btn-primary" (click)="edit(row)">Open</button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <app-table-state
+          [loading]="loading()"
+          [empty]="!loading() && rows().length === 0"
+          icon="📡"
+          title="No traffic recorded yet"
+          message="Anybody who opens the Technology site appears here. Check the site is deployed with API_URL set."
+        />
+      </div>
+
+      <app-pager [meta]="meta()" (pageChange)="load($event)" />
+    }
+  </div>
+</div>
+
+@if (editing(); as row) {
+  <app-modal
+    [title]="whoOf(row)"
+    [subtitle]="'First seen ' + (row.firstSeenAt | date: 'd MMM yyyy') + ' · ' + row.visitCount + ' visit(s)'"
+    size="lg"
+    (closed)="close()"
+  >
+    <!--
+      Read-only. Everything here is what the browser reported, and correcting a
+      campaign would quietly falsify the report that campaign is judged by.
+    -->
+    <dl class="detail-grid">
+      <div>
+        <dt>First touch</dt>
+        <dd>{{ campaignOf(row) }}</dd>
+      </div>
+      <div>
+        <dt>Landed on</dt>
+        <dd class="tiny">{{ row.firstLandingUrl || '—' }}</dd>
+      </div>
+      <div>
+        <dt>Last touch</dt>
+        <dd class="tiny">{{ row.lastReferrerHost || 'Direct' }}</dd>
+      </div>
+      <div>
+        <dt>Device</dt>
+        <dd>{{ row.deviceType }} · {{ row.browser }} · {{ row.os }}</dd>
+      </div>
+      <div>
+        <dt>Where</dt>
+        <dd>{{ row.city || '—' }}{{ row.country ? ', ' + row.country : '' }}</dd>
+      </div>
+      <div>
+        <dt>Activity</dt>
+        <dd>{{ row.visitCount }} visits · {{ row.pageViewCount }} pages</dd>
+      </div>
+    </dl>
+
+    @if (row.enquiry) {
+      <div class="field" style="margin-top:12px">
+        <label>They sent an enquiry</label>
+        <p class="muted" style="margin:0">
+          {{ row.enquiry.kind === 'demo' ? 'Demo request' : 'Contact message' }}
+          @if (row.enquiry.plan) {
+            · interested in {{ row.enquiry.plan }}
+          }
+        </p>
+        @if (row.enquiry.message) {
+          <p class="tiny muted" style="white-space:pre-wrap">{{ row.enquiry.message }}</p>
+        }
+      </div>
+    }
+
+    <form [formGroup]="form" class="form-grid" style="margin-top:12px">
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="stage">Stage</label>
+          <select id="stage" class="select" formControlName="stage">
+            @for (stage of stages; track stage) {
+              <option [value]="stage">{{ stage }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label for="name">Name</label>
+          <input id="name" class="input" formControlName="name" placeholder="Learned on the call" />
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="phone">Phone</label>
+          <input id="phone" class="input" formControlName="phone" />
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" class="input" formControlName="email" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="notes">Notes</label>
+        <textarea id="notes" class="textarea" formControlName="notes" rows="4"></textarea>
+        <span class="hint">Ours. Never shown to anybody outside this console.</span>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="close()">Close</button>
+      <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="save()">
+        {{ saving() ? 'Saving…' : 'Save' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

@@ -1,9 +1,6 @@
 import Link from 'next/link';
 import Glyph from './Glyph';
-import { HERO } from '@/config/site';
-import { BUSINESS_TYPES } from '@/content/business-types';
-import { CAPABILITIES } from '@/content/capabilities';
-import { PLANS } from '@/content/plans';
+import { getSite } from '@/lib/api';
 import { formatMoney, payablePrice } from '@/lib/format';
 import styles from './Hero.module.css';
 
@@ -17,12 +14,15 @@ import styles from './Hero.module.css';
  * and the promise this business makes is about the *running* of it. A frame
  * with four facts in it says the right thing and never goes out of date.
  *
- * The four facts are derived from the content files rather than typed here, so
- * adding a trade or a capability updates the hero without anybody remembering
- * to. The cheapest plan's price is read the same way: there is exactly one
- * place a rupee figure lives, and it is `content/plans.ts`.
+ * The four facts are counted from what the API returns rather than typed here,
+ * so adding a trade or a capability updates the hero without anybody
+ * remembering to. The cheapest plan's price is read the same way: there is no
+ * rupee figure anywhere in this project.
  */
-export default function Hero() {
+export default async function Hero() {
+  const { content, plans, capabilities, businessTypes } = await getSite();
+  const hero = content.hero;
+
   /**
    * The cheapest plan, by what is actually charged.
    *
@@ -31,13 +31,17 @@ export default function Hero() {
    * `Math.min` on an empty array returns `Infinity`, so the list is checked
    * first — a content file emptied by accident should not print "₹∞".
    */
-  const cheapest = PLANS.length ? Math.min(...PLANS.map(payablePrice)) : null;
-  const currency = PLANS[0]?.currency ?? 'INR';
+  const cheapest = plans.length ? Math.min(...plans.map(payablePrice)) : null;
+  const currency = plans[0]?.currency ?? 'INR';
 
   const tiles = [
     { value: '1 day', label: 'to go live' },
-    { value: `${BUSINESS_TYPES.length}+`, label: 'kinds of business' },
-    { value: `${CAPABILITIES.length}`, label: 'features to switch on' },
+    ...(businessTypes.length
+      ? [{ value: `${businessTypes.length}+`, label: 'kinds of business' }]
+      : []),
+    ...(capabilities.length
+      ? [{ value: `${capabilities.length}`, label: 'features to switch on' }]
+      : []),
     ...(cheapest !== null
       ? [{ value: formatMoney(cheapest, currency), label: 'a month, all in' }]
       : []),
@@ -47,7 +51,7 @@ export default function Hero() {
     <section className={styles.hero}>
       <div className={`container ${styles.inner}`}>
         <div className={styles.copy}>
-          <span className="eyebrow">{HERO.eyebrow}</span>
+          <span className="eyebrow">{hero?.eyebrow}</span>
 
           {/*
             One gradient phrase per page, and it is always the payload of the
@@ -55,23 +59,27 @@ export default function Hero() {
             somebody is actually weighing.
           */}
           <h1 className={styles.title}>
-            {HERO.title} <span className="gradient-text">{HERO.titleAccent}</span>
+            {hero?.title} <span className="gradient-text">{hero?.titleAccent}</span>
           </h1>
 
-          <p className={styles.body}>{HERO.body}</p>
+          <p className={styles.body}>{hero?.body}</p>
 
           <div className={styles.actions}>
-            <Link className="btn btn--primary" href={HERO.primaryCta.href}>
-              {HERO.primaryCta.label}
-              <Glyph name="arrow-right" className={styles.btnIcon} />
-            </Link>
-            <Link className="btn btn--ghost" href={HERO.secondaryCta.href}>
-              {HERO.secondaryCta.label}
-            </Link>
+            {hero?.primaryCta?.href ? (
+              <Link className="btn btn--primary" href={hero.primaryCta.href}>
+                {hero.primaryCta.label}
+                <Glyph name="arrow-right" className={styles.btnIcon} />
+              </Link>
+            ) : null}
+            {hero?.secondaryCta?.href ? (
+              <Link className="btn btn--ghost" href={hero.secondaryCta.href}>
+                {hero.secondaryCta.label}
+              </Link>
+            ) : null}
           </div>
 
           <ul className={styles.assurances}>
-            {HERO.assurances.map((line) => (
+            {(hero?.assurances ?? []).map((line) => (
               <li key={line}>
                 <Glyph name="check" className={styles.tick} />
                 <span>{line}</span>

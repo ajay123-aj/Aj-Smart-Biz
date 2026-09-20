@@ -1,24 +1,18 @@
-import { CONTACT, SITE } from '@/config/site';
-
 /**
- * Where a demo request goes.
+ * Composing the message a visitor hands to WhatsApp or their mail app.
  *
- * **It goes to WhatsApp or to email, not to a server.** This project has no API
- * of its own and does not call the platform's: the form composes a message from
- * what was typed and hands it to the visitor's own WhatsApp or mail app, so
- * nothing is stored anywhere and the enquiry lands in an inbox that is already
- * being read.
+ * **The enquiry is posted to the API first** — `POST /website/enquiries`, via
+ * the server action in `app/actions/submit-enquiry.ts` — so there is a record
+ * of who asked and a screen in the super admin console listing them. What is
+ * here is the *second* half: once it is stored, the visitor is still offered
+ * the WhatsApp handoff, because a message in a thread somebody is already
+ * reading gets answered faster than a row in a table somebody has to open.
  *
- * That is a real trade and worth stating plainly. What it buys is a site that
- * works the moment it is deployed, with no endpoint to build, no database row
- * to own, and no table of strangers' phone numbers sitting behind a screen
- * nobody has written yet. What it costs is reporting — there is no list of who
- * enquired and no conversion funnel, because nothing was recorded.
+ * Keeping both is deliberate. If the API is unreachable the form says so and
+ * still offers these links, so an outage costs us the record rather than the
+ * lead.
  *
- * When that reporting is wanted, the change is one function: post this same
- * payload to a public endpoint on `Aj-Smart-Biz-Backend` instead of opening
- * `wa.me`. Everything above this line — the form, its fields, its validation —
- * stays as it is. See the README.
+ * Nothing in this file talks to a server; it only builds `href`s.
  */
 
 /** Why they wrote. Only changes the first line of the message. */
@@ -65,11 +59,16 @@ export const OTHER_BUSINESS_TYPE = '__other__';
  * fields are dropped entirely — a message full of "City: —" is harder to scan
  * than a short one.
  */
-export function composeMessage(kind: EnquiryKind, values: EnquiryPayload): string {
+export function composeMessage(
+  kind: EnquiryKind,
+  values: EnquiryPayload,
+  /** From the API's `site` block. Defaulted so a blank one cannot read "Hi ,". */
+  shortName = 'Aj Smart Biz'
+): string {
   const opening =
     kind === 'demo'
-      ? `Hi ${SITE.shortName}, I would like a free demo for my business.`
-      : `Hi ${SITE.shortName}, I have a question.`;
+      ? `Hi ${shortName}, I would like a free demo for my business.`
+      : `Hi ${shortName}, I have a question.`;
 
   const lines: [string, string][] = [
     ['Name', values.name],
@@ -90,20 +89,37 @@ export function composeMessage(kind: EnquiryKind, values: EnquiryPayload): strin
   return [opening, '', ...details, ...(note ? ['', note] : [])].join('\n');
 }
 
-/** A `wa.me` link carrying the composed message. */
-export function whatsappHref(kind: EnquiryKind, values: EnquiryPayload): string {
-  const text = composeMessage(kind, values);
-  return `https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(text)}`;
+/**
+ * A `wa.me` link carrying the composed message.
+ *
+ * Returns undefined when no WhatsApp number is configured, so the caller can
+ * drop the button rather than render one that opens `wa.me/undefined`.
+ */
+export function whatsappHref(
+  kind: EnquiryKind,
+  values: EnquiryPayload,
+  whatsapp?: string,
+  shortName?: string
+): string | undefined {
+  if (!whatsapp) return undefined;
+  const text = composeMessage(kind, values, shortName);
+  return `https://wa.me/${whatsapp}?text=${encodeURIComponent(text)}`;
 }
 
 /** The same message as a `mailto:`, for anyone without WhatsApp. */
-export function mailtoHref(kind: EnquiryKind, values: EnquiryPayload): string {
+export function mailtoHref(
+  kind: EnquiryKind,
+  values: EnquiryPayload,
+  email?: string,
+  shortName?: string
+): string | undefined {
+  if (!email) return undefined;
   const subject =
     kind === 'demo'
       ? `Demo request${values.businessName.trim() ? ` — ${values.businessName.trim()}` : ''}`
       : 'Website enquiry';
-  const body = composeMessage(kind, values);
-  return `mailto:${CONTACT.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const body = composeMessage(kind, values, shortName);
+  return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 /**

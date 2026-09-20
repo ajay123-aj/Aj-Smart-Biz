@@ -2,8 +2,7 @@ import type { Metadata } from 'next';
 import EnquiryForm from '@/components/EnquiryForm';
 import BusinessTypesSection from '@/components/BusinessTypesSection';
 import Glyph from '@/components/Glyph';
-import { CONTACT, DEMO_PAGE } from '@/config/site';
-import { PLANS } from '@/content/plans';
+import { getSite } from '@/lib/api';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
@@ -17,31 +16,37 @@ export const metadata: Metadata = {
  *
  * `searchParams` carries `?plan=` from a pricing card, so somebody who pressed
  * "Start with Growth" arrives with Growth already chosen. It is checked against
- * `PLANS` rather than trusted — a stale or hand-typed id becomes "not sure yet"
- * rather than putting a plan that does not exist into the message.
- *
- * In Next 15 `searchParams` is a promise, which is why the page is async
- * despite fetching nothing.
+ * the live plan list rather than trusted — a stale or hand-typed id becomes
+ * "not sure yet" rather than putting a plan that does not exist into the
+ * message. That check matters more now that the list is editable: a plan
+ * withdrawn in the console makes every old link fall back instead of naming it.
  */
 export default async function DemoPage({
   searchParams,
 }: {
   searchParams: Promise<{ plan?: string }>;
 }) {
-  const params = await searchParams;
-  const selectedPlan = PLANS.some((plan) => plan.id === params.plan) ? params.plan : undefined;
+  const [params, { content, plans, businessTypes }] = await Promise.all([
+    searchParams,
+    getSite(),
+  ]);
+
+  const page = content.demo_page;
+  const contact = content.contact;
+  const expectations = page?.expectations ?? [];
+  const selectedPlan = plans.some((plan) => plan.id === params.plan) ? params.plan : undefined;
 
   return (
     <>
       <section className={`section ${styles.top}`}>
         <div className={`container ${styles.grid}`}>
           <div className={styles.intro}>
-            <span className="eyebrow">{DEMO_PAGE.eyebrow}</span>
-            <h1 className={styles.title}>{DEMO_PAGE.title}</h1>
-            <p className={styles.lede}>{DEMO_PAGE.lede}</p>
+            <span className="eyebrow">{page?.eyebrow}</span>
+            <h1 className={styles.title}>{page?.title}</h1>
+            <p className={styles.lede}>{page?.lede}</p>
 
             <ol className={styles.expectations}>
-              {DEMO_PAGE.expectations.map((item, index) => (
+              {expectations.map((item, index) => (
                 <li key={item.title}>
                   <span className={styles.step} aria-hidden="true">
                     {index + 1}
@@ -60,30 +65,48 @@ export default async function DemoPage({
             <div className={styles.direct}>
               <p className={styles.directNote}>Would rather just talk?</p>
               <div className={styles.directActions}>
-                <a className="btn btn--ghost" href={`tel:${CONTACT.phoneHref}`}>
-                  <Glyph name="phone" className={styles.directIcon} />
-                  {CONTACT.phone}
-                </a>
-                <a
-                  className="btn btn--ghost"
-                  href={`https://wa.me/${CONTACT.whatsapp}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Glyph name="message-circle" className={styles.directIcon} />
-                  WhatsApp
-                </a>
+                {contact?.phoneHref ? (
+                  <a className="btn btn--ghost" href={`tel:${contact.phoneHref}`}>
+                    <Glyph name="phone" className={styles.directIcon} />
+                    {contact.phone ?? contact.phoneHref}
+                  </a>
+                ) : null}
+                {contact?.whatsapp ? (
+                  <a
+                    className="btn btn--ghost"
+                    href={`https://wa.me/${contact.whatsapp}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Glyph name="message-circle" className={styles.directIcon} />
+                    WhatsApp
+                  </a>
+                ) : null}
               </div>
             </div>
           </div>
 
           <div className={styles.formColumn}>
-            <EnquiryForm kind="demo" selectedPlan={selectedPlan} submitLabel="Request my free demo" />
+            <EnquiryForm
+              kind="demo"
+              selectedPlan={selectedPlan}
+              submitLabel="Request my free demo"
+              businessTypes={businessTypes}
+              plans={plans}
+              whatsapp={contact?.whatsapp}
+              email={contact?.email}
+              shortName={content.site?.shortName}
+              source="/demo"
+            />
           </div>
         </div>
       </section>
 
-      <BusinessTypesSection title={DEMO_PAGE.typesTitle} lede={DEMO_PAGE.typesLede} panel />
+      <BusinessTypesSection
+        title={page?.typesTitle ?? 'Built for any trade'}
+        lede={page?.typesLede}
+        panel
+      />
     </>
   );
 }

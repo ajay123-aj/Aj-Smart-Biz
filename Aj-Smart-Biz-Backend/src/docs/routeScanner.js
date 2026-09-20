@@ -80,6 +80,9 @@ function walk(stack, prefix, out, depth = 0) {
  * `modules/index.js`.
  */
 function moduleOf(path) {
+  if (path.startsWith('/theme')) {
+    return { tag: 'Theme', secured: false };
+  }
   if (path.startsWith('/website')) {
     return { tag: 'Website', secured: false };
   }
@@ -142,7 +145,7 @@ function scanRoutes(router) {
         '_Discovered from the router. See the module for what it does; ' +
         'request shapes come from this endpoint\'s Joi validator._',
       // An empty array is meaningful in OpenAPI: it overrides the global
-      // requirement, which is what makes `/website` and `/auth` open.
+      // requirement, which is what makes `/theme` and `/auth` open.
       security: secured ? [{ bearerAuth: [] }] : [],
       parameters: paramsOf(openApiPath).map((name) => ({
         name,

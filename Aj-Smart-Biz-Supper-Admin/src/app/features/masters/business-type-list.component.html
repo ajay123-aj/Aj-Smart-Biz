@@ -28,6 +28,7 @@
             <tr>
               <th class="sortable" (click)="page.store.toggleSort('name')">Name{{ page.store.sortIcon('name') }}</th>
               <th>Description</th>
+              <th>On website</th>
               <th>Status</th>
               <th class="text-right">Actions</th>
             </tr>
@@ -42,6 +43,9 @@
                   }
                 </td>
                 <td class="muted">{{ row.description || '—' }}</td>
+                <!-- Whether the marketing site's demo form offers this trade.
+                     Off for the broad classification types. -->
+                <td>{{ row.isPublic ? 'Yes' : '—' }}</td>
                 <td><app-status-badge [value]="row.status" /></td>
                 <td>
                   <div class="row-end">
@@ -89,6 +93,17 @@
       <div class="field">
         <label for="description">Description</label>
         <textarea id="description" class="textarea" formControlName="description" placeholder="Shops selling directly to consumers"></textarea>
+      </div>
+      <div class="field">
+        <label class="check">
+          <input type="checkbox" formControlName="isPublic" />
+          Offer this trade on the marketing site
+        </label>
+        <span class="hint">
+          The demo form on the Technology site lists the trades ticked here. Leave it off for the
+          broad types a company is classified by — ticking both puts “Retail” and “Retail shop”
+          next to each other on the public form.
+        </span>
       </div>
       <div class="field">
         <label for="status">Status</label>

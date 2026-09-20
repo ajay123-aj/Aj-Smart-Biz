@@ -39,6 +39,20 @@ module.exports = (sequelize) =>
        */
       functionalities: { type: DataTypes.JSON, allowNull: true },
       isPopular: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+      /**
+       * Whether this plan is advertised on our own marketing site.
+       *
+       * **Defaults to false, and that default is the point.** Most rows in this
+       * table are not a public price list: a plan built for one tenant, a
+       * theme's bundled plan, something somebody made while testing. Those were
+       * never meant to be read by strangers, and a public endpoint that showed
+       * every active plan would put them on the pricing page — which is exactly
+       * what happened before this column existed.
+       *
+       * So the marketing site shows nothing until somebody says it should.
+       * Only `/website/plans` reads this; every console still sees every plan.
+       */
+      isPublic: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
       sequence: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       status: { type: DataTypes.ENUM(...STATUS_VALUES), allowNull: false, defaultValue: STATUS.ACTIVE },
       createdBy: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
@@ -46,6 +60,6 @@ module.exports = (sequelize) =>
     },
     {
       tableName: 'plans',
-      indexes: [{ fields: ['name'] }, { fields: ['status'] }, { fields: ['sequence'] }],
+      indexes: [{ fields: ['name'] }, { fields: ['status'] }, { fields: ['sequence'] }, { fields: ['is_public'] }],
     }
   );

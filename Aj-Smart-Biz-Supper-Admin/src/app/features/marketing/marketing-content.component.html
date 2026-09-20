@@ -1,0 +1,139 @@
+<app-page-header
+  title="Website content"
+  subtitle="Every word on the Aj Smart Biz Technology site. Changes appear within five minutes."
+/>
+
+<div class="card">
+  <div class="card-body">
+    <p class="hint" style="margin-bottom:12px">
+      These thirteen sections are the whole of the marketing site’s writing. The price list is on
+      <strong>Plan Management</strong>, the trades on <strong>Business Types</strong>, and the
+      questions on <strong>Website FAQ</strong>.
+    </p>
+
+    @if (failed()) {
+      <!-- Distinguished from "no rows": one is a state, the other is a failure
+           somebody has to act on. Retry rather than a reload, so filters and
+           scroll position survive. -->
+      <div class="empty-state">
+        <div class="empty-icon">⚠️</div>
+        <h3>Could not load the content</h3>
+        <p class="muted">The API did not answer. Nothing has been changed.</p>
+        <button type="button" class="btn btn-primary" (click)="load()">Try again</button>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Section</th>
+              <th>Where it appears</th>
+              <th>Fields</th>
+              <th>Status</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (section of sections; track section.key) {
+              <tr>
+                <td>
+                  <span class="strong">{{ section.name }}</span>
+                  <div class="tiny muted">{{ section.key }}</div>
+                </td>
+                <td class="muted">{{ section.where }}</td>
+                <td class="tiny muted">
+                  @if (rowFor(section.key); as row) {
+                    <span>{{ fieldCount(row) }} field(s)</span>
+                  } @else {
+                    <!-- No row at all. The site falls back to nothing for this
+                         section, so it simply does not render. -->
+                    <span style="color:var(--warning)">Not written yet</span>
+                  }
+                </td>
+                <td>
+                  @if (rowFor(section.key); as row) {
+                    <app-status-badge [value]="row.status" />
+                  } @else {
+                    <span class="tiny muted">—</span>
+                  }
+                </td>
+                <td>
+                  <div class="row-end">
+                    <button type="button" class="btn btn-sm btn-primary" (click)="open(section)">
+                      Edit
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <app-table-state [loading]="loading()" [empty]="false" />
+      </div>
+    }
+  </div>
+</div>
+
+@if (editing(); as section) {
+  <app-modal
+    [title]="section.name"
+    [subtitle]="section.where"
+    size="lg"
+    [closeOnBackdrop]="false"
+    (closed)="close()"
+  >
+    <form [formGroup]="form" class="form-grid">
+      <div class="field">
+        <label for="label">Label</label>
+        <input id="label" class="input" formControlName="label" placeholder="Home — hero" />
+        <span class="hint">For this screen only. Never shown on the website.</span>
+      </div>
+
+      <div class="field">
+        <label for="payload">Content</label>
+        <textarea
+          id="payload"
+          class="textarea"
+          formControlName="payload"
+          rows="18"
+          spellcheck="false"
+          style="font-family:var(--font-mono, monospace); font-size:13px"
+        ></textarea>
+
+        @if (isValid()) {
+          <span class="hint">
+            Valid. Fields: {{ payloadKeys().join(', ') || 'none — this section would render empty' }}
+          </span>
+        } @else {
+          <!-- Refused rather than saved: an unparseable payload is the one
+               mistake here that the website cannot degrade around. -->
+          <span class="hint" style="color:var(--danger)">Not valid JSON — {{ parseError() }}</span>
+        }
+      </div>
+
+      <div class="field">
+        <label for="status">Status</label>
+        <select id="status" class="select" formControlName="status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <span class="hint">
+          Inactive removes the section from the website without deleting what is written here.
+        </span>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="close()">Cancel</button>
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="!isValid() || saving()"
+        (click)="save()"
+      >
+        {{ saving() ? 'Saving…' : 'Save' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

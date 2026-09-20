@@ -166,6 +166,26 @@ const productFields = {
   offerLabel: Joi.string().trim().allow('', null).max(60),
 
   stockStatus: Joi.string().valid(...PRODUCT_STOCK_VALUES),
+  /**
+   * Whether this product's stock is actually counted.
+   *
+   * **The switch the whole warehouse feature hangs off.** `trackedLines` in the
+   * stock service only looks at products where this is true, so a product with
+   * it off is never reserved on confirm and never issued on dispatch — an order
+   * for it moves through every status leaving the shelf untouched.
+   *
+   * It was missing from this list, and the effect was worse than a missing
+   * field usually is: Joi strips an unknown key, so a body containing only this
+   * one arrived empty and was refused with "value must have at least 1 key".
+   * The column could not be turned on through the API at all, so every product
+   * sat at its `false` default for ever and warehouses counted stock that no
+   * order could ever spend.
+   *
+   * Means nothing unless the `warehouse` functionality is live — see
+   * `availabilityOf` in the stock service, the one place that reads this and
+   * the levels together.
+   */
+  trackInventory: Joi.boolean(),
   ctaLabel: Joi.string().trim().allow('', null).max(40),
   featured: Joi.boolean(),
   /** Whether it can go in a basket at all. See the column for what it is for. */

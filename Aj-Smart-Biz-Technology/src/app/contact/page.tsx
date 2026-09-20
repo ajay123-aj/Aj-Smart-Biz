@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import EnquiryForm from '@/components/EnquiryForm';
 import FaqSection from '@/components/FaqSection';
 import Glyph from '@/components/Glyph';
-import { CONTACT, CONTACT_PAGE } from '@/config/site';
+import { getSite } from '@/lib/api';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
@@ -23,41 +23,57 @@ export const metadata: Metadata = {
  * `kind="contact"` only changes the opening line of the composed message — see
  * `lib/enquiry.ts`.
  */
-export default function ContactPage() {
+export default async function ContactPage() {
+  const { content, businessTypes, plans } = await getSite();
+  const page = content.contact_page;
+  const contact = content.contact;
+
+  /**
+   * Built from what the console holds, and each one dropped where the detail is
+   * blank. A channel card that links to `tel:` with nothing after it looks like
+   * a way to reach us and is not.
+   */
   const channels = [
-    {
+    contact?.whatsapp && {
       icon: 'message-circle',
       label: 'WhatsApp',
-      value: CONTACT.phone,
-      href: `https://wa.me/${CONTACT.whatsapp}`,
+      value: contact.phone ?? 'WhatsApp us',
+      href: `https://wa.me/${contact.whatsapp}`,
       note: 'Fastest. Usually answered within the hour.',
       external: true,
     },
-    {
+    contact?.phoneHref && {
       icon: 'phone',
       label: 'Phone',
-      value: CONTACT.phone,
-      href: `tel:${CONTACT.phoneHref}`,
-      note: CONTACT.hours,
+      value: contact.phone ?? contact.phoneHref,
+      href: `tel:${contact.phoneHref}`,
+      note: contact.hours ?? '',
       external: false,
     },
-    {
+    contact?.email && {
       icon: 'mail',
       label: 'Email',
-      value: CONTACT.email,
-      href: `mailto:${CONTACT.email}`,
+      value: contact.email,
+      href: `mailto:${contact.email}`,
       note: 'Replied to within one working day.',
       external: false,
     },
-  ];
+  ].filter(Boolean) as {
+    icon: string;
+    label: string;
+    value: string;
+    href: string;
+    note: string;
+    external: boolean;
+  }[];
 
   return (
     <>
       <section className={`section ${styles.head}`}>
         <div className="container">
-          <span className="eyebrow">{CONTACT_PAGE.eyebrow}</span>
-          <h1 className={styles.title}>{CONTACT_PAGE.title}</h1>
-          <p className={styles.lede}>{CONTACT_PAGE.lede}</p>
+          <span className="eyebrow">{page?.eyebrow}</span>
+          <h1 className={styles.title}>{page?.title}</h1>
+          <p className={styles.lede}>{page?.lede}</p>
         </div>
       </section>
 
@@ -86,24 +102,35 @@ export default function ContactPage() {
             ))}
           </ul>
 
-          <p className={styles.address}>
-            <Glyph name="map-pin" className={styles.addressIcon} />
-            {CONTACT.addressLine}
-          </p>
+          {contact?.addressLine ? (
+            <p className={styles.address}>
+              <Glyph name="map-pin" className={styles.addressIcon} />
+              {contact.addressLine}
+            </p>
+          ) : null}
         </div>
       </section>
 
       <section className="section">
         <div className={`container ${styles.formWrap}`}>
           <header className="section-head">
-            <h2 className="section-title">{CONTACT_PAGE.formTitle}</h2>
+            <h2 className="section-title">{page?.formTitle}</h2>
             <p className="section-lede">
               Tell us a little about the business and we will come back with a straight answer —
               including &ldquo;this is not what you need&rdquo; where that is the truth.
             </p>
           </header>
 
-          <EnquiryForm kind="contact" submitLabel="Send on WhatsApp" />
+          <EnquiryForm
+            kind="contact"
+            submitLabel="Send"
+            businessTypes={businessTypes}
+            plans={plans}
+            whatsapp={contact?.whatsapp}
+            email={contact?.email}
+            shortName={content.site?.shortName}
+            source="/contact"
+          />
         </div>
       </section>
 

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Glyph from '@/components/Glyph';
 import StepsSection from '@/components/StepsSection';
 import CtaBand from '@/components/CtaBand';
-import { ABOUT_PAGE } from '@/config/site';
+import { getSite } from '@/lib/api';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
@@ -19,25 +19,30 @@ export const metadata: Metadata = {
  * right here is the measure — see `.prose`.
  *
  * There is deliberately **no** band of round numbers ("500+ happy clients").
- * Every number on this site is either a price or something countable from the
- * content files; a customer count is neither, and a page about being honest
+ * Every number on this site is either a price or something countable from what
+ * the API returns; a customer count is neither, and a page about being honest
  * with people is the last place to put a figure nobody counted.
  */
-export default function AboutPage() {
+export default async function AboutPage() {
+  const { content } = await getSite();
+  const page = content.about_page;
+  const body = page?.body ?? [];
+  const values = page?.values ?? [];
+
   return (
     <>
       <section className={`section ${styles.head}`}>
         <div className="container">
-          <span className="eyebrow">{ABOUT_PAGE.eyebrow}</span>
-          <h1 className={styles.title}>{ABOUT_PAGE.title}</h1>
-          <p className={styles.lede}>{ABOUT_PAGE.lede}</p>
+          <span className="eyebrow">{page?.eyebrow}</span>
+          <h1 className={styles.title}>{page?.title}</h1>
+          <p className={styles.lede}>{page?.lede}</p>
         </div>
       </section>
 
       <section className={styles.bodySection}>
         <div className="container">
           <div className={styles.prose}>
-            {ABOUT_PAGE.body.map((paragraph) => (
+            {body.map((paragraph) => (
               <p key={paragraph}>{paragraph}</p>
             ))}
           </div>
@@ -47,15 +52,17 @@ export default function AboutPage() {
       <section className="section section--panel">
         <div className="container">
           <header className="section-head">
-            <h2 className="section-title">{ABOUT_PAGE.valuesTitle}</h2>
+            <h2 className="section-title">{page?.valuesTitle}</h2>
           </header>
 
           <ul className={styles.values}>
-            {ABOUT_PAGE.values.map((value) => (
+            {values.map((value) => (
               <li key={value.title} className={styles.value}>
-                <span className={styles.valueIcon} aria-hidden="true">
-                  <Glyph name={value.icon} />
-                </span>
+                {value.icon ? (
+                  <span className={styles.valueIcon} aria-hidden="true">
+                    <Glyph name={value.icon} />
+                  </span>
+                ) : null}
                 <div>
                   <h3 className={styles.valueTitle}>{value.title}</h3>
                   <p className={styles.valueBody}>{value.body}</p>

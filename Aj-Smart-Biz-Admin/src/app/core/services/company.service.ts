@@ -253,7 +253,9 @@ export class CompanyService {
    * tenant adds, edits, reorders and deletes — so they share one client rather
    * than four near-identical ones.
    */
-  cards<T>(path: 'stats' | 'team' | 'gallery' | 'features' | 'services' | 'testimonials'): CardClient<T> {
+  cards<T>(
+    path: 'stats' | 'team' | 'gallery' | 'features' | 'services' | 'testimonials' | 'social-links'
+  ): CardClient<T> {
     return new CardClient<T>(this.api, `/admin/company/${path}`);
   }
 

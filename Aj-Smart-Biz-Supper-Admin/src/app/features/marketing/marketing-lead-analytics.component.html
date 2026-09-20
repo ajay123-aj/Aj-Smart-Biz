@@ -1,0 +1,159 @@
+<app-page-header
+  title="Campaign analysis"
+  subtitle="Where traffic to the Technology site came from, and which campaigns produced enquiries."
+/>
+
+<div class="card">
+  <div class="card-body">
+    <form [formGroup]="filters" class="filter-bar" (ngSubmit)="load()">
+      <select class="select" formControlName="days">
+        <option value="7">Last 7 days</option>
+        <option value="30">Last 30 days</option>
+        <option value="90">Last 90 days</option>
+        <option value="365">Last year</option>
+      </select>
+      <select class="select" formControlName="limit">
+        <option value="5">Top 5</option>
+        <option value="10">Top 10</option>
+        <option value="25">Top 25</option>
+      </select>
+      <label class="check">
+        <input type="checkbox" formControlName="includeBots" />
+        Include crawlers
+      </label>
+      <button type="submit" class="btn btn-primary">Apply</button>
+      <a class="btn btn-ghost" routerLink="/website/leads">← All leads</a>
+    </form>
+  </div>
+</div>
+
+@if (failed()) {
+  <div class="card">
+    <div class="card-body">
+      <div class="empty-state">
+        <div class="empty-icon">⚠️</div>
+        <h3>Could not load the report</h3>
+        <p class="muted">The API did not answer.</p>
+        <button type="button" class="btn btn-primary" (click)="load()">Try again</button>
+      </div>
+    </div>
+  </div>
+} @else if (data(); as a) {
+  <div class="stat-row">
+    <div class="stat-card">
+      <span class="stat-label">Leads</span>
+      <span class="stat-value">{{ a.totals.leads }}</span>
+      <span class="tiny muted">unique devices</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Visits</span>
+      <span class="stat-value">{{ a.totals.visits }}</span>
+      <span class="tiny muted">sessions, not page views</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Enquiries</span>
+      <span class="stat-value">{{ a.totals.enquiries }}</span>
+      <span class="tiny muted">demo or contact form</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Conversion</span>
+      <span class="stat-value">{{ a.totals.conversionRate }}%</span>
+      <span class="tiny muted">of leads wrote in</span>
+    </div>
+  </div>
+
+  <!--
+    The two panels that answer different questions. Side by side deliberately:
+    a campaign that brings the most traffic and the fewest enquiries is the one
+    thing on this page worth acting on, and it is only visible as a comparison.
+  -->
+  <div class="grid grid-2">
+    <app-lead-breakdown
+      title="Campaigns by traffic"
+      hint="utm_campaign · first touch"
+      [rows]="a.utm.campaign"
+      emptyText="No campaign tags seen in this period. Traffic with no utm_* is counted as Direct."
+    />
+    <app-lead-breakdown
+      title="Campaigns by enquiries"
+      hint="who actually wrote in"
+      [rows]="a.campaignEnquiries"
+      emptyText="No enquiries from a tagged campaign in this period."
+    />
+  </div>
+
+  <div class="grid grid-2">
+    <app-lead-breakdown title="Sources" hint="utm_source" [rows]="a.utm.source" />
+    <app-lead-breakdown title="Mediums" hint="utm_medium" [rows]="a.utm.medium" />
+  </div>
+
+  <div class="grid grid-2">
+    <app-lead-breakdown
+      title="Ad content"
+      hint="utm_content — which creative"
+      [rows]="a.utm.content"
+      emptyText="No utm_content on any visit in this period."
+    />
+    <app-lead-breakdown
+      title="Keywords"
+      hint="utm_term — what they searched"
+      [rows]="a.utm.term"
+      emptyText="No utm_term on any visit in this period."
+    />
+  </div>
+
+  <div class="grid grid-2">
+    <app-lead-breakdown
+      title="Referrers"
+      hint="where the click came from"
+      [rows]="a.referrers"
+      emptyText="Nothing referred traffic in this period."
+    />
+    <app-lead-breakdown
+      title="Landing pages"
+      hint="the first page they opened"
+      [rows]="a.landingPages"
+    />
+  </div>
+
+  <div class="grid grid-2">
+    <app-lead-breakdown title="Cities" [rows]="a.geo.cities" />
+    <app-lead-breakdown title="Countries" [rows]="a.geo.countries" />
+  </div>
+
+  <div class="grid grid-2">
+    <app-lead-breakdown title="Browsers" [rows]="a.tech.browsers" />
+    <app-lead-breakdown title="Operating systems" [rows]="a.tech.os" />
+  </div>
+
+  <section class="card">
+    <div class="card-head">
+      <h3 class="card-title">Leads per day</h3>
+      <span class="tiny muted" style="margin-left:auto">by the day each lead was last seen</span>
+    </div>
+    <div class="card-body">
+      @if (!a.daily.length) {
+        <p class="muted mb-0 tiny">No traffic in this period.</p>
+      } @else {
+        <div class="trend">
+          @for (day of a.daily; track day.day) {
+            <div class="trend-col" [title]="day.day + ' · ' + day.total">
+              <!-- Scaled against the busiest day, not the total. See `peakDay`. -->
+              <div class="trend-bar" [style.height.%]="barHeight(day.total)"></div>
+            </div>
+          }
+        </div>
+        <div class="trend-axis">
+          <span class="tiny muted">{{ a.daily[0].day }}</span>
+          <span class="tiny muted">{{ a.daily[a.daily.length - 1].day }}</span>
+        </div>
+      }
+    </div>
+  </section>
+} @else if (loading()) {
+  <div class="card">
+    <div class="card-body">
+      <p class="muted mb-0">Loading…</p>
+    </div>
+  </div>
+}

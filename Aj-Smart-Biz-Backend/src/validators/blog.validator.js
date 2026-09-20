@@ -120,7 +120,7 @@ const listQueryAdmin = {
  * ------------------------------------------------------------------ */
 
 /**
- * `GET /website/blog`, which a stranger calls.
+ * `GET /theme/blog`, which a stranger calls.
  *
  * Its own schema rather than the console's, and narrower in every direction:
  * there is no `state` (only published posts exist out there), no `branchId` (the
@@ -142,7 +142,7 @@ const publicList = {
   }),
 };
 
-/** `GET /website/blog/:slug`. */
+/** `GET /theme/blog/:slug`. */
 const publicOne = {
   params: Joi.object({ slug: Joi.string().trim().min(1).max(SLUG_MAX).required() }),
   query: Joi.object({ domain: Joi.string().trim().max(255) }),

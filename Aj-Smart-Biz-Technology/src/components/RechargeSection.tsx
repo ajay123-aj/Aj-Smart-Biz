@@ -1,4 +1,4 @@
-import { RECHARGE } from '@/config/site';
+import { getSite } from '@/lib/api';
 import styles from './RechargeSection.module.css';
 
 /**
@@ -9,18 +9,24 @@ import styles from './RechargeSection.module.css';
  * section earlier already use icons; reusing them here would make two different
  * things look like one pattern.
  */
-export default function RechargeSection() {
+export default async function RechargeSection() {
+  const { content } = await getSite();
+  const recharge = content.recharge;
+  const points = recharge?.points ?? [];
+
+  if (!points.length) return null;
+
   return (
     <section className="section" id="recharge">
       <div className="container">
         <header className="section-head">
-          <span className="eyebrow">{RECHARGE.eyebrow}</span>
-          <h2 className="section-title">{RECHARGE.title}</h2>
-          <p className="section-lede">{RECHARGE.lede}</p>
+          <span className="eyebrow">{recharge?.eyebrow}</span>
+          <h2 className="section-title">{recharge?.title}</h2>
+          <p className="section-lede">{recharge?.lede}</p>
         </header>
 
         <ol className={styles.list}>
-          {RECHARGE.points.map((point, index) => (
+          {points.map((point, index) => (
             <li key={point.title} className={styles.point}>
               <span className={styles.number} aria-hidden="true">
                 {index + 1}

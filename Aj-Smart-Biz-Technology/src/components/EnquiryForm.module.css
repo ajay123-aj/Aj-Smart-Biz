@@ -143,3 +143,143 @@ select.input {
     flex: 1 1 100%;
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Sent
+ * ------------------------------------------------------------------ */
+
+/*
+ * The confirmation card, which *replaces* the form rather than sitting under
+ * it — see the note in `EnquiryForm.tsx`.
+ *
+ * Centred, because there is nothing to fill in any more and a left edge only
+ * matters when the eye has to run down a column of fields. The list inside is
+ * the exception and stays left-aligned: those are sentences, and centred prose
+ * is read a line at a time.
+ */
+.done {
+  text-align: center;
+  align-items: center;
+}
+
+/* The tick. A ring rather than a filled circle, so it reads as confirmation
+   rather than as a button somebody still has to press. */
+.doneMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  margin-bottom: 0.25rem;
+  border-radius: 50%;
+  color: var(--accent, #7c5cff);
+  background: color-mix(in srgb, var(--accent, #7c5cff) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #7c5cff) 35%, transparent);
+}
+
+.doneMark svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.doneTitle {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.doneLede {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--muted, rgba(255, 255, 255, 0.66));
+}
+
+/* What happens next. Left-aligned inside a centred card, and `fit-content`
+   plus auto margins is what keeps the block itself centred while its text is
+   not. */
+.doneList {
+  list-style: none;
+  margin: 0.5rem auto 0;
+  padding: 0;
+  width: fit-content;
+  max-width: 100%;
+  text-align: left;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.doneList li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.925rem;
+  color: var(--muted, rgba(255, 255, 255, 0.72));
+}
+
+.doneTick {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-top: 0.15rem;
+  color: var(--accent, #7c5cff);
+}
+
+.doneNudge {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted, rgba(255, 255, 255, 0.66));
+}
+
+/* A link, not a button: it undoes something rather than doing something, and
+   giving it a button's weight would compete with the two above it. */
+.againLink {
+  margin-top: 0.25rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--muted, rgba(255, 255, 255, 0.66));
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.againLink:hover {
+  color: inherit;
+}
+
+/* ------------------------------------------------------------------ *
+ * Failed
+ * ------------------------------------------------------------------ */
+
+/*
+ * Kept inside the form, under the button, because the form is still there and
+ * still the thing to retry. Tinted rather than shouted: the enquiry is
+ * recoverable in two other ways, both of which are right here.
+ */
+.failed {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--danger, #ff6b6b) 35%, transparent);
+  background: color-mix(in srgb, var(--danger, #ff6b6b) 10%, transparent);
+}
+
+.failedTitle {
+  margin: 0 0 0.35rem;
+  font-weight: 600;
+}
+
+/* Focused programmatically, not by tabbing, so the default ring would appear
+   unprompted and read as an error. The card itself is the affordance. */
+.doneTitle:focus {
+  outline: none;
+}
+
+.doneTitle:focus-visible {
+  outline: 2px solid var(--accent, #7c5cff);
+  outline-offset: 4px;
+  border-radius: 4px;
+}

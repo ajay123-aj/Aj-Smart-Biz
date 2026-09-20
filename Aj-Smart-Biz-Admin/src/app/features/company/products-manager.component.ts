@@ -242,6 +242,20 @@ export class ProductsManagerComponent {
      * whatever this says — the API folds the two together.
      */
     orderable: [true],
+    /**
+     * Whether this product's stock is actually counted.
+     *
+     * Off by default, and that is the honest default: a product nobody has
+     * counted reads as zero everywhere, and a catalogue that silently went to
+     * "out of stock" the day the warehouse feature was switched on would be
+     * worse than one that ignores it.
+     *
+     * Only does anything while **Warehouse & stock** is live. With it on, the
+     * order flow reserves this product on confirm and takes it off the shelf on
+     * dispatch; with it off, an order moves through every status and the shelf
+     * never changes.
+     */
+    trackInventory: [false],
     status: ['active'],
   });
 
@@ -621,6 +635,7 @@ export class ProductsManagerComponent {
          this one is not for sale, and treating it as "never set" would put it
          back on the counter every time somebody opened the product. */
       orderable: row?.orderable ?? true,
+      trackInventory: row?.trackInventory ?? false,
       status: row?.status ?? 'active',
     });
 
@@ -681,6 +696,7 @@ export class ProductsManagerComponent {
       ctaLabel: raw.ctaLabel || null,
       featured: raw.featured,
       orderable: raw.orderable,
+      trackInventory: raw.trackInventory,
       status: raw.status,
     };
 

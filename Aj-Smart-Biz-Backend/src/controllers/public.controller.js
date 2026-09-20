@@ -527,7 +527,7 @@ const submitTestimonial = asyncHandler(async (req, res) => {
  * ------------------------------------------------------------------ */
 
 /**
- * POST /website/service-leads
+ * POST /theme/service-leads
  *
  * Somebody asking a tenant to ring them back about one of its services. The
  * second route on the platform that lets an unauthenticated stranger create a
@@ -615,7 +615,7 @@ async function resolveServiceTenant(req) {
 }
 
 /**
- * GET /website/services/:slug/slots
+ * GET /theme/services/:slug/slots
  *
  * One day of a service's diary, and the next few days that have anything free.
  *
@@ -894,7 +894,7 @@ const submitServiceLead = asyncHandler(async (req, res) => {
  * ------------------------------------------------------------------ */
 
 /**
- * POST /website/orders
+ * POST /theme/orders
  *
  * A cart, from a stranger, turned into an order.
  *
@@ -1154,7 +1154,7 @@ async function resolveBlogTenant(req) {
 }
 
 /**
- * GET /website/blog
+ * GET /theme/blog
  *
  * The archive, a page at a time.
  *
@@ -1214,7 +1214,7 @@ const blogList = asyncHandler(async (req, res) => {
 });
 
 /**
- * GET /website/blog/:slug
+ * GET /theme/blog/:slug
  *
  * One article, whole, with the two beside it.
  *

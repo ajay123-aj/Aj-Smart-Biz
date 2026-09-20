@@ -16,6 +16,7 @@ const {
   FUNCTIONALITY_VALUES,
   FUNCTIONALITY_CATALOGUE,
   WHATSAPP_TYPE_CATALOGUE,
+  SOCIAL_PLATFORM_CATALOGUE,
   WHATSAPP_FALLBACK_TYPE,
   SHARE_CHANNEL_VALUES,
   SHARE_LINK_DEFAULTS,
@@ -1586,7 +1587,7 @@ const publicCategory = (row, extra = {}) => ({
  *  - `home` — the counts the home page's three bands actually render, so the
  *    template does not have to know where to slice
  *
- * One payload rather than four endpoints because `/website/company-details` is
+ * One payload rather than four endpoints because `/theme/company-details` is
  * already one request that returns the whole site, and a catalogue this size —
  * one small business's range — costs less to send whole than four round trips
  * cost to make.
@@ -1863,7 +1864,7 @@ async function blogScoped(companyId, branchId, { limit = null, offset = 0, where
  * sending all of them with every render would make the home page pay for the
  * archive forever. So the band gets what the band shows, `total` says how much
  * more there is, and the archive asks for the rest a page at a time from
- * `GET /website/blog`.
+ * `GET /theme/blog`.
  */
 async function publicBlog(companyId, branchId, settings) {
   const { rows, count } = await blogScoped(companyId, branchId, { limit: BLOG_HOME_LIMIT });
@@ -2054,6 +2055,7 @@ async function publicFeatures(companyId, branchId = null) {
     orders: null,
     customers: null,
     blog: null,
+    social: null,
   };
   if (!activeKeys.length) return features;
 
@@ -2080,6 +2082,37 @@ async function publicFeatures(companyId, branchId = null) {
       });
 
       features.whatsapp = { numbers, byType, primary: fallback };
+    }
+  }
+
+  /**
+   * The footer's social icons.
+   *
+   * Omitted entirely rather than sent empty when there is nothing to show: the
+   * templates render the row on presence, so `null` is what keeps a footer from
+   * carrying an empty strip of nothing. A company that has the feature but has
+   * added no links yet is exactly that case.
+   *
+   * `platform` reaches the site as-is and the template maps it to a glyph, so a
+   * platform the template has never heard of falls back to its generic link
+   * icon rather than rendering blank.
+   */
+  if (activeKeys.includes(FUNCTIONALITY.SOCIAL_MEDIA)) {
+    const rows = await db.CompanySocialLink.findAll({
+      where: { companyId, status: STATUS.ACTIVE },
+      order: [['sequence', 'ASC'], ['id', 'ASC']],
+    });
+
+    if (rows.length) {
+      features.social = {
+        links: rows.map((row) => ({
+          id: row.id,
+          platform: row.platform,
+          url: row.url,
+          /** The accessible name. Falls back to the platform's own name. */
+          label: row.label || SOCIAL_PLATFORM_CATALOGUE.find((p) => p.key === row.platform)?.name || row.platform,
+        })),
+      };
     }
   }
 

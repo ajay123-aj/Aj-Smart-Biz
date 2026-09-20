@@ -109,6 +109,12 @@ router.delete('/theme', ...websiteSettingsGuard, validate(schema.themeQuery), co
 
 router.use('/functionalities', ...websiteSettingsGuard, functionalityRoutes.functionalities);
 router.use('/whatsapp-numbers', ...websiteSettingsGuard, functionalityRoutes.whatsapp);
+/**
+ * The social profiles in the footer. Behind the same guard as the WhatsApp
+ * numbers: both publish a company's contact details to the open internet, so
+ * both are the main admin's to change.
+ */
+router.use('/social-links', ...websiteSettingsGuard, functionalityRoutes.socialLinks);
 /** The About copy, the figures, the Team section and the Gallery — same guard, same reason. */
 router.use('/about', ...websiteSettingsGuard, functionalityRoutes.about);
 router.use('/contact', ...websiteSettingsGuard, functionalityRoutes.contact);

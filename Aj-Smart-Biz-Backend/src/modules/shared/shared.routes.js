@@ -12,7 +12,7 @@
  * console has to know about.
  *
  * So these keep flat, unprefixed paths, and the module boundary means what it
- * says: everything under `/admin`, `/super-admin` and `/website` is that
+ * says: everything under `/admin`, `/super-admin` and `/theme` is that
  * consumer's alone.
  *
  * Authorisation still differs inside them — `/masters` is readable by anyone

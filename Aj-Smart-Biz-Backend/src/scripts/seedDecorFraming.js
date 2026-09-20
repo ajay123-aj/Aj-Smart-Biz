@@ -5,7 +5,7 @@
  *
  *     npm run db:seed:decor
  *
- * The company that the `themes/commercial/decor-framing` template was built
+ * The company that the `themes/atelier` template was built
  * against. Everything that template renders arrives from the API, so everything
  * that template renders has to exist as **rows**: the shop itself, its plan, its
  * domain, its framing services, its wall-art shelf, its people, its reviews and
@@ -1780,7 +1780,7 @@ async function seedBlog(companyId, created) {
       logger.info('Every content section is live on this tenant’s website.');
     }
 
-    logger.info('Serve it: cd themes/commercial/decor-framing && npm run dev  →  http://localhost:4600');
+    logger.info('Serve it: cd themes/atelier && npm run dev  →  http://localhost:4600');
     logger.info(`The site resolves this tenant from TENANT_DOMAIN=${DOMAIN} in its .env.local`);
 
     process.exit(0);

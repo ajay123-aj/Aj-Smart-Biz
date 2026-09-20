@@ -35,6 +35,8 @@ const warehouseValidator = require('../validators/warehouse.validator');
 const subscriptionValidator = require('../validators/subscription.validator');
 const planRequestValidator = require('../validators/planRequest.validator');
 const masterValidator = require('../validators/master.validator');
+const marketingValidator = require('../validators/marketing.validator');
+const leadValidator = require('../validators/lead.validator');
 
 /**
  * Every validator worth naming in the spec, as `SchemaName -> Joi object`.
@@ -53,8 +55,23 @@ const SCHEMA_SOURCES = {
   RefreshToken: pick(authValidator.refresh),
   ChangePassword: pick(authValidator.changePassword),
 
-  /* ------------------------------ website ----------------------------- */
+  /* ------------------------------- theme ------------------------------ */
   TestimonialSubmission: pick(functionalityValidator.testimonialSubmit),
+
+  /* ------------------------------ website ----------------------------- */
+  MarketingEnquiryCreate: pick(marketingValidator.enquiryCreate),
+  MarketingContentUpsert: pick(marketingValidator.contentUpsert),
+  MarketingFaqCreate: pick(marketingValidator.faqCreate),
+  MarketingFaqUpdate: pick(marketingValidator.faqUpdate),
+  MarketingEnquiryUpdate: pick(marketingValidator.enquiryUpdate),
+  /**
+   * The tracking beacon, shared by `/theme/leads` and `/website/track`.
+   *
+   * One schema because it is literally one schema — `marketingLead.validator`
+   * re-exports this rather than declaring a second copy, since the payload a
+   * marketing page sends and the payload a tenant's page sends are the same.
+   */
+  LeadTrack: pick(leadValidator.track),
 
   /* ------------------------------- admin ------------------------------ */
   CompanySelfUpdate: pick(companyValidator.companyUpdateSelf),
@@ -180,6 +197,87 @@ const ENVELOPES = {
       limit: { type: 'integer', example: 20 },
     },
   },
+
+  /* ------------------------------------------------------------------ *
+   * What the marketing site reads
+   * ------------------------------------------------------------------ */
+
+  /**
+   * These four are hand-written for the same reason as the envelopes above:
+   * they describe what goes *out*, and nothing validates a response. They are
+   * the mapped shapes from `marketing.controller`, not the table columns — a
+   * `plans` row carries entitlement fields a pricing card has no business
+   * showing, and the mapper is what decides which ones reach the page.
+   */
+  WebsitePlan: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        example: 'starter',
+        description: "The plan's `code`, not its primary key — it appears in `/demo?plan=`.",
+      },
+      name: { type: 'string', example: 'Starter' },
+      tagline: { type: 'string', example: 'One business, one website, live tomorrow.' },
+      price: { type: 'number', example: 499 },
+      discountPrice: {
+        type: 'number',
+        nullable: true,
+        description: 'Absent unless the plan is discounted; the card then shows the saving.',
+      },
+      currency: { type: 'string', example: 'INR' },
+      billingCycle: { type: 'string', example: 'monthly' },
+      limits: {
+        type: 'object',
+        properties: {
+          branches: { type: 'integer', example: 1 },
+          logins: { type: 'integer', example: 1 },
+          storageMb: { type: 'integer', example: 1024, description: 'Rendered as GB above 1024.' },
+        },
+      },
+      highlights: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Prose, ticked on the card.',
+      },
+      includes: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          'Capability keys from `GET /website/capabilities`. The site drops one it does not recognise.',
+      },
+      isPopular: { type: 'boolean', example: false },
+    },
+  },
+  WebsiteCapability: {
+    type: 'object',
+    properties: {
+      key: { type: 'string', example: 'whatsapp' },
+      name: { type: 'string', example: 'WhatsApp' },
+      icon: { type: 'string', nullable: true, example: 'message-circle' },
+      summary: { type: 'string', example: 'WhatsApp buttons on the public website, per enquiry type.' },
+      description: { type: 'string' },
+      sequence: { type: 'integer', example: 1 },
+    },
+  },
+  WebsiteBusinessType: {
+    type: 'object',
+    properties: {
+      id: { type: 'integer', example: 3 },
+      name: { type: 'string', example: 'Salon' },
+      slug: { type: 'string', nullable: true, example: 'salon' },
+      icon: { type: 'string', nullable: true },
+      description: { type: 'string', nullable: true },
+    },
+  },
+  WebsiteFaq: {
+    type: 'object',
+    properties: {
+      id: { type: 'integer', example: 2 },
+      question: { type: 'string', example: 'What happens if I stop the recharge?' },
+      answer: { type: 'string' },
+    },
+  },
 };
 
 const definition = {
@@ -188,12 +286,13 @@ const definition = {
     title: 'Aj Smart Biz API',
     version: '1.0.0',
     description: [
-      'One API, three consumers. Every route lives under the prefix of the consumer it belongs to,',
+      'One API, four consumers. Every route lives under the prefix of the consumer it belongs to,',
       'so a client needs its base URL and its own prefix and nothing else.',
       '',
       '| Prefix | Consumer | Auth |',
       '| --- | --- | --- |',
-      '| `/website` | A tenant\'s public website | None. The tenant is resolved from the request host. |',
+      '| `/theme` | A tenant\'s public website | None. The tenant is resolved from the request host. |',
+      '| `/website` | Our own marketing site | None. One site, not scoped to any tenant. |',
       '| `/admin` | The company workspace | Admin token. Every query is scoped to the token\'s company. |',
       '| `/super-admin` | The platform console | Super-admin token. Not scoped to any tenant. |',
       '',
@@ -209,7 +308,8 @@ const definition = {
   ],
   tags: [
     { name: 'Shared', description: 'Health, signing in, master data and uploads — used by every consumer.' },
-    { name: 'Website', description: 'What a tenant\'s public site consumes. Unauthenticated; the host names the tenant.' },
+    { name: "Theme", description: "What a tenant's public site consumes. Unauthenticated; the host names the tenant." },
+    { name: 'Website', description: 'What the Aj Smart Biz Technology marketing site consumes. Unauthenticated, and the same for every caller — there is no tenant.' },
     { name: 'Admin', description: 'The company workspace. Scoped to the signed-in admin\'s own tenant.' },
     { name: 'Super Admin', description: 'The platform console. Spans every tenant.' },
   ],
@@ -248,7 +348,7 @@ const definition = {
       },
     },
   },
-  /** Everything needs a token unless it says otherwise — `/website` and `/auth` do. */
+  /** Everything needs a token unless it says otherwise — `/theme` and `/auth` do. */
   security: [{ bearerAuth: [] }],
 };
 

@@ -3,7 +3,7 @@ import PlansSection from '@/components/PlansSection';
 import RechargeSection from '@/components/RechargeSection';
 import FaqSection from '@/components/FaqSection';
 import CtaBand from '@/components/CtaBand';
-import { PLANS_PAGE } from '@/config/site';
+import { getSite } from '@/lib/api';
 import styles from '../services/page.module.css';
 
 export const metadata: Metadata = {
@@ -23,18 +23,21 @@ export const metadata: Metadata = {
  * `PlansSection` is given no heading here — the page's own `h1` is already
  * both, and repeating it would put "Plans / Plans" down the page.
  */
-export default function PlansPage() {
+export default async function PlansPage() {
+  const { content } = await getSite();
+  const page = content.plans_page;
+
   return (
     <>
       <section className={`section ${styles.head}`}>
         <div className="container">
-          <span className="eyebrow">{PLANS_PAGE.eyebrow}</span>
-          <h1 className={styles.title}>{PLANS_PAGE.title}</h1>
-          <p className={styles.lede}>{PLANS_PAGE.lede}</p>
+          <span className="eyebrow">{page?.eyebrow}</span>
+          <h1 className={styles.title}>{page?.title}</h1>
+          <p className={styles.lede}>{page?.lede}</p>
         </div>
       </section>
 
-      <PlansSection footnote={PLANS_PAGE.footnote} />
+      <PlansSection footnote={page?.footnote} />
 
       <RechargeSection />
 

@@ -3,7 +3,7 @@ import Glyph from '@/components/Glyph';
 import CapabilitiesSection from '@/components/CapabilitiesSection';
 import RechargeSection from '@/components/RechargeSection';
 import CtaBand from '@/components/CtaBand';
-import { SERVICES_PAGE } from '@/config/site';
+import { getSite } from '@/lib/api';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
@@ -24,29 +24,36 @@ export const metadata: Metadata = {
  * day" and no plan can leave it out — so they come first, because they are true
  * of every visitor whatever they end up buying.
  */
-export default function ServicesPage() {
+export default async function ServicesPage() {
+  const { content } = await getSite();
+  const page = content.services_page;
+  const always = page?.always ?? [];
+
   return (
     <>
       <section className={`section ${styles.head}`}>
         <div className="container">
-          <span className="eyebrow">{SERVICES_PAGE.eyebrow}</span>
-          <h1 className={styles.title}>{SERVICES_PAGE.title}</h1>
-          <p className={styles.lede}>{SERVICES_PAGE.lede}</p>
+          <span className="eyebrow">{page?.eyebrow}</span>
+          <h1 className={styles.title}>{page?.title}</h1>
+          <p className={styles.lede}>{page?.lede}</p>
         </div>
       </section>
 
+      {always.length ? (
       <section className="section section--panel">
         <div className="container">
           <header className="section-head">
-            <h2 className="section-title">{SERVICES_PAGE.alwaysTitle}</h2>
+            <h2 className="section-title">{page?.alwaysTitle}</h2>
           </header>
 
           <ul className={styles.always}>
-            {SERVICES_PAGE.always.map((item) => (
+            {always.map((item) => (
               <li key={item.title} className={styles.alwaysItem}>
-                <span className={styles.alwaysIcon} aria-hidden="true">
-                  <Glyph name={item.icon} />
-                </span>
+                {item.icon ? (
+                  <span className={styles.alwaysIcon} aria-hidden="true">
+                    <Glyph name={item.icon} />
+                  </span>
+                ) : null}
                 <div>
                   <h3 className={styles.alwaysTitle}>{item.title}</h3>
                   <p className={styles.alwaysBody}>{item.body}</p>
@@ -56,10 +63,11 @@ export default function ServicesPage() {
           </ul>
         </div>
       </section>
+      ) : null}
 
       <CapabilitiesSection
-        title={SERVICES_PAGE.capabilitiesTitle}
-        lede={SERVICES_PAGE.capabilitiesLede}
+        title={page?.capabilitiesTitle ?? 'The building blocks'}
+        lede={page?.capabilitiesLede}
         detailed
       />
 

@@ -1,0 +1,196 @@
+<app-page-header
+  title="Website enquiries"
+  subtitle="People who asked us to build them a website, newest first."
+/>
+
+<div class="card">
+  <div class="card-body">
+    <!-- Everything on a row is a stranger's typing. Worth saying once, here,
+         rather than in a tooltip nobody opens. -->
+    <p class="hint" style="margin-bottom:12px">
+      These are enquiries about <strong>our</strong> platform — not a tenant’s leads. Nothing on a
+      row is verified: it is whatever was typed into the form.
+    </p>
+
+    <form [formGroup]="filters" class="filter-bar" (ngSubmit)="applyFilters()">
+      <input
+        class="input"
+        formControlName="search"
+        placeholder="Search name, business, phone, email or city"
+      />
+      <select class="select" formControlName="kind">
+        <option value="">Any form</option>
+        <option value="demo">Demo request</option>
+        <option value="contact">Contact message</option>
+      </select>
+      <select class="select" formControlName="status">
+        <option value="">Any status</option>
+        @for (option of statuses; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
+      <button type="submit" class="btn btn-primary">Filter</button>
+      <button type="button" class="btn btn-ghost" (click)="clearFilters()">Clear</button>
+    </form>
+
+    @if (failed()) {
+      <div class="empty-state">
+        <div class="empty-icon">⚠️</div>
+        <h3>Could not load the enquiries</h3>
+        <p class="muted">The API did not answer. Nothing has been changed.</p>
+        <button type="button" class="btn btn-primary" (click)="load()">Try again</button>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Who</th>
+              <th>Contact</th>
+              <th>Trade</th>
+              <th>Plan</th>
+              <th>Form</th>
+              <th>Received</th>
+              <th>Status</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.id) {
+              <tr>
+                <td>
+                  <span class="strong">{{ row.name }}</span>
+                  @if (row.businessName) {
+                    <div class="tiny muted">{{ row.businessName }}</div>
+                  }
+                </td>
+                <td class="tiny">
+                  {{ contactOf(row) }}
+                  @if (row.city) {
+                    <div class="muted">{{ row.city }}</div>
+                  }
+                </td>
+                <!-- Free text, so it may be a trade we do not have a tile for.
+                     Those are the useful ones. -->
+                <td class="tiny muted">{{ row.businessType || '—' }}</td>
+                <td class="tiny muted">{{ row.plan || 'Undecided' }}</td>
+                <td class="tiny muted">{{ row.kind === 'demo' ? 'Demo' : 'Contact' }}</td>
+                <td class="tiny muted nowrap">{{ row.createdAt | date: 'd MMM, h:mm a' }}</td>
+                <td><span [class]="statusClass(row.status)">{{ row.status }}</span></td>
+                <td>
+                  <div class="row-end">
+                    <button type="button" class="btn btn-sm btn-primary" (click)="view(row)">
+                      Open
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <app-table-state
+          [loading]="loading()"
+          [empty]="!loading() && rows().length === 0"
+          icon="📨"
+          title="No enquiries yet"
+          message="Anything sent from the demo or contact form on the Technology site lands here."
+        />
+      </div>
+
+      <app-pager [meta]="meta()" (pageChange)="load($event)" />
+    }
+  </div>
+</div>
+
+@if (viewing(); as row) {
+  <app-modal
+    [title]="row.name"
+    [subtitle]="(row.kind === 'demo' ? 'Demo request' : 'Contact message') + ' · ' + (row.createdAt | date: 'd MMM yyyy, h:mm a')"
+    size="lg"
+    (closed)="close()"
+  >
+    <!-- Read-only: what they typed stays as they typed it. Editing it here
+         would turn a message into a record that reads as if they had said
+         something they did not. -->
+    <dl class="detail-grid">
+      <div>
+        <dt>Business</dt>
+        <dd>{{ row.businessName || '—' }}</dd>
+      </div>
+      <div>
+        <dt>Phone</dt>
+        <dd>
+          @if (row.phone) {
+            <a [href]="'tel:' + row.phone">{{ row.phone }}</a>
+          } @else {
+            —
+          }
+        </dd>
+      </div>
+      <div>
+        <dt>Email</dt>
+        <dd>
+          @if (row.email) {
+            <a [href]="'mailto:' + row.email">{{ row.email }}</a>
+          } @else {
+            —
+          }
+        </dd>
+      </div>
+      <div>
+        <dt>City</dt>
+        <dd>{{ row.city || '—' }}</dd>
+      </div>
+      <div>
+        <dt>Trade</dt>
+        <dd>{{ row.businessType || '—' }}</dd>
+      </div>
+      <div>
+        <dt>Plan</dt>
+        <dd>{{ row.plan || 'Undecided' }}</dd>
+      </div>
+      <div>
+        <dt>Came from</dt>
+        <dd>{{ row.source || '—' }}</dd>
+      </div>
+    </dl>
+
+    @if (row.message) {
+      <div class="field" style="margin-top:12px">
+        <label>Their message</label>
+        <p class="muted" style="white-space:pre-wrap">{{ row.message }}</p>
+      </div>
+    }
+
+    <form [formGroup]="form" class="form-grid" style="margin-top:12px">
+      <div class="field">
+        <label for="status">Status</label>
+        <select id="status" class="select" formControlName="status">
+          @for (option of statuses; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="note">Your note</label>
+        <textarea
+          id="note"
+          class="textarea"
+          formControlName="note"
+          rows="4"
+          placeholder="Called back — wants two branches, sending photos on Monday."
+        ></textarea>
+        <span class="hint">Ours, not theirs. Never shown to the person who wrote in.</span>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="close()">Close</button>
+      <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="save()">
+        {{ saving() ? 'Saving…' : 'Save' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

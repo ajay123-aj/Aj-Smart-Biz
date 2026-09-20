@@ -1,0 +1,132 @@
+<app-page-header
+  title="Website FAQ"
+  subtitle="The questions on the Aj Smart Biz Technology site, in the order they appear."
+/>
+
+<div class="card">
+  <div class="card-body">
+    <div class="row-end" style="margin-bottom:12px">
+      <button type="button" class="btn btn-primary" (click)="open()">Add question</button>
+    </div>
+
+    @if (failed()) {
+      <div class="empty-state">
+        <div class="empty-icon">⚠️</div>
+        <h3>Could not load the questions</h3>
+        <p class="muted">The API did not answer. Nothing has been changed.</p>
+        <button type="button" class="btn btn-primary" (click)="load()">Try again</button>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:70px">Order</th>
+              <th>Question</th>
+              <th>Answer</th>
+              <th>Status</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.id) {
+              <tr>
+                <td class="muted">{{ row.sequence }}</td>
+                <td><span class="strong">{{ row.question }}</span></td>
+                <!-- Truncated: an answer is a paragraph, and the whole point of
+                     the list is scanning which question is which. -->
+                <td class="tiny muted">
+                  {{ row.answer.length > 120 ? (row.answer | slice: 0 : 120) + '…' : row.answer }}
+                </td>
+                <td>
+                  <label
+                    class="switch"
+                    [title]="row.status === 'active' ? 'Hide from the website' : 'Show on the website'"
+                  >
+                    <input
+                      type="checkbox"
+                      [checked]="row.status === 'active'"
+                      (change)="toggleStatus(row)"
+                    />
+                    <span class="slider"></span>
+                  </label>
+                  <app-status-badge [value]="row.status" />
+                </td>
+                <td>
+                  <div class="row-end">
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="open(row)">Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" (click)="remove(row)">
+                      Remove
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <app-table-state
+          [loading]="loading()"
+          [empty]="!loading() && rows().length === 0"
+          icon="❓"
+          title="No questions yet"
+          message="The FAQ section is hidden from the website until there is at least one."
+        />
+      </div>
+    }
+  </div>
+</div>
+
+@if (editing()) {
+  <app-modal
+    [title]="isNew ? 'Add question' : 'Edit question'"
+    size="lg"
+    [closeOnBackdrop]="false"
+    (closed)="close()"
+  >
+    <form [formGroup]="form" class="form-grid">
+      <div class="field">
+        <label for="question">Question</label>
+        <input
+          id="question"
+          class="input"
+          formControlName="question"
+          placeholder="What happens if I stop the recharge?"
+        />
+        <app-field-error [control]="form.controls.question" label="Question" />
+      </div>
+
+      <div class="field">
+        <label for="answer">Answer</label>
+        <textarea id="answer" class="textarea" formControlName="answer" rows="8"></textarea>
+        <app-field-error [control]="form.controls.answer" label="Answer" />
+      </div>
+
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="sequence">Order</label>
+          <input id="sequence" class="input" type="number" formControlName="sequence" min="0" />
+          <span class="hint">
+            Low to high. Numbered in tens so a question can be slipped between two others without
+            renumbering the rest.
+          </span>
+        </div>
+        <div class="field">
+          <label for="status">Status</label>
+          <select id="status" class="select" formControlName="status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <span class="hint">Inactive hides it from the website but keeps it here.</span>
+        </div>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="close()">Cancel</button>
+      <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="save()">
+        {{ saving() ? 'Saving…' : 'Save' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Glyph from './Glyph';
-import { BUSINESS_TYPES } from '@/content/business-types';
-import { PLANS } from '@/content/plans';
+import { submitEnquiryAction } from '@/app/actions/submit-enquiry';
+import { deviceId } from '@/lib/tracking';
+import type { BusinessType, Plan } from '@/lib/api';
 import {
   EMPTY_ENQUIRY,
   OTHER_BUSINESS_TYPE,
@@ -19,27 +20,41 @@ import styles from './EnquiryForm.module.css';
  * The demo request, and the contact message — one component, because they are
  * the same form with a different opening line.
  *
- * **Nothing is posted anywhere.** On submit it composes a message from what was
- * typed and hands it to the visitor's own WhatsApp or mail app; see
- * `lib/enquiry.ts`, which explains the trade and what changes when this should
- * start hitting an API instead.
+ * **It posts to the API, then offers WhatsApp.** Submitting stores the enquiry
+ * through `POST /website/enquiries`, so there is a record and a screen in the
+ * super admin console listing it; the composed WhatsApp and email links are
+ * then shown on the confirmation, because a message in a thread somebody is
+ * already reading gets answered faster than a row in a table.
  *
- * Two consequences worth knowing while reading this file:
+ * **A failed send still shows those links.** The worst outcome here is a person
+ * who wanted a website and could not tell us, so an API that is down costs us
+ * the record rather than the lead.
  *
- *   - There is no pending state and no server error to render. The two buttons
- *     are links in disguise, so the only state is what has been typed.
- *   - Nothing is sent until the visitor presses a button, and what is sent is
- *     visible to them first, in an app they already trust.
+ * The lists and the contact details are props rather than imports: this is a
+ * client component and cannot call `getSite` itself.
  */
 export default function EnquiryForm({
   kind = 'demo',
   /** Pre-selected from `/demo?plan=`, when they came from a pricing card. */
   selectedPlan,
-  submitLabel = 'Send on WhatsApp',
+  submitLabel = 'Send',
+  businessTypes,
+  plans,
+  whatsapp,
+  email,
+  shortName,
+  /** Which page this was on, stored with the enquiry. */
+  source,
 }: {
   kind?: EnquiryKind;
   selectedPlan?: string;
   submitLabel?: string;
+  businessTypes: BusinessType[];
+  plans: Plan[];
+  whatsapp?: string;
+  email?: string;
+  shortName?: string;
+  source?: string;
 }) {
   /**
    * One state object rather than nine `useState` calls.
@@ -50,8 +65,32 @@ export default function EnquiryForm({
    */
   const [values, setValues] = useState<EnquiryPayload>(() => ({
     ...EMPTY_ENQUIRY,
-    plan: PLANS.find((plan) => plan.id === selectedPlan)?.name ?? '',
+    plan: plans.find((plan) => plan.id === selectedPlan)?.name ?? '',
   }));
+
+  /**
+   * idle -> sending -> sent, or -> failed.
+   *
+   * `failed` is not a dead end: it renders the same handoff links as `sent`,
+   * with an honest line above them. See the note at the top.
+   */
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+  const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Moves focus to the confirmation once it replaces the form.
+   *
+   * `role="status"` alone is not enough here. A live region announces changes
+   * *within* itself; this one is inserted into the document already populated,
+   * which several screen readers skip entirely. Focusing the heading is the
+   * reliable half — it also puts a keyboard user at the top of the new card
+   * rather than wherever the submit button used to be, which is now gone.
+   */
+  const doneRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    if (status === 'sent') doneRef.current?.focus();
+  }, [status]);
 
   /**
    * The business-type select, held separately from `values.businessType`.
@@ -74,11 +113,120 @@ export default function EnquiryForm({
     if (slug === OTHER_BUSINESS_TYPE) {
       set('businessType', '');
     } else {
-      set('businessType', BUSINESS_TYPES.find((type) => type.slug === slug)?.name ?? '');
+      set('businessType', businessTypes.find((type) => String(type.id) === slug)?.name ?? '');
     }
   };
 
   const ready = canSend(values);
+
+  const whatsappLink = whatsappHref(kind, values, whatsapp, shortName);
+  const mailLink = mailtoHref(kind, values, email, shortName);
+
+  /**
+   * Sent: the form is replaced, not annotated.
+   *
+   * Everything on this card answers the one question somebody has the moment
+   * they press the button — *did that work, and what happens now* — and a form
+   * still sitting under it invites them to fill it in again. On a **failure**
+   * the form stays exactly where it was, because there the right next action is
+   * to retry and nothing they typed should be lost.
+   *
+   * `role="status"` rather than `alert`: this is the expected outcome, so a
+   * screen reader should hear it politely after the current phrase rather than
+   * having the page interrupt itself.
+   */
+  if (status === 'sent') {
+    const firstName = values.name.trim().split(/\s+/)[0];
+
+    return (
+      <div className={`card-surface ${styles.form} ${styles.done}`} role="status">
+        <span className={styles.doneMark} aria-hidden="true">
+          <Glyph name="check" />
+        </span>
+
+        {/* `tabIndex={-1}` makes it focusable without adding it to the tab
+            order — see `doneRef`. */}
+        <h3 className={styles.doneTitle} ref={doneRef} tabIndex={-1}>
+          {firstName ? `Thank you, ${firstName}.` : 'Thank you.'}
+        </h3>
+
+        <p className={styles.doneLede}>
+          {kind === 'demo'
+            ? 'Your demo request is with us. We will call you back, usually the same working day.'
+            : 'Your message is with us. We will come back to you within one working day.'}
+        </p>
+
+        <ul className={styles.doneList}>
+          {contactSummary(values) ? (
+            <li>
+              <Glyph name="check" className={styles.doneTick} />
+              <span>We reply on {contactSummary(values)}, in working hours.</span>
+            </li>
+          ) : null}
+          <li>
+            <Glyph name="check" className={styles.doneTick} />
+            <span>Nothing to pay and nothing to sign — this was an enquiry, not an order.</span>
+          </li>
+          {values.plan.trim() ? (
+            <li>
+              <Glyph name="check" className={styles.doneTick} />
+              <span>We will talk through the {values.plan.trim()} plan, and whether it fits.</span>
+            </li>
+          ) : null}
+        </ul>
+
+        {/*
+          Still offered, because a message in a thread somebody is already
+          reading gets answered faster than a row in a table. Secondary now:
+          the enquiry is already safely stored, so this is a shortcut rather
+          than the way to reach us.
+        */}
+        {whatsappLink || mailLink ? (
+          <>
+            <p className={styles.doneNudge}>In a hurry? Send the same details straight to us.</p>
+            <div className={styles.actions}>
+              {whatsappLink ? (
+                <a
+                  className={`btn btn--ghost ${styles.submit}`}
+                  href={whatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Glyph name="message-circle" className={styles.submitIcon} />
+                  Send on WhatsApp
+                </a>
+              ) : null}
+              {mailLink ? (
+                <a className={`btn btn--ghost ${styles.submit}`} href={mailLink}>
+                  <Glyph name="mail" className={styles.submitIcon} />
+                  Send by email
+                </a>
+              ) : null}
+            </div>
+          </>
+        ) : null}
+
+        {/*
+          A way back, for the person enquiring about a second business. Clears
+          the fields rather than keeping them: this is a new enquiry, and
+          pre-filled boxes are how somebody accidentally sends the first one
+          twice.
+        */}
+        <button
+          type="button"
+          className={styles.againLink}
+          onClick={() => {
+            setValues({ ...EMPTY_ENQUIRY });
+            setTypeChoice('');
+            setStatus('idle');
+            setError(null);
+          }}
+        >
+          Send another enquiry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className={`card-surface ${styles.form}`}>
@@ -143,8 +291,10 @@ export default function EnquiryForm({
             onChange={(event) => onTypeChange(event.target.value)}
           >
             <option value="">Choose your trade</option>
-            {BUSINESS_TYPES.map((type) => (
-              <option key={type.slug} value={type.slug}>
+            {businessTypes.map((type) => (
+              /* The id is the value: `slug` is nullable in the API and two
+                 trades with no slug would collide on an empty string. */
+              <option key={type.id} value={String(type.id)}>
                 {type.name}
               </option>
             ))}
@@ -183,7 +333,7 @@ export default function EnquiryForm({
           onChange={(event) => set('plan', event.target.value)}
         >
           <option value="">Not sure yet — advise me</option>
-          {PLANS.map((plan) => (
+          {plans.map((plan) => (
             /* The *name* is the value, because the name is what goes into the
                message. Nothing downstream needs the id. */
             <option key={plan.id} value={plan.name}>
@@ -204,37 +354,40 @@ export default function EnquiryForm({
       </Field>
 
       {/*
-        Both actions are links, not buttons, because both navigate — `wa.me` in
-        a new tab, `mailto:` in the mail client. Rendering them as buttons and
-        calling `window.open` after an await is what gets blocked by popup
-        blockers; a real link never is.
-
-        `aria-disabled` plus `tabIndex={-1}` rather than removing the href: the
-        control stays in the DOM in one place, so the layout does not shift as
-        the visitor types their name and it becomes usable.
+        A real submit, unlike the two links this used to be. It has to be: the
+        enquiry is stored before anything else happens, and that needs a
+        request, a pending state and somewhere to put a failure.
       */}
       <div className={styles.actions}>
-        <a
+        <button
+          type="button"
           className={`btn btn--primary ${styles.submit}`}
-          href={ready ? whatsappHref(kind, values) : undefined}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-disabled={!ready}
-          tabIndex={ready ? undefined : -1}
+          disabled={!ready || status === 'sending'}
+          onClick={async () => {
+            setStatus('sending');
+            setError(null);
+            /**
+             * The browser's own tracking id, so the API can tie this enquiry
+             * to the traffic that produced it — which campaign brought them,
+             * and how many pages they read first.
+             *
+             * Read at submit rather than at mount: a visitor who blocked
+             * storage on arrival may have allowed it since, and this is the
+             * one moment the answer matters. Null is fine and common — the
+             * enquiry is stored either way and simply goes unattributed.
+             */
+            const result = await submitEnquiryAction(kind, values, source, deviceId());
+            if (result.ok) {
+              setStatus('sent');
+            } else {
+              setStatus('failed');
+              setError(result.error);
+            }
+          }}
         >
-          <Glyph name="message-circle" className={styles.submitIcon} />
-          {submitLabel}
-        </a>
-
-        <a
-          className={`btn btn--ghost ${styles.submit}`}
-          href={ready ? mailtoHref(kind, values) : undefined}
-          aria-disabled={!ready}
-          tabIndex={ready ? undefined : -1}
-        >
-          <Glyph name="mail" className={styles.submitIcon} />
-          Send by email
-        </a>
+          <Glyph name="arrow-right" className={styles.submitIcon} />
+          {status === 'sending' ? 'Sending…' : submitLabel}
+        </button>
       </div>
 
       {/*
@@ -248,12 +401,71 @@ export default function EnquiryForm({
         </p>
       ) : null}
 
-      <p className={styles.small}>
-        No obligation and no card details. Your message goes straight to our WhatsApp or inbox —
-        this page does not store anything.
-      </p>
+      {/*
+        Failure only — success replaces the whole form above.
+
+        The form stays put so nothing typed is lost, and the direct links are
+        promoted to primary: the enquiry did *not* reach us, so this is now the
+        way to get through rather than a shortcut.
+
+        Still links rather than buttons that call `window.open`: a programmatic
+        open after an await is what popup blockers stop, and a real link never
+        is. Each is dropped when there is no number or address configured — a
+        button that opens `wa.me/undefined` is worse than no button.
+      */}
+      {status === 'failed' ? (
+        <div className={styles.failed} role="alert">
+          <p className={styles.failedTitle}>That did not go through.</p>
+          <p className={styles.small}>
+            {error ?? 'Something went wrong.'} Nothing you typed has been lost — press the button
+            again, or send the same details to us directly. Both reach the same people.
+          </p>
+
+          {whatsappLink || mailLink ? (
+            <div className={styles.actions}>
+              {whatsappLink ? (
+                <a
+                  className={`btn btn--primary ${styles.submit}`}
+                  href={whatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Glyph name="message-circle" className={styles.submitIcon} />
+                  Send on WhatsApp
+                </a>
+              ) : null}
+              {mailLink ? (
+                <a className={`btn btn--ghost ${styles.submit}`} href={mailLink}>
+                  <Glyph name="mail" className={styles.submitIcon} />
+                  Send by email
+                </a>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <p className={styles.small}>
+          No obligation and no card details. We store what you send here so we can call you back,
+          and nothing else.
+        </p>
+      )}
     </div>
   );
+}
+
+/**
+ * How we said we would reach them, in their own details.
+ *
+ * Echoing the number back is the cheapest reassurance on the card: it proves
+ * we have it and it is the one thing they might have typed wrong. Phone first
+ * because that is what a callback uses; email only where there is no number,
+ * which the form's own rule allows.
+ */
+function contactSummary(values: EnquiryPayload): string {
+  const phone = values.phone.trim();
+  const email = values.email.trim();
+  if (phone && email) return `${phone} or ${email}`;
+  return phone || email;
 }
 
 /**

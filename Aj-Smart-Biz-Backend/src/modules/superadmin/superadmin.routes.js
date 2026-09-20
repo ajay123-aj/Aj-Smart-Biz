@@ -22,6 +22,7 @@ const planRequestRoutes = require('../../routes/planRequest.routes');
 const superAdminRoutes = require('../../routes/superAdmin.routes');
 const leadRoutes = require('../../routes/lead.routes');
 const insights = require('../../controllers/platformInsight.controller');
+const marketingRoutes = require('../../routes/marketing.routes');
 
 /** Platform-wide counts: tenants, subscriptions, revenue, expiries. */
 router.get('/dashboard', dashboard.superAdminDashboard);
@@ -33,6 +34,15 @@ router.use('/plan-requests', planRequestRoutes);
 
 /** The platform's own operators. */
 router.use('/super-admins', superAdminRoutes);
+
+/**
+ * Our own marketing site: its writing, its FAQ and the enquiries it takes.
+ *
+ * Here rather than under `/admin` because none of it belongs to a tenant --
+ * it is the site that sells the platform, so the people who run the platform
+ * are the only ones who edit it.
+ */
+router.use('/marketing', marketingRoutes);
 
 /**
  * Every tenant's website leads, and the analysis across them. The same

@@ -6,7 +6,7 @@ import BusinessTypesSection from '@/components/BusinessTypesSection';
 import PlansSection from '@/components/PlansSection';
 import FaqSection from '@/components/FaqSection';
 import CtaBand from '@/components/CtaBand';
-import { PLANS_PAGE } from '@/config/site';
+import { getSite } from '@/lib/api';
 
 /**
  * The home page.
@@ -20,7 +20,9 @@ import { PLANS_PAGE } from '@/config/site';
  * nothing else — which is the point. Changing what the page argues means moving
  * eight lines here, not editing eight components.
  */
-export default function HomePage() {
+export default async function HomePage() {
+  const { content } = await getSite();
+
   return (
     <>
       <Hero />
@@ -46,7 +48,7 @@ export default function HomePage() {
       />
 
       <PlansSection
-        eyebrow={PLANS_PAGE.eyebrow}
+        eyebrow={content.plans_page?.eyebrow}
         title="One monthly recharge. Everything in it."
         lede="No setup fee, no contract, no notice period. Change plan any month; stop any month."
         showAllLink

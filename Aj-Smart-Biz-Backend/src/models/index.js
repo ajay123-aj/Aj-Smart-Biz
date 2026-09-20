@@ -13,6 +13,7 @@ const CompanyDomain = require('./companyDomain.model')(sequelize);
 const Slider = require('./slider.model')(sequelize);
 const CompanyFunctionality = require('./companyFunctionality.model')(sequelize);
 const CompanyWhatsapp = require('./companyWhatsapp.model')(sequelize);
+const CompanySocialLink = require('./companySocialLink.model')(sequelize);
 const CompanyAbout = require('./companyAbout.model')(sequelize);
 const CompanyContact = require('./companyContact.model')(sequelize);
 const CompanyStat = require('./companyStat.model')(sequelize);
@@ -44,6 +45,13 @@ const RolePermission = require('./rolePermission.model')(sequelize);
 const Admin = require('./admin.model')(sequelize);
 const Lead = require('./lead.model')(sequelize);
 const LeadVisit = require('./leadVisit.model')(sequelize);
+
+/* Our own marketing site. No tenant, no company — see each model's note. */
+const MarketingContent = require('./marketingContent.model')(sequelize);
+const MarketingFaq = require('./marketingFaq.model')(sequelize);
+const MarketingEnquiry = require('./marketingEnquiry.model')(sequelize);
+const MarketingLead = require('./marketingLead.model')(sequelize);
+const MarketingLeadVisit = require('./marketingLeadVisit.model')(sequelize);
 
 /* ------------------------------------------------------------------ *
  * Associations
@@ -80,6 +88,13 @@ Company.hasMany(CompanyFunctionality, { foreignKey: 'companyId', as: 'functional
 CompanyFunctionality.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasMany(CompanyWhatsapp, { foreignKey: 'companyId', as: 'whatsappNumbers', onDelete: 'CASCADE' });
 CompanyWhatsapp.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+
+/**
+ * A company's social profiles. `CASCADE` like every other owned list: deleting
+ * the company is the one thing that should take these with it.
+ */
+Company.hasMany(CompanySocialLink, { foreignKey: 'companyId', as: 'socialLinks', onDelete: 'CASCADE' });
+CompanySocialLink.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 
 // Website content the tenant writes: the About stat band, the Team section, the
 // Gallery, the Testimonials wall and the Features / Benefits cards. Each is
@@ -414,6 +429,7 @@ const db = {
   Slider,
   CompanyFunctionality,
   CompanyWhatsapp,
+  CompanySocialLink,
   CompanyAbout,
   CompanyContact,
   CompanyStat,
@@ -445,6 +461,33 @@ const db = {
   Admin,
   Lead,
   LeadVisit,
+  MarketingContent,
+  MarketingFaq,
+  MarketingEnquiry,
+  MarketingLead,
+  MarketingLeadVisit,
 };
+
+/* ------------------------------------------------------------------ *
+ * Our own marketing site
+ * ------------------------------------------------------------------ */
+
+/**
+ * A marketing lead and its visits. The same shape as Lead -> LeadVisit, with
+ * no company in it — see `marketingLead.model.js` for why that is a separate
+ * table rather than a nullable scope column.
+ */
+MarketingLead.hasMany(MarketingLeadVisit, { foreignKey: 'leadId', as: 'visits', onDelete: 'CASCADE' });
+MarketingLeadVisit.belongsTo(MarketingLead, { foreignKey: 'leadId', as: 'lead' });
+
+/**
+ * The enquiry a device sent, where it sent one.
+ *
+ * `SET NULL` rather than `CASCADE`: deleting an enquiry is tidying a message,
+ * and it should not take the traffic that produced it with it. The lead is
+ * still the record that somebody from that campaign was interested.
+ */
+MarketingLead.belongsTo(MarketingEnquiry, { foreignKey: 'enquiryId', as: 'enquiry', onDelete: 'SET NULL' });
+MarketingEnquiry.hasOne(MarketingLead, { foreignKey: 'enquiryId', as: 'lead' });
 
 module.exports = db;

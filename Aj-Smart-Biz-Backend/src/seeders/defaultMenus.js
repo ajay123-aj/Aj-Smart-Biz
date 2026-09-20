@@ -180,13 +180,14 @@ const menus = [
   { name: 'Gallery', slug: 'company-gallery', icon: 'image', route: '/company/gallery', sequence: 36, parent: 'company-details' },
   { name: 'Contact page', slug: 'company-contact', icon: 'mail', route: '/company/contact', sequence: 37, parent: 'company-details' },
   { name: 'Features / Benefits', slug: 'company-features', icon: 'sparkles', route: '/company/features', sequence: 38, parent: 'company-details' },
+  { name: 'Social links', slug: 'company-social', icon: 'share-2', route: '/company/social', sequence: 39, parent: 'company-details' },
   /**
    * Customer reviews. Unlike the rest of the section this screen is a queue as
    * well as an editor — a review a stranger wrote sits here until someone
    * approves it — which is why it is worth its own entry rather than a tab.
    */
-  { name: 'Testimonials', slug: 'company-testimonials', icon: 'quote', route: '/company/testimonials', sequence: 39, parent: 'company-details' },
-  { name: 'Plan & billing', slug: 'company-subscription', icon: 'credit-card', route: '/company/subscription', sequence: 40, parent: 'company-details' },
+  { name: 'Testimonials', slug: 'company-testimonials', icon: 'quote', route: '/company/testimonials', sequence: 40, parent: 'company-details' },
+  { name: 'Plan & billing', slug: 'company-subscription', icon: 'credit-card', route: '/company/subscription', sequence: 41, parent: 'company-details' },
 ];
 
 /**
@@ -217,6 +218,7 @@ const MENU_INHERITS_PARENT = new Set([
   'company-gallery',
   'company-contact',
   'company-features',
+  'company-social',
   'company-testimonials',
   'company-subscription',
 ]);
@@ -296,6 +298,7 @@ const MENU_FUNCTIONALITY = {
   'company-contact': FUNCTIONALITY.CONTACT_PAGE,
   'company-testimonials': FUNCTIONALITY.TESTIMONIALS,
   'company-features': FUNCTIONALITY.FEATURES,
+  'company-social': FUNCTIONALITY.SOCIAL_MEDIA,
 };
 
 module.exports = { menus, MENU_INHERITS_PARENT, MENU_FUNCTIONALITY };

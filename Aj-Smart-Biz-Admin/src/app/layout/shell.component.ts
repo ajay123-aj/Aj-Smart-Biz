@@ -33,6 +33,7 @@ const ICONS: Record<string, string> = {
   'company-gallery': '🖼️',
   'company-contact': '✉️',
   'company-features': '✨',
+  'company-social': '🔗',
   'company-subscription': '💳',
 };
 

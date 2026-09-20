@@ -28,69 +28,92 @@ is worth stating before anyone tries to reuse code between them.
 | --- | --- | --- |
 | Whose site is it | a **tenant's** — a salon, a shop | **ours** |
 | Who does it describe | resolved from the host at request time | always Aj Smart Biz |
-| Where its content lives | the API (`/website/company-details`) | `src/content/` and `src/config/` |
+| Where its content lives | the API (`/theme/company-details`) | the API (`/website/bootstrap`) |
 | Has `middleware.ts` | yes, to resolve the tenant | **no** — nothing to resolve |
 | Theme colours | the tenant's, injected at runtime | fixed |
 
 A tenant template is one deployment serving many companies. This is one
 deployment serving one company, which happens to be us. That is why it has no
-tenant resolver, no `TENANT_DOMAIN`, no uploads proxy and no API calls.
+tenant resolver, no `TENANT_DOMAIN` and no uploads proxy.
+
+It *does* call the API — that is the one row above where the two are now alike.
+The difference is which prefix: a theme reads `/theme/*` and gets whichever
+tenant the request host names; this reads `/website/*` and gets the same answer
+every time, because there is only one of us.
 
 ---
 
 ## Where the content lives
 
-Four files. Nothing else in the project holds copy or prices.
+**In the database, reached over the API. Not in this project.**
 
-| File | What is in it |
-| --- | --- |
-| `src/content/plans.ts` | **The price list.** The only rupee figures in the project. |
-| `src/content/capabilities.ts` | The product: what a customer's site can be built from. |
-| `src/content/business-types.ts` | The trades we build for. |
-| `src/config/site.ts` | Brand, contact details, and every piece of prose. |
+Every word on this site — the headlines, the price list, the capability list,
+the trades and the FAQ — comes from `GET /website/bootstrap` and is edited in
+the **super admin console**. `src/content/` and `src/config/site.ts` used to
+hold it and have been deleted.
 
-`plans.ts` refers to capabilities **by key**, and `CapabilityKey` is a union
-type — so a plan cannot promise something that does not exist, and a typo is a
-build error rather than a chip that silently fails to render.
+| What | Where it comes from | Edited in |
+| --- | --- | --- |
+| Headlines, page copy, contact details | `marketing_contents` | Super admin → Marketing |
+| The price list | `plans` (only where `isPublic`) | Super admin → Plans |
+| What a site can be built from | the API's functionality catalogue | code (`constants`) |
+| The trades | `business_types` (only where `isPublic`) | Super admin → Business types |
+| The FAQ | `marketing_faqs` | Super admin → Marketing |
 
-The home page's hero counts `business-types.ts` and `capabilities.ts` and reads
-the cheapest plan out of `plans.ts`, so adding a trade or a feature updates the
-first screen without anybody remembering to.
+`src/lib/api.ts` is the only file that talks to the API, and it holds the two
+calls this site makes. **There is no database driver in this project** and there
+must not be: `package.json` is `next`, `react` and `react-dom`. Two things
+owning the same rows is the situation the API exists to prevent.
+
+### `isPublic`, and why the pricing page is not "every active plan"
+
+The `plans` table also holds plans built for one tenant and plans bundled with a
+theme. Those are not a price list, so only rows flagged `isPublic` reach this
+site. The flag defaults to **false**: a new plan is invisible here until
+somebody says otherwise, which is the safe direction for a table that is mostly
+not public. `business_types` works the same way.
+
+### There is no fallback copy
+
+If the API has never answered, a page renders an error rather than content.
+That is deliberate — inventing wording would put a price on the page that nobody
+agreed to. Once it *has* answered, Next serves the last good response for five
+minutes and refreshes in the background (`REVALIDATE_SECONDS`), so a backend
+restart or deploy is invisible to visitors.
+
+The cost is that an edit takes up to five minutes to appear. That is the right
+trade for a page read by strangers and edited a few times a year.
 
 ### ⚠ Replace the contact details before this goes live
 
-`CONTACT` in `src/config/site.ts` is placeholder — `+91 90000 00000`,
+The seeded `contact` section is placeholder — `+91 90000 00000`,
 `hello@ajsmartbiz.in`. They are deliberately obvious (`90000 00000` is not an
-assignable Indian mobile number) so that shipping them by accident is loud. Every
-phone link, WhatsApp link and mail link on the site reads from that one object,
-so it is a single edit.
+assignable Indian mobile number) so that shipping them by accident is loud.
+Every phone, WhatsApp and mail link on the site reads from that one section, so
+it is a single edit **in the console** — not in this repository.
 
 ---
 
 ## Where the demo form goes
 
-**Nowhere — by design, for now.**
+**To the API, and then to WhatsApp.**
 
-`EnquiryForm` composes a message from what was typed and hands it to the
-visitor's own WhatsApp or mail app (`src/lib/enquiry.ts`). Nothing is posted and
-nothing is stored.
+Submitting posts to `POST /website/enquiries` through the server action in
+`src/app/actions/submit-enquiry.ts`, so the enquiry is stored and appears in the
+super admin console. The composed WhatsApp and mail links are then offered on
+the confirmation, because a message in a thread somebody is already reading gets
+answered faster than a row in a table somebody has to open.
 
-What that buys: a site that works the moment it is deployed, with no endpoint to
-build, no table of strangers' phone numbers to own, and no admin screen to write
-before anybody can read what came in.
+**A failed send still shows those links.** The worst outcome is a person who
+wanted a website and could not tell us, so an API that is down costs us the
+record rather than the lead.
 
-What it costs: **no reporting.** There is no list of who enquired and no
-conversion funnel, because nothing was recorded.
-
-When that reporting is wanted, the change is contained:
-
-1. Add a public endpoint to `Aj-Smart-Biz-Backend` — the `/website` module is
-   the right home, since it is the platform's only unauthenticated surface.
-2. Replace the two `href`s in `EnquiryForm` with a Server Action that posts the
-   same payload.
-
-The form, its fields and its validation do not change. `src/lib/enquiry.ts` has
-the detail.
+One thing to know about the rate limit: the post goes through a **server
+action**, so the API sees this container's address rather than the visitor's.
+The endpoint allows 10 per 15 minutes per address in production, and every
+submission from this site counts against the same one. Raise it on the endpoint
+if that bites — moving the call into the browser would publish the API origin
+and need CORS on top.
 
 ---
 
@@ -109,7 +132,7 @@ changing any of it. In short:
   hairline, a glow, and one button per screen. The closing CTA band is the sole
   exception and says so in its own CSS.
 
-It is deliberately the inverse material of `themes/commercial/decor-framing`,
+It is deliberately the inverse material of `themes/atelier`,
 which is white glass on warm paper. Those two get opened in adjacent tabs when
 somebody is deciding whether to buy, and looking alike would make the whole
 product look like one template with the colours swapped.

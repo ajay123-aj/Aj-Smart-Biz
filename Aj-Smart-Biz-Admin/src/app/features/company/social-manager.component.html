@@ -1,0 +1,148 @@
+<div class="card-body">
+  @if (loading()) {
+    <div class="skeleton" style="height:280px"></div>
+  } @else {
+    <app-feature-gate [feature]="feature()" />
+
+    @if (!canEdit()) {
+      <p class="tiny muted" style="margin-top:0">
+        Only the main admin can change what your website says. You are viewing this read only.
+      </p>
+    }
+
+    @if (feature()?.granted) {
+      <div class="row-end" style="margin-bottom:14px; gap:10px; align-items:baseline">
+        <div style="margin-right:auto">
+          <h4 style="margin:0 0 4px">Your social profiles</h4>
+          <p class="tiny muted" style="margin:0; max-width:64ch">
+            Shown as icons in your website footer, in this order. Each opens in a new tab. Add only
+            the accounts you actually post on &mdash; an icon that leads to an empty page costs you
+            more than a missing one.
+          </p>
+        </div>
+        @if (canEdit()) {
+          <button type="button" class="btn btn-primary" (click)="open()">Add link</button>
+        }
+      </div>
+
+      @if (!cards().length) {
+        <!-- The footer row is absent entirely until there is one, so this says
+             what the visitor currently sees rather than just "no records". -->
+        <p class="link-empty">
+          No links yet, so no social row appears on your website footer.
+        </p>
+      } @else {
+        @for (row of cards(); track row.id; let i = $index) {
+          <div class="link-row">
+            <div class="seq">
+              <button
+                type="button"
+                class="btn btn-sm btn-ghost"
+                [disabled]="!canEdit() || i === 0"
+                title="Move up"
+                (click)="move(row, -1)"
+              >
+                &uarr;
+              </button>
+              <span class="seq-num">{{ i + 1 }}</span>
+              <button
+                type="button"
+                class="btn btn-sm btn-ghost"
+                [disabled]="!canEdit() || i === cards().length - 1"
+                title="Move down"
+                (click)="move(row, 1)"
+              >
+                &darr;
+              </button>
+            </div>
+
+            <span class="link-platform">{{ nameOf(row.platform) }}</span>
+
+            <div class="link-main">
+              <div class="link-url">{{ row.url }}</div>
+              @if (row.label) {
+                <div class="link-note">Shown as &ldquo;{{ row.label }}&rdquo;</div>
+              }
+            </div>
+
+            <app-status-badge [value]="row.status" />
+
+            @if (canEdit()) {
+              <div class="row-end" style="gap:6px">
+                <button type="button" class="btn btn-sm btn-ghost" (click)="open(row)">Edit</button>
+                <button type="button" class="btn btn-sm btn-ghost" (click)="toggle(row)">
+                  {{ row.status === 'active' ? 'Hide' : 'Show' }}
+                </button>
+                <button type="button" class="btn btn-sm btn-danger" (click)="remove(row)">
+                  Remove
+                </button>
+              </div>
+            }
+          </div>
+        }
+      }
+    }
+  }
+</div>
+
+@if (editing()) {
+  <app-modal
+    [title]="isNew ? 'Add social link' : 'Edit social link'"
+    [closeOnBackdrop]="false"
+    (closed)="close()"
+  >
+    <form [formGroup]="form" class="form-grid">
+      <div class="field">
+        <label for="platform">Platform</label>
+        <select id="platform" class="select" formControlName="platform">
+          @for (option of platforms; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+        <span class="hint">Decides which icon appears. Pick &ldquo;Other&rdquo; for anything not listed.</span>
+      </div>
+
+      <div class="field">
+        <label for="url">Profile address</label>
+        <input
+          id="url"
+          class="input"
+          formControlName="url"
+          placeholder="https://instagram.com/yourbusiness"
+        />
+        <app-field-error [control]="form.controls.url" label="Profile address" />
+        <!-- The scheme is required by the API too. Said here so the refusal is
+             explained before it happens rather than after. -->
+        <span class="hint">
+          Paste the whole address, starting with https:// &mdash; open your profile and copy it from
+          the browser bar.
+        </span>
+      </div>
+
+      <div class="field">
+        <label for="label">Name (optional)</label>
+        <input id="label" class="input" formControlName="label" placeholder="Careers on LinkedIn" />
+        <span class="hint">
+          Read out by screen readers and shown on hover. Leave empty to use the platform&rsquo;s own
+          name.
+        </span>
+      </div>
+
+      <div class="preview">
+        The footer icon will be announced as <strong>{{ previewLabel() }}</strong>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="close()">Cancel</button>
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="saving() || !canEdit()"
+        (click)="save()"
+      >
+        {{ saving() ? 'Saving…' : 'Save' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

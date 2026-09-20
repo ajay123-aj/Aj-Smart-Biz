@@ -499,7 +499,60 @@ export type FunctionalityKey =
   | 'customers'
   | 'blog'
   | 'service_enquiry'
-  | 'service_booking';
+  | 'service_booking'
+  | 'social_media';
+
+/* ------------------------------ social links ------------------------------ */
+
+/**
+ * The networks a company may publish in its footer.
+ *
+ * Mirrors `SOCIAL_PLATFORM` in the API, which validates against the same list.
+ * `other` is the escape hatch — any URL, a generic icon — so a network nobody
+ * anticipated is publishable without a release on either side.
+ */
+export type SocialPlatform =
+  | 'facebook'
+  | 'instagram'
+  | 'x'
+  | 'linkedin'
+  | 'youtube'
+  | 'whatsapp'
+  | 'telegram'
+  | 'pinterest'
+  | 'threads'
+  | 'other';
+
+/** What the picker offers, in the order the API lists them. */
+export const SOCIAL_PLATFORMS: { value: SocialPlatform; label: string }[] = [
+  { value: 'facebook', label: 'Facebook' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'x', label: 'X (Twitter)' },
+  { value: 'linkedin', label: 'LinkedIn' },
+  { value: 'youtube', label: 'YouTube' },
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'telegram', label: 'Telegram' },
+  { value: 'pinterest', label: 'Pinterest' },
+  { value: 'threads', label: 'Threads' },
+  { value: 'other', label: 'Other' },
+];
+
+/**
+ * One social profile in the website footer.
+ *
+ * Rows survive the feature being switched off or the plan changing — losing a
+ * plan must not delete a tenant's links. What the feature decides is whether
+ * the footer renders them.
+ */
+export interface CompanySocialLink extends AuditFields {
+  companyId: number;
+  platform: SocialPlatform;
+  /** The whole profile URL. The API refuses anything that is not http(s). */
+  url: string;
+  /** Overrides the platform's name as the link's accessible name. */
+  label?: string | null;
+  sequence: number;
+}
 
 /** What a WhatsApp number is for, and therefore which button it lands on. */
 export type WhatsappType = 'inquiry' | 'contact' | 'support' | 'orders';
@@ -1201,6 +1254,21 @@ export interface Product extends AuditFields {
    * functionality is live.
    */
   orderable?: boolean;
+  /**
+   * Whether this product's stock is actually counted.
+   *
+   * **The switch the warehouse feature hangs off.** With it on, an order
+   * reserves this product when it is confirmed and takes it off the shelf when
+   * it is dispatched. With it off — the default — an order moves through every
+   * status and the levels never change, however much stock the warehouse says
+   * it holds.
+   *
+   * Off by default on purpose: a product nobody has counted reads as zero, and
+   * a catalogue that silently went out of stock the day Warehouse was switched
+   * on would be worse than one that ignores it. Means nothing unless the
+   * `warehouse` functionality is live.
+   */
+  trackInventory?: boolean;
   sequence: number;
 }
 

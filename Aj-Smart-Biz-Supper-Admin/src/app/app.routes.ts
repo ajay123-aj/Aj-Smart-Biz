@@ -109,6 +109,56 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/masters/business-type-list.component').then((m) => m.BusinessTypeListComponent),
       },
+      /**
+       * Our own marketing site — the Aj Smart Biz Technology pages.
+       *
+       * Grouped under `website/` because all three screens manage the same one
+       * site, and because `/content` on its own would read as a tenant's.
+       */
+      {
+        path: 'website/content',
+        title: 'Website Content · Aj Smart Biz',
+        loadComponent: () =>
+          import('./features/marketing/marketing-content.component').then(
+            (m) => m.MarketingContentComponent
+          ),
+      },
+      {
+        path: 'website/faq',
+        title: 'Website FAQ · Aj Smart Biz',
+        loadComponent: () =>
+          import('./features/marketing/marketing-faq.component').then((m) => m.MarketingFaqComponent),
+      },
+      {
+        path: 'website/enquiries',
+        title: 'Website Enquiries · Aj Smart Biz',
+        loadComponent: () =>
+          import('./features/marketing/marketing-enquiry-list.component').then(
+            (m) => m.MarketingEnquiryListComponent
+          ),
+      },
+      /**
+       * `website/analytics` is declared before nothing that could swallow it —
+       * these are all literal paths, unlike the tenant lead routes where
+       * `/analytics` has to beat `/:id`. Kept adjacent anyway so the ordering
+       * stays obvious if an `:id` route is ever added here.
+       */
+      {
+        path: 'website/leads',
+        title: 'Website Leads · Aj Smart Biz',
+        loadComponent: () =>
+          import('./features/marketing/marketing-lead-list.component').then(
+            (m) => m.MarketingLeadListComponent
+          ),
+      },
+      {
+        path: 'website/analytics',
+        title: 'Campaign Analysis · Aj Smart Biz',
+        loadComponent: () =>
+          import('./features/marketing/marketing-lead-analytics.component').then(
+            (m) => m.MarketingLeadAnalyticsComponent
+          ),
+      },
       {
         path: 'themes',
         title: 'Theme Management · Aj Smart Biz',

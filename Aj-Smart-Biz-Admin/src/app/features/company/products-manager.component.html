@@ -496,6 +496,21 @@
         </span>
       </div>
 
+      <!-- The switch the warehouse feature hangs off. Off, an order for this
+           product moves through every status and the shelf never changes. -->
+      <div class="field">
+        <label for="prd-track">Count stock for this product</label>
+        <select id="prd-track" class="select" formControlName="trackInventory">
+          <option [value]="true">Yes — reserve on confirm, take off the shelf on dispatch</option>
+          <option [value]="false">No — do not count it</option>
+        </select>
+        <span class="hint">
+          Only applies while <strong>Warehouse &amp; stock</strong> is switched on. Add an opening
+          quantity on the Stock screen before turning this on — a product nobody has counted reads
+          as zero, and an order for it will be refused for want of stock.
+        </span>
+      </div>
+
       <div class="field">
         <label for="prd-card-cta">Button label</label>
         <input id="prd-card-cta" class="input" formControlName="ctaLabel" placeholder="View details"

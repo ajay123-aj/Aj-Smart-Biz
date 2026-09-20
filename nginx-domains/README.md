@@ -366,9 +366,9 @@ product site — and everything else is `smart-biz-<service>`.
 | `smart-biz-api.ajtechhub.com` | NestJS — backend API | 4000 | `deploy/aj-smart-biz-backend/.env` |
 | `smart-biz-admin.ajtechhub.com` | Angular — company admin console | 4300 | `deploy/aj-smart-biz-admin/.env` |
 | `smart-biz-super-admin.ajtechhub.com` | Angular — super admin console | 4200 | `deploy/aj-smart-biz-supper-admin/.env` |
-| `smart-biz-white.ajtechhub.com` | Next.js — informational theme | 4400 | `deploy/aj-smart-biz-white-theme/.env` |
-| `smart-biz-black.ajtechhub.com` | Next.js — salon theme | 4500 | `deploy/aj-smart-biz-black-theme/.env` |
-| `smart-biz-decor-framing.ajtechhub.com` | Next.js — decor & framing theme | 4600 | `deploy/aj-smart-biz-decor-framing/.env` |
+| `smart-biz-white.ajtechhub.com` | Next.js — informational theme | 4400 | `deploy/aj-smart-biz-theme-default/.env` |
+| `smart-biz-black.ajtechhub.com` | Next.js — salon theme | 4500 | `deploy/aj-smart-biz-theme-midnight/.env` |
+| `smart-biz-decor-framing.ajtechhub.com` | Next.js — decor & framing theme | 4600 | `deploy/aj-smart-biz-theme-atelier/.env` |
 
 A `proxy_pass` port and the matching `HOST_PORT` in that `.env` are two halves
 of one mapping. Change them together.

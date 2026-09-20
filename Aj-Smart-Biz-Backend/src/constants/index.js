@@ -230,6 +230,7 @@ const FUNCTIONALITY = {
   BLOG: 'blog',
   SERVICE_ENQUIRY: 'service_enquiry',
   SERVICE_BOOKING: 'service_booking',
+  SOCIAL_MEDIA: 'social_media',
 };
 const FUNCTIONALITY_VALUES = Object.values(FUNCTIONALITY);
 
@@ -476,6 +477,61 @@ const FUNCTIONALITY_CATALOGUE = [
       'Adds a diary to the website — your working days and hours cut into slots, with a limit on how many bookings one slot holds. A visitor picks a time on the service’s own page and it arrives as a request; nothing is an appointment until somebody at the company confirms it, and declining hands the time straight back. The website shows how many places are left in each slot and stops offering one at the limit. Only the services you mark as bookable offer a time, so a shop can take appointments for a haircut and enquiries about a wedding.',
     sequence: 17,
   },
+  {
+    key: FUNCTIONALITY.SOCIAL_MEDIA,
+    name: 'Social media',
+    icon: 'share-2',
+    summary: 'Your social profiles, as icons in the website footer.',
+    description:
+      'Adds a row of social icons to the website footer — one per profile the company adds, in the order it chooses. Each is a link out to the account itself, opened in a new tab. Switched off, the row is absent from the footer entirely rather than shown empty, and the links stay here so switching it back on restores them.',
+    sequence: 18,
+  },
+];
+
+/* ------------------------------------------------------------------ *
+ * Social media
+ * ------------------------------------------------------------------ */
+
+/**
+ * The networks a company may publish, and how each one is rendered.
+ *
+ * A closed list rather than free text, for two reasons that both show up in the
+ * footer: the icon has to come from somewhere, and "Facebook" typed four
+ * different ways is four different rows to a report. `other` is the escape
+ * hatch — it takes any URL and renders a generic glyph, so a network nobody
+ * anticipated is still publishable without a release.
+ *
+ * `icon` is a name from the themes' own glyph set, so adding a platform here
+ * means adding that glyph in each template. `match` is what the validator uses
+ * to catch a LinkedIn URL pasted into the Instagram row — a warning, not a
+ * refusal, because vanity domains and regional hosts are real.
+ */
+const SOCIAL_PLATFORM = {
+  FACEBOOK: 'facebook',
+  INSTAGRAM: 'instagram',
+  X: 'x',
+  LINKEDIN: 'linkedin',
+  YOUTUBE: 'youtube',
+  WHATSAPP: 'whatsapp',
+  TELEGRAM: 'telegram',
+  PINTEREST: 'pinterest',
+  THREADS: 'threads',
+  OTHER: 'other',
+};
+const SOCIAL_PLATFORM_VALUES = Object.values(SOCIAL_PLATFORM);
+
+const SOCIAL_PLATFORM_CATALOGUE = [
+  { key: SOCIAL_PLATFORM.FACEBOOK, name: 'Facebook', icon: 'facebook', match: 'facebook.com', sequence: 1 },
+  { key: SOCIAL_PLATFORM.INSTAGRAM, name: 'Instagram', icon: 'instagram', match: 'instagram.com', sequence: 2 },
+  { key: SOCIAL_PLATFORM.X, name: 'X (Twitter)', icon: 'x', match: 'x.com', sequence: 3 },
+  { key: SOCIAL_PLATFORM.LINKEDIN, name: 'LinkedIn', icon: 'linkedin', match: 'linkedin.com', sequence: 4 },
+  { key: SOCIAL_PLATFORM.YOUTUBE, name: 'YouTube', icon: 'youtube', match: 'youtube.com', sequence: 5 },
+  { key: SOCIAL_PLATFORM.WHATSAPP, name: 'WhatsApp', icon: 'message-circle', match: 'wa.me', sequence: 6 },
+  { key: SOCIAL_PLATFORM.TELEGRAM, name: 'Telegram', icon: 'send', match: 't.me', sequence: 7 },
+  { key: SOCIAL_PLATFORM.PINTEREST, name: 'Pinterest', icon: 'pinterest', match: 'pinterest.', sequence: 8 },
+  { key: SOCIAL_PLATFORM.THREADS, name: 'Threads', icon: 'threads', match: 'threads.', sequence: 9 },
+  /** No `match`: this one exists precisely for the addresses the list cannot predict. */
+  { key: SOCIAL_PLATFORM.OTHER, name: 'Other', icon: 'link', match: null, sequence: 99 },
 ];
 
 /* ------------------------------------------------------------------ *
@@ -2066,9 +2122,61 @@ const ADDRESS_LABELS = ['Home', 'Work', 'Other'];
 /** Permission actions stored per (role, menu) pair. */
 const PERMISSION_ACTIONS = ['canView', 'canCreate', 'canEdit', 'canDelete', 'canExport'];
 
+/* ------------------------------------------------------------------ *
+ * Our own marketing site
+ * ------------------------------------------------------------------ */
+
+/**
+ * The sections of writing the Technology site reads, and what each one is.
+ *
+ * This list is the whitelist: `marketing_contents` refuses a key that is not
+ * here, so a typo cannot create a row that nothing will ever render. Adding a
+ * section to the site means adding it here first.
+ */
+const MARKETING_CONTENT_KEY = {
+  SITE: 'site',
+  CONTACT: 'contact',
+  HERO: 'hero',
+  STEPS: 'steps',
+  PROMISES: 'promises',
+  RECHARGE: 'recharge',
+  CTA: 'cta',
+  SERVICES_PAGE: 'services_page',
+  PLANS_PAGE: 'plans_page',
+  DEMO_PAGE: 'demo_page',
+  ABOUT_PAGE: 'about_page',
+  CONTACT_PAGE: 'contact_page',
+  FAQ_INTRO: 'faq_intro',
+};
+const MARKETING_CONTENT_KEY_VALUES = Object.values(MARKETING_CONTENT_KEY);
+
+/** Which form an enquiry came from. */
+const MARKETING_ENQUIRY_KIND = { DEMO: 'demo', CONTACT: 'contact' };
+const MARKETING_ENQUIRY_KIND_VALUES = Object.values(MARKETING_ENQUIRY_KIND);
+
+/**
+ * How far along an enquiry is.
+ *
+ * Deliberately short. This is a callback list, not a CRM: anything past "we
+ * spoke to them" is a company on the platform and has a row of its own.
+ */
+const MARKETING_ENQUIRY_STATUS = {
+  NEW: 'new',
+  CONTACTED: 'contacted',
+  CONVERTED: 'converted',
+  CLOSED: 'closed',
+};
+const MARKETING_ENQUIRY_STATUS_VALUES = Object.values(MARKETING_ENQUIRY_STATUS);
+
 module.exports = {
   STATUS,
   STATUS_VALUES,
+  MARKETING_CONTENT_KEY,
+  MARKETING_CONTENT_KEY_VALUES,
+  MARKETING_ENQUIRY_KIND,
+  MARKETING_ENQUIRY_KIND_VALUES,
+  MARKETING_ENQUIRY_STATUS,
+  MARKETING_ENQUIRY_STATUS_VALUES,
   AUTH_SCOPE,
   SUPER_ADMIN_ROLE,
   BILLING_CYCLE,
@@ -2095,6 +2203,9 @@ module.exports = {
   FUNCTIONALITY,
   FUNCTIONALITY_VALUES,
   FUNCTIONALITY_CATALOGUE,
+  SOCIAL_PLATFORM,
+  SOCIAL_PLATFORM_VALUES,
+  SOCIAL_PLATFORM_CATALOGUE,
   WHATSAPP_TYPE,
   WHATSAPP_TYPE_VALUES,
   WHATSAPP_TYPE_CATALOGUE,

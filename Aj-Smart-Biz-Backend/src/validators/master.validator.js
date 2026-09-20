@@ -33,6 +33,8 @@ const stateUpdate = {
 /* ------------- Business type ------------- */
 const businessTypeFields = {
   name: Joi.string().min(2).max(150),
+  /** Whether the marketing site's demo form offers this trade. See the model. */
+  isPublic: Joi.boolean(),
   slug: Joi.string().allow('', null).max(150),
   icon: Joi.string().allow('', null).max(120),
   description: Joi.string().allow('', null).max(2000),
@@ -93,6 +95,8 @@ const planFields = {
   // not exist. `unique()` keeps the snapshot honest.
   functionalities: Joi.array().items(Joi.string().valid(...FUNCTIONALITY_VALUES)).unique().allow(null),
   isPopular: Joi.boolean(),
+  /** Whether the marketing site advertises this. Defaults to false; see the model. */
+  isPublic: Joi.boolean(),
   sequence: Joi.number().integer(),
   status,
 };
@@ -109,6 +113,7 @@ const planCreate = {
     maxUsers: planFields.maxUsers.default(5),
     storageMb: planFields.storageMb.default(1024),
     isPopular: planFields.isPopular.default(false),
+    isPublic: planFields.isPublic.default(false),
     sequence: planFields.sequence.default(0),
   }),
 };

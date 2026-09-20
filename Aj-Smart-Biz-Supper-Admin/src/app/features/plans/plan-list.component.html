@@ -44,6 +44,13 @@
                   @if (row.isPopular) {
                     <span class="badge badge-warning" style="margin-left:6px">Popular</span>
                   }
+                  <!-- Whether the public pricing page advertises this plan.
+                       Most rows here are not a price list - a plan built for
+                       one tenant, or bundled with a theme - so this is off
+                       unless somebody says otherwise. -->
+                  @if (row.isPublic) {
+                    <span class="badge badge-info" style="margin-left:6px">On website</span>
+                  }
                   @if (row.description) {
                     <div class="tiny muted">{{ row.description }}</div>
                   }
@@ -237,6 +244,16 @@
         <input type="checkbox" formControlName="isPopular" />
         Highlight this plan as most popular
       </label>
+
+      <label class="check">
+        <input type="checkbox" formControlName="isPublic" />
+        Advertise this plan on the marketing site
+      </label>
+      <span class="hint">
+        The pricing page on the Technology site shows only the plans ticked here, in sequence
+        order. Leave it off for a plan built for one tenant or bundled with a theme — those are
+        not a price list, and a public page that showed every plan would list them all.
+      </span>
     </form>
 
     <ng-container footer>

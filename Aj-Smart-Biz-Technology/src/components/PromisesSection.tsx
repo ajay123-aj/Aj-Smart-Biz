@@ -1,5 +1,5 @@
 import Glyph from './Glyph';
-import { PROMISES } from '@/config/site';
+import { getSite } from '@/lib/api';
 import styles from './PromisesSection.module.css';
 
 /**
@@ -9,22 +9,30 @@ import styles from './PromisesSection.module.css';
  * the home page: the band is lifted onto its own sheet of glass because it is
  * the thing a visitor should remember having read.
  */
-export default function PromisesSection() {
+export default async function PromisesSection() {
+  const { content } = await getSite();
+  const promises = content.promises;
+  const items = promises?.items ?? [];
+
+  if (!items.length) return null;
+
   return (
     <section className="section section--panel">
       <div className="container">
         <header className="section-head">
-          <span className="eyebrow">{PROMISES.eyebrow}</span>
-          <h2 className="section-title">{PROMISES.title}</h2>
-          <p className="section-lede">{PROMISES.lede}</p>
+          <span className="eyebrow">{promises?.eyebrow}</span>
+          <h2 className="section-title">{promises?.title}</h2>
+          <p className="section-lede">{promises?.lede}</p>
         </header>
 
         <ul className={styles.grid}>
-          {PROMISES.items.map((item) => (
+          {items.map((item) => (
             <li key={item.title} className={styles.item}>
-              <span className={styles.icon} aria-hidden="true">
-                <Glyph name={item.icon} />
-              </span>
+              {item.icon ? (
+                <span className={styles.icon} aria-hidden="true">
+                  <Glyph name={item.icon} />
+                </span>
+              ) : null}
               <div>
                 <h3 className={styles.title}>{item.title}</h3>
                 <p className={styles.body}>{item.body}</p>

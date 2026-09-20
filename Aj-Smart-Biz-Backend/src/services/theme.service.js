@@ -25,7 +25,7 @@
  * real operation — clear a level and it falls back to the one under it rather
  * than to whatever the template happens to ship.
  *
- * This is the same chain `/website/branding` already uses for the logo and the
+ * This is the same chain `/theme/branding` already uses for the logo and the
  * favicon (pinned branch → company → head office), which is deliberate: a
  * visitor on the Surat domain should not get Surat's logo above the company's
  * colours.

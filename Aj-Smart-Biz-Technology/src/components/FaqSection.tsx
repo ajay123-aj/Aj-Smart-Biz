@@ -1,4 +1,4 @@
-import { FAQ } from '@/config/site';
+import { getSite } from '@/lib/api';
 import styles from './FaqSection.module.css';
 
 /**
@@ -16,21 +16,29 @@ import styles from './FaqSection.module.css';
  * No `name` attribute, so they are independent rather than mutually exclusive —
  * somebody comparing "what if I stop paying" against "do I own my domain"
  * should be able to have both on screen.
+ *
+ * The questions are their own table in the API rather than part of the page
+ * copy, so they arrive already ordered and keyed by id.
  */
-export default function FaqSection({ panel = false }: { panel?: boolean }) {
+export default async function FaqSection({ panel = false }: { panel?: boolean }) {
+  const { content, faqs } = await getSite();
+  const intro = content.faq_intro;
+
+  if (!faqs.length) return null;
+
   return (
     <section className={`section ${panel ? 'section--panel' : ''}`} id="faq">
       <div className="container">
         <header className="section-head">
-          <span className="eyebrow">{FAQ.eyebrow}</span>
-          <h2 className="section-title">{FAQ.title}</h2>
+          <span className="eyebrow">{intro?.eyebrow}</span>
+          <h2 className="section-title">{intro?.title}</h2>
         </header>
 
         <div className={styles.list}>
-          {FAQ.items.map((item, index) => (
-            <details key={item.q} className={styles.item} open={index === 0}>
+          {faqs.map((item, index) => (
+            <details key={item.id} className={styles.item} open={index === 0}>
               <summary className={styles.question}>
-                <span>{item.q}</span>
+                <span>{item.question}</span>
                 {/* A plus that becomes a minus, drawn as two bars rather than
                     two icons: the horizontal one stays and the vertical one
                     rotates flat, which is one transition instead of a swap. */}
@@ -39,7 +47,7 @@ export default function FaqSection({ panel = false }: { panel?: boolean }) {
                   <i className={`${styles.signBar} ${styles.signBarV}`} />
                 </span>
               </summary>
-              <p className={styles.answer}>{item.a}</p>
+              <p className={styles.answer}>{item.answer}</p>
             </details>
           ))}
         </div>

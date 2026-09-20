@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Glyph from './Glyph';
-import { BUSINESS_TYPES } from '@/content/business-types';
+import { getSite } from '@/lib/api';
 import styles from './BusinessTypesSection.module.css';
 
 /**
@@ -12,7 +12,7 @@ import styles from './BusinessTypesSection.module.css';
  * the invitation, and it points at the demo form where "Something else" is a
  * real option.
  */
-export default function BusinessTypesSection({
+export default async function BusinessTypesSection({
   eyebrow,
   title,
   lede,
@@ -23,6 +23,8 @@ export default function BusinessTypesSection({
   lede?: string;
   panel?: boolean;
 }) {
+  const { businessTypes } = await getSite();
+
   return (
     <section className={`section ${panel ? 'section--panel' : ''}`} id="business-types">
       <div className="container">
@@ -33,11 +35,13 @@ export default function BusinessTypesSection({
         </header>
 
         <ul className={styles.grid}>
-          {BUSINESS_TYPES.map((type) => (
-            <li key={type.slug} className={`card-surface ${styles.tile}`}>
-              <span className={styles.icon} aria-hidden="true">
-                <Glyph name={type.icon} />
-              </span>
+          {businessTypes.map((type) => (
+            <li key={type.id} className={`card-surface ${styles.tile}`}>
+              {type.icon ? (
+                <span className={styles.icon} aria-hidden="true">
+                  <Glyph name={type.icon} />
+                </span>
+              ) : null}
               <h3 className={styles.name}>{type.name}</h3>
               <p className={styles.body}>{type.description}</p>
             </li>

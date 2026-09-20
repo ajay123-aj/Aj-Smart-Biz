@@ -34,6 +34,7 @@ export class BusinessTypeListComponent {
     slug: [''],
     icon: [''],
     description: [''],
+    isPublic: [false],
     status: ['active'],
   });
 
@@ -48,6 +49,7 @@ export class BusinessTypeListComponent {
       slug: row?.slug ?? '',
       icon: row?.icon ?? '',
       description: row?.description ?? '',
+      isPublic: row?.isPublic ?? false,
       status: row?.status ?? 'active',
     }),
     initialQuery: { sortBy: 'name', sortOrder: 'asc' },

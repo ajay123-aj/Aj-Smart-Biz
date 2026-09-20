@@ -3,14 +3,14 @@
 /**
  * The **website** module — everything a tenant's public site consumes.
  *
- * Mounted at `/website`. Unauthenticated in full: these are the only routes on
+ * Mounted at `/theme`. Unauthenticated in full: these are the only routes on
  * the platform a stranger can reach, which is why the module exists as its own
  * surface rather than as a corner of a larger one. Anything added here is
  * public by definition, and that should take a deliberate act.
  *
  * The tenant is always resolved from the **host** the request arrived on, never
  * from the body or a query parameter a caller could aim — see
- * `controllers/website.controller`. So there is no company id anywhere in this
+ * `controllers/theme.controller`. So there is no company id anywhere in this
  * file, and no route that could be pointed at a company the caller never
  * visited.
  *
@@ -55,9 +55,9 @@ const readLimit = rateLimit({
  */
 /**
  * @openapi
- * /website/leads:
+ * /theme/leads:
  *   post:
- *     tags: [Website]
+ *     tags: [Theme]
  *     summary: Report that someone opened a tenant's site
  *     description: |
  *       Traffic reporting from a tenant's own website. The tenant is resolved
@@ -97,9 +97,9 @@ router.post(
 /** Branding only — what a login screen needs. Both consoles use this too. */
 /**
  * @openapi
- * /website/branding:
+ * /theme/branding:
  *   get:
- *     tags: [Website]
+ *     tags: [Theme]
  *     summary: Branding for a host
  *     description: |
  *       The little a login screen needs to look like the tenant's: name, logo,
@@ -146,9 +146,9 @@ router.get('/branding', readLimit, controller.branding);
 /** The full public profile — what a customer-facing website launches with. */
 /**
  * @openapi
- * /website/company-details:
+ * /theme/company-details:
  *   get:
- *     tags: [Website]
+ *     tags: [Theme]
  *     summary: Everything a tenant's website renders from
  *     description: |
  *       The one call a public site makes at launch. It answers with the whole of
@@ -240,9 +240,9 @@ router.get('/company-details', readLimit, controller.companyDetails);
 
 /**
  * @openapi
- * /website/blog:
+ * /theme/blog:
  *   get:
- *     tags: [Website]
+ *     tags: [Theme]
  *     summary: A tenant's blog archive, a page at a time
  *     description: |
  *       **The one paged public list on the platform**, and it exists because a
@@ -256,7 +256,7 @@ router.get('/company-details', readLimit, controller.companyDetails);
  *       home page, and the rest is asked for here, by the page that shows it.
  *
  *       **Bodies are not in this response.** A listing prints a title, a picture
- *       and a line or two; the article itself comes from `/website/blog/{slug}`.
+ *       and a line or two; the article itself comes from `/theme/blog/{slug}`.
  *
  *       404 when this tenant has no blog today - the plan does not grant it, the
  *       switch is off, or the term has lapsed. The same answer the archive page
@@ -273,9 +273,9 @@ router.get('/company-details', readLimit, controller.companyDetails);
  */
 /**
  * @openapi
- * /website/services/{slug}/slots:
+ * /theme/services/{slug}/slots:
  *   get:
- *     tags: [Website]
+ *     tags: [Theme]
  *     summary: One day of a service's diary, and the next days with anything free
  *     description: |
  *       Answered by the **same generator** the booking route checks against, so a
@@ -311,9 +311,9 @@ router.get('/blog', readLimit, validate(blogSchema.publicList), controller.blogL
 
 /**
  * @openapi
- * /website/blog/{slug}:
+ * /theme/blog/{slug}:
  *   get:
- *     tags: [Website]
+ *     tags: [Theme]
  *     summary: One article, with the two beside it
  *     description: |
  *       The slug is matched **within the tenant the host resolved to**, never
@@ -349,9 +349,9 @@ router.get('/blog/:slug', readLimit, validate(blogSchema.publicOne), controller.
  */
 /**
  * @openapi
- * /website/testimonials:
+ * /theme/testimonials:
  *   post:
- *     tags: [Website]
+ *     tags: [Theme]
  *     summary: Leave a review on a tenant's website
  *     description: |
  *       The only unauthenticated **write** on the platform, and every rule here
@@ -422,9 +422,9 @@ router.post(
 
 /**
  * @openapi
- * /website/service-leads:
+ * /theme/service-leads:
  *   post:
- *     tags: [Website]
+ *     tags: [Theme]
  *     summary: Ask a tenant to call you back about one of its services
  *     description: |
  *       The enquiry form behind a service card's button. The tenant is resolved
@@ -486,9 +486,9 @@ router.post(
 
 /**
  * @openapi
- * /website/orders:
+ * /theme/orders:
  *   post:
- *     tags: [Website]
+ *     tags: [Theme]
  *     summary: Place an order from a tenant's cart
  *     description: |
  *       The cart on a tenant's own website, turned into a record. The tenant is
@@ -572,9 +572,9 @@ const authLimit = rateLimit({
 
 /**
  * @openapi
- * /website/auth/register:
+ * /theme/auth/register:
  *   post:
- *     tags: [Website]
+ *     tags: [Theme]
  *     summary: Register a customer, or ask for a sign-in code
  *     description: |
  *       A name, a mobile number and an email. **No password** — sign-in is a
@@ -610,9 +610,9 @@ router.post('/auth/register', authLimit, validate(customerSchema.register), cust
 
 /**
  * @openapi
- * /website/auth/request-otp:
+ * /theme/auth/request-otp:
  *   post:
- *     tags: [Website]
+ *     tags: [Theme]
  *     summary: Ask for a sign-in code
  *     description: |
  *       Returns `registered`, so the website can carry somebody new straight into
@@ -647,9 +647,9 @@ router.post('/auth/request-otp', authLimit, validate(customerSchema.requestOtp),
 
 /**
  * @openapi
- * /website/auth/verify:
+ * /theme/auth/verify:
  *   post:
- *     tags: [Website]
+ *     tags: [Theme]
  *     summary: Exchange a code for a session
  *     description: |
  *       Every failure says the same thing — no account, wrong code and expired
@@ -698,9 +698,9 @@ mine.delete('/addresses/:id', validate(customerSchema.idParam), customerControll
 
 /**
  * @openapi
- * /website/me/orders:
+ * /theme/me/orders:
  *   get:
- *     tags: [Website]
+ *     tags: [Theme]
  *     summary: A customer's own order history
  *     description: |
  *       Their orders, newest first, with the lines on each — a history that only

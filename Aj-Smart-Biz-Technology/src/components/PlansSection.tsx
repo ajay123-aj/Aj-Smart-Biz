@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Glyph from './Glyph';
-import { PLANS, type Plan } from '@/content/plans';
+import { getSite, type Capability, type Plan } from '@/lib/api';
 import {
   billingUnit,
   capabilitiesOf,
@@ -15,12 +15,15 @@ import styles from './PlansSection.module.css';
 /**
  * The pricing table.
  *
- * Every figure on these cards comes from `content/plans.ts` — the price, the
- * discount, the cycle, the limits, and which capabilities the plan switches on.
- * There is no second copy of any of it in this component, so changing a price
- * is one edit in one file.
+ * Every figure on these cards comes from the API — the price, the discount, the
+ * cycle, the limits, and which capabilities the plan switches on. There is no
+ * second copy of any of it in this component, and no rupee figure anywhere in
+ * this project: a price is changed in the super admin console and nowhere else.
+ *
+ * Only plans flagged `isPublic` reach this list. The platform also sells plans
+ * built for one tenant, and those are not a price list.
  */
-export default function PlansSection({
+export default async function PlansSection({
   eyebrow,
   title,
   lede,
@@ -34,6 +37,10 @@ export default function PlansSection({
   footnote?: string;
   showAllLink?: boolean;
 }) {
+  const { plans, capabilities } = await getSite();
+
+  if (!plans.length) return null;
+
   return (
     <section className="section" id="plans">
       <div className="container">
@@ -48,8 +55,8 @@ export default function PlansSection({
         ) : null}
 
         <ul className={styles.grid}>
-          {PLANS.map((plan) => (
-            <PlanCard key={plan.id} plan={plan} />
+          {plans.map((plan) => (
+            <PlanCard key={plan.id} plan={plan} catalogue={capabilities} />
           ))}
         </ul>
 
@@ -78,9 +85,9 @@ export default function PlansSection({
  *                 keys into names. Chips, because it is a set to scan rather
  *                 than an argument to read.
  */
-function PlanCard({ plan }: { plan: Plan }) {
+function PlanCard({ plan, catalogue }: { plan: Plan; catalogue: Capability[] }) {
   const saving = discountPercent(plan);
-  const includes = capabilitiesOf(plan);
+  const includes = capabilitiesOf(plan, catalogue);
 
   return (
     <li className={`card-surface ${styles.card} ${plan.isPopular ? styles.popular : ''}`}>
@@ -135,7 +142,7 @@ function PlanCard({ plan }: { plan: Plan }) {
               /* `title` carries the capability's own one-line summary, so the
                  chip stays short without losing what it means. */
               <li key={item.key} className="chip" title={item.summary}>
-                <Glyph name={item.icon} className={styles.chipIcon} />
+                {item.icon ? <Glyph name={item.icon} className={styles.chipIcon} /> : null}
                 {item.name}
               </li>
             ))}
@@ -146,8 +153,9 @@ function PlanCard({ plan }: { plan: Plan }) {
       {/*
         The plan rides along in the query string, so the demo form opens with
         this plan already chosen — and the message we receive says which card
-        they were looking at. The id is checked against `PLANS` on the other
-        side, so a stale or hand-typed one falls back to "not sure yet".
+        they were looking at. The id is the plan's `code` and is checked
+        against the live list on the other side, so a stale or hand-typed one
+        falls back to "not sure yet".
       */}
       <div className={styles.ctaSlot}>
         <Link

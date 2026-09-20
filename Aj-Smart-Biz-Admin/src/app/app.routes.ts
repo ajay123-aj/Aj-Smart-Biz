@@ -185,6 +185,14 @@ export const routes: Routes = [
               ),
           },
           {
+            path: 'social',
+            title: 'Social links',
+            loadComponent: () =>
+              import('./features/company/social-manager.component').then(
+                (m) => m.SocialManagerComponent
+              ),
+          },
+          {
             path: 'team',
             title: 'Team',
             loadComponent: () =>

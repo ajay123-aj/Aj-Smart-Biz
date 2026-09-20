@@ -6,6 +6,7 @@ const {
   FUNCTIONALITY,
   FUNCTIONALITY_VALUES,
   WHATSAPP_TYPE_VALUES,
+  SOCIAL_PLATFORM_VALUES,
   SHARE_CHANNEL_VALUES,
   STAT_MODE,
   STAT_MODE_VALUES,
@@ -422,6 +423,63 @@ const whatsappReorder = {
 };
 
 /* ------------------------------------------------------------------ *
+ * Social links
+ * ------------------------------------------------------------------ */
+
+/**
+ * A profile URL.
+ *
+ * `http(s)` only, and that is the whole security story for a field whose value
+ * becomes an `href` in every visitor's footer. Without the scheme allow-list a
+ * company admin could store `javascript:...` and the website would render it as
+ * a link — the templates escape the value, but a `javascript:` URL is dangerous
+ * precisely because escaping it changes nothing.
+ *
+ * The scheme is required rather than assumed: `instagram.com/acme` with no
+ * scheme is a *relative* link once it reaches an `href`, and it would quietly
+ * point at a page on the tenant's own site.
+ */
+const socialUrl = Joi.string()
+  .trim()
+  .uri({ scheme: ['http', 'https'] })
+  .max(500)
+  .messages({
+    'string.uriCustomScheme': 'url must start with http:// or https://',
+  });
+
+const socialFields = {
+  platform: Joi.string().valid(...SOCIAL_PLATFORM_VALUES),
+  url: socialUrl,
+  label: Joi.string().trim().allow('', null).max(80),
+  sequence: Joi.number().integer().min(0).max(9999),
+  status,
+};
+
+const socialCreate = {
+  body: Joi.object({
+    ...socialFields,
+    platform: socialFields.platform.required(),
+    url: socialUrl.required(),
+  }),
+};
+
+/** Partial — see the note at the top of `master.validator` on why. */
+const socialUpdate = {
+  params: idParam,
+  body: Joi.object(socialFields).min(1),
+};
+
+const socialReorder = {
+  body: Joi.object({
+    ids: Joi.array().items(Joi.number().integer().positive().required()).min(1).max(100).required(),
+  }),
+};
+
+const socialListQuery = {
+  query: listQuery({ platform: Joi.string().valid(...SOCIAL_PLATFORM_VALUES) }),
+};
+
+/* ------------------------------------------------------------------ *
  * About stat cards
  * ------------------------------------------------------------------ */
 
@@ -749,7 +807,7 @@ const serviceUpdate = { params: idParam, body: Joi.object(serviceFields).min(1) 
  * anything.
  *
  * `domain` is how the endpoint knows which tenant is being enquired at on a
- * local dev server, matching `?domain=` on `/website/company-details`. In
+ * local dev server, matching `?domain=` on `/theme/company-details`. In
  * production the Host header answers it and the field is never sent.
  */
 const serviceLeadSubmit = {
@@ -946,6 +1004,10 @@ module.exports = {
   whatsappListQuery: {
     query: listQuery({ type: Joi.string().valid(...WHATSAPP_TYPE_VALUES) }),
   },
+  socialCreate,
+  socialUpdate,
+  socialReorder,
+  socialListQuery,
   statCreate,
   statUpdate,
   teamCreate,

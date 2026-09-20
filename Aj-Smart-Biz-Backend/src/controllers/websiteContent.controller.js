@@ -40,6 +40,26 @@ const stats = cardResource({
   searchFields: ['label'],
 });
 
+/**
+ * The social profiles in the website footer.
+ *
+ * A card resource like the rest: an ordered, tenant-owned list, gated on the
+ * plan granting `social_media` rather than on the feature being switched on —
+ * so a company can tidy its links while the row of icons is off.
+ */
+const socialLinks = cardResource({
+  model: db.CompanySocialLink,
+  functionality: FUNCTIONALITY.SOCIAL_MEDIA,
+  label: 'Social link',
+  searchFields: ['label', 'url'],
+  /**
+   * Not branch-scoped, unlike every other section: a company's Instagram
+   * account belongs to the business, not to one of its shops. The model has no
+   * `branch_id` at all, which is what this flag tells the factory.
+   */
+  branchScoped: false,
+});
+
 const team = cardResource({
   model: db.CompanyTeamMember,
   functionality: FUNCTIONALITY.TEAM,
@@ -531,6 +551,7 @@ const testimonials = {
 
 module.exports = {
   stats,
+  socialLinks,
   team,
   gallery,
   testimonials,

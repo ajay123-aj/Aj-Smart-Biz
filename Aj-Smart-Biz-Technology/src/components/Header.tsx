@@ -3,18 +3,33 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CONTACT, NAV_LINKS, SITE } from '@/config/site';
+import type { NavLink } from '@/lib/api';
 import styles from './Header.module.css';
 
 /**
  * The floating glass bar.
  *
  * A client component for three things that need the browser: the scroll state,
- * the escape key, and closing the mobile sheet when the route changes. The nav
- * itself is a constant — this site has one owner and five pages, both known at
- * build time — so nothing is threaded in from the layout.
+ * the escape key, and closing the mobile sheet when the route changes.
+ *
+ * **The only component on this site that is handed its content instead of
+ * reading it.** Everything else is a server component and calls `getSite`
+ * directly; a client component cannot, so the layout fetches this half and
+ * passes it down. Kept to the three things the bar actually renders rather than
+ * the whole payload, because all of it would otherwise be serialised into the
+ * browser bundle on every page.
  */
-export default function Header() {
+export default function Header({
+  shortName,
+  navLinks,
+  phone,
+  phoneHref,
+}: {
+  shortName?: string;
+  navLinks: NavLink[];
+  phone?: string;
+  phoneHref?: string;
+}) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
@@ -59,11 +74,11 @@ export default function Header() {
           <span className={styles.mark} aria-hidden="true">
             AJ
           </span>
-          <span className={styles.brandText}>{SITE.shortName}</span>
+          <span className={styles.brandText}>{shortName}</span>
         </Link>
 
         <nav className={`${styles.nav} ${menuOpen ? styles.navOpen : ''}`} aria-label="Primary">
-          {NAV_LINKS.map((link) => (
+          {navLinks.map((link) => (
             <Link
               key={link.href}
               className={styles.navLink}
@@ -80,9 +95,11 @@ export default function Header() {
 
           {/* Inside the nav so it is reachable in the mobile sheet, where the
               desktop call-to-action beside it is hidden. */}
-          <a className={styles.navPhone} href={`tel:${CONTACT.phoneHref}`}>
-            {CONTACT.phone}
-          </a>
+          {phoneHref ? (
+            <a className={styles.navPhone} href={`tel:${phoneHref}`}>
+              {phone ?? phoneHref}
+            </a>
+          ) : null}
         </nav>
 
         <Link className={`btn btn--primary ${styles.cta}`} href="/demo">

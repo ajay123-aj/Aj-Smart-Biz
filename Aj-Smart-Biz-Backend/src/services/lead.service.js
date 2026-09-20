@@ -537,6 +537,14 @@ module.exports = {
   recordVisit,
   /* Exported for the controllers and for tests to reuse the same rules. */
   collectUtm,
+  /**
+   * Also used by `marketingLead.service`, which tracks our own site.
+   *
+   * Exported rather than copied on purpose: this is where a beacon's payload
+   * is normalised, bounded and parsed, and two copies of those rules would
+   * drift the first time one of them learned about a new field.
+   */
+  describeVisit,
   utmColumns,
   clientIp,
   resolveDeviceId,

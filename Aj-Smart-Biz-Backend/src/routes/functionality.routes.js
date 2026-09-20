@@ -4,7 +4,8 @@
  * Optional functionality for one tenant: the on/off switches and their
  * settings, plus the typed WhatsApp numbers the `whatsapp` feature publishes.
  *
- * Mounted under `/my-company/functionalities` and `/my-company/whatsapp-numbers`
+ * Mounted under `/my-company/functionalities`, `/my-company/whatsapp-numbers`
+ * and `/my-company/social-links`
  * with `mergeParams`, so the same router could be hung off a super-admin
  * `/companies/:companyId/...` path later without changing the controller.
  *
@@ -200,12 +201,27 @@ serviceCategories.patch('/:id/status', validate(master.statusBody), serviceCateg
 serviceCategories.delete('/:id', validate(master.idParam), serviceCategoryController.remove);
 
 /**
+ * The social profiles the website footer renders.
+ *
+ * `/reorder` before `/:id`, or Express reads "reorder" as an id — the same
+ * ordering hazard every list here carries.
+ */
+const socialLinks = express.Router({ mergeParams: true });
+socialLinks.get('/', validate(schema.socialListQuery), content.socialLinks.list);
+socialLinks.patch('/reorder', validate(schema.socialReorder), content.socialLinks.reorder);
+socialLinks.post('/', validate(schema.socialCreate), content.socialLinks.create);
+socialLinks.put('/:id', validate(schema.socialUpdate), content.socialLinks.update);
+socialLinks.patch('/:id/status', validate(master.statusBody), content.socialLinks.toggleStatus);
+socialLinks.delete('/:id', validate(master.idParam), content.socialLinks.remove);
+
+/**
  * Exported as separate routers rather than one: the caller mounts each under
  * its own path with its own guards, and an Express middleware attached to a
  * pathless `use` would otherwise run on every request to the parent router.
  */
 module.exports = {
   serviceCategories,
+  socialLinks,
   functionalities,
   whatsapp,
   about,

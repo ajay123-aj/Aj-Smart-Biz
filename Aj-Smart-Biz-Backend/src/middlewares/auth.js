@@ -80,7 +80,7 @@ const authenticate = asyncHandler(async (req, res, next) => {
    * it has no customers who can be signed in to it.
    *
    * `companyId` is taken from the **token**, never from the request. It is what
-   * pins every `/website/me/*` route to one tenant, and it is why a customer of
+   * pins every `/theme/me/*` route to one tenant, and it is why a customer of
    * one shop cannot read another's orders by changing a path.
    */
   if (payload.scope === AUTH_SCOPE.CUSTOMER) {
@@ -136,7 +136,7 @@ const adminOnly = requireScope(AUTH_SCOPE.ADMIN);
 /**
  * Customer routes, and **only** customer routes.
  *
- * Stated rather than assumed: `/website/me/*` is mounted outside the admin
+ * Stated rather than assumed: `/theme/me/*` is mounted outside the admin
  * prefixes, but a staff token reaching a customer route would resolve
  * `req.auth.id` to an admin's id and read somebody else's addresses. The scope
  * check is what makes that impossible rather than merely unlikely.

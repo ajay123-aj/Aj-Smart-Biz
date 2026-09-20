@@ -17,15 +17,17 @@
 # serving many companies and has to be told which company a request is for.
 #
 # **This one takes none of those, and that is not an oversight.** It calls no
-# API: its plans, capabilities and business types are compiled in from
-# `src/content/`, and the demo form composes a WhatsApp or mail link in the
-# visitor's own browser rather than posting anywhere. So there is nothing to
-# configure per environment, the image is genuinely identical everywhere, and
-# `docker run` needs no `-e` at all.
+# API for everything it renders. The headlines, the price list, the capability
+# catalogue, the trades and the FAQ are read from `GET /website/bootstrap` at
+# request time, and the demo form posts to `POST /website/enquiries`.
 #
-# If that changes — if enquiries are ever posted to the backend — the variable
-# to add is `API_URL`, as a plain ENV read at request time, exactly as the
-# theme images do it. See this project's README.
+# So **`API_URL` is required** and the image needs `-e API_URL=...` to do
+# anything. It is a plain ENV read at request time, exactly as the theme images
+# do it — not a build argument — which is what keeps one image usable in every
+# environment. There is no content compiled in and no fallback copy: pointed at
+# nothing, this renders an error rather than a stale home page, on purpose.
+#
+#     docker run -p 4700:3000 -e API_URL=http://aj-smart-biz-backend:4000/api/v1 #       aj-smart-biz-technology
 # ------------------------------------------------------------------ #
 
 # Node 24, matching the backend and theme images. Next 15 requires >= 18.18.

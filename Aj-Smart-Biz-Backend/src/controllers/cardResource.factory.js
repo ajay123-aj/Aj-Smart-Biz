@@ -42,6 +42,16 @@ const { AUTH_SCOPE, STATUS } = require('../constants');
  *   References that must belong to the same tenant - a service's category, say.
  *   Checked rather than trusted: without it a card could be filed against
  *   another company's row.
+ * @param {boolean} [options.branchScoped=true]
+ *   Whether a row can belong to one branch rather than the whole company.
+ *   True for every section of the website — Team, Gallery, Figures — because a
+ *   branch genuinely has its own people and its own photographs.
+ *
+ *   **False for a list that is a property of the company itself**, which is
+ *   what the footer's social links are: an Instagram account belongs to the
+ *   business, not to one of its shops. Such a model has no `branch_id` at all,
+ *   so eagerly including `Branch` would be a Sequelize error on every read —
+ *   which is exactly how this option came to exist.
  * @param {object[]} [options.include]     Extra associations the console's list
  *   needs alongside the branch.
  * @param {(patch: object, row: object|null) => void} [options.check]
@@ -56,6 +66,7 @@ module.exports = ({
   imageFields = [],
   slugFrom = null,
   owned = [],
+  branchScoped = true,
   include = [],
   check = null,
 }) => {
@@ -134,13 +145,13 @@ module.exports = ({
     const rows = await model.findAll({
       where: mergeWhere(
         { companyId },
-        branchFilter(req.query),
+        branchScoped ? branchFilter(req.query) : null,
         req.query.status ? { status: req.query.status } : null,
         req.query.search && searchFields.length
           ? require('../utils/query').buildSearch(req.query.search, searchFields)
           : null
       ),
-      include: [BRANCH_INCLUDE, ...include],
+      include: branchScoped ? [BRANCH_INCLUDE, ...include] : include,
       order: ORDER,
     });
     return success(res, { message: `${label} list fetched successfully`, data: { items: rows } });
@@ -149,7 +160,9 @@ module.exports = ({
   const create = asyncHandler(async (req, res) => {
     const companyId = resolveCompanyId(req);
     await assertGranted(companyId);
-    const branchId = await assertBranchBelongsToCompany(req.body.branchId, companyId);
+    const branchId = branchScoped
+      ? await assertBranchBelongsToCompany(req.body.branchId, companyId)
+      : null;
 
     /**
      * Appended to the end of its OWN list, like slides: a branch's cards and the
@@ -158,7 +171,9 @@ module.exports = ({
      */
     const sequence =
       req.body.sequence ??
-      ((await model.max('sequence', { where: { companyId, branchId: branchId ?? null } })) || 0) + 1;
+      ((await model.max('sequence', {
+        where: branchScoped ? { companyId, branchId: branchId ?? null } : { companyId },
+      })) || 0) + 1;
 
     const body = { ...req.body };
     await assertOwned(body, companyId);
@@ -167,7 +182,7 @@ module.exports = ({
     const row = await model.create({
       ...body,
       companyId,
-      branchId: branchId ?? null,
+      ...(branchScoped ? { branchId: branchId ?? null } : {}),
       ...(slugFrom ? { slug: await uniqueSlug(model, companyId, body.slug || body[slugFrom]) } : {}),
       sequence,
       createdBy: req.auth?.id ?? null,
@@ -185,8 +200,11 @@ module.exports = ({
 
     // Moving a card between scopes is allowed; moving it to someone else's
     // branch is not. `null` is a real value here — it means "company-wide".
-    if ('branchId' in req.body) {
+    if (branchScoped && 'branchId' in req.body) {
       patch.branchId = await assertBranchBelongsToCompany(req.body.branchId, companyId);
+    } else {
+      /* A model with no branch column must not be handed one. */
+      delete patch.branchId;
     }
 
     await assertOwned(patch, companyId);

@@ -6,8 +6,7 @@
  * in it.
  */
 
-import type { Plan } from '@/content/plans';
-import { CAPABILITIES, type Capability, type CapabilityKey } from '@/content/capabilities';
+import type { Plan, Capability } from './api';
 
 /**
  * Money, in the currency the plan is priced in.
@@ -70,16 +69,25 @@ export function plural(count: number, one: string, many = `${one}s`): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
-const BY_KEY = new Map<CapabilityKey, Capability>(CAPABILITIES.map((item) => [item.key, item]));
-
 /**
  * The capabilities a plan switches on, as full entries rather than bare keys.
  *
  * A key with no entry is **dropped** rather than rendered raw, so retiring a
  * capability removes it from every pricing card at once without anybody having
- * to edit the plans as well. `CapabilityKey` being a union means a typo is a
- * build error rather than a silently missing chip, so this only ever drops
- * something genuinely retired.
+ * to edit the plans as well.
+ *
+ * The catalogue is passed in rather than imported. It used to be a module-level
+ * constant, which cannot work now that both the plans and the catalogue arrive
+ * from the API on each render — and passing it makes the drop-unknown-keys rule
+ * a property of one call rather than of whatever was loaded at import time.
+ *
+ * Both lists come from the same `/website/bootstrap` response, so a key is only
+ * ever missing because the capability was genuinely retired and a plan still
+ * names it — which is exactly the case this is meant to survive.
  */
-export const capabilitiesOf = (plan: Plan): Capability[] =>
-  plan.includes.map((key) => BY_KEY.get(key)).filter((item): item is Capability => Boolean(item));
+export const capabilitiesOf = (plan: Plan, catalogue: Capability[]): Capability[] => {
+  const byKey = new Map(catalogue.map((item) => [item.key, item]));
+  return plan.includes
+    .map((key) => byKey.get(key))
+    .filter((item): item is Capability => Boolean(item));
+};

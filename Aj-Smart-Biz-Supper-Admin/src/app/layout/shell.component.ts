@@ -149,5 +149,22 @@ export class ShellComponent {
         { label: 'Theme Management', route: '/themes', icon: '🎨' },
       ],
     },
+    /**
+     * Our own marketing site, not a tenant's.
+     *
+     * Its own group rather than three more entries under Platform: these edit
+     * the site that *sells* the platform, and filing them beside Business Types
+     * invites somebody to read "Website content" as a tenant's website.
+     */
+    {
+      label: 'Our website',
+      items: [
+        { label: 'Website Content', route: '/website/content', icon: '📝' },
+        { label: 'Website FAQ', route: '/website/faq', icon: '❓' },
+        { label: 'Website Enquiries', route: '/website/enquiries', icon: '📨' },
+        { label: 'Website Leads', route: '/website/leads', icon: '📡' },
+        { label: 'Campaign Analysis', route: '/website/analytics', icon: '📈' },
+      ],
+    },
   ];
 }

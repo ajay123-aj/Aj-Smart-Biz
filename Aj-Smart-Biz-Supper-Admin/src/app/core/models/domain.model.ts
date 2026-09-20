@@ -60,6 +60,15 @@ export interface BusinessType extends AuditFields {
   slug?: string | null;
   icon?: string | null;
   description?: string | null;
+  /**
+   * Whether the Technology marketing site offers this trade on its demo form.
+   *
+   * Defaults to false. This table holds both the coarse types a company is
+   * classified by ("Retail") and the richer ones the marketing site advertises
+   * ("Retail shop", with an icon and a line of copy); showing all of them put
+   * near duplicates next to each other on the public form.
+   */
+  isPublic: boolean;
 }
 
 export interface Theme extends AuditFields {
@@ -103,6 +112,16 @@ export interface Plan extends AuditFields {
    */
   functionalities?: FunctionalityKey[] | null;
   isPopular: boolean;
+  /**
+   * Whether the Technology marketing site advertises this plan.
+   *
+   * **Defaults to false, and that default is the point.** This table also holds
+   * plans built for one tenant and plans bundled with a theme; those were never
+   * meant to be read by strangers, and a public pricing page that showed every
+   * active plan would list them. Only `/website/plans` reads this — every
+   * console still sees every plan.
+   */
+  isPublic: boolean;
   sequence: number;
   /** Attached by the API so the plan list can show what each plan is carrying. */
   usage?: { companies: number; expiringSoon: number };

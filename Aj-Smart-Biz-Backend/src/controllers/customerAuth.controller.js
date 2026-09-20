@@ -76,7 +76,7 @@ function meOf(req) {
  * ------------------------------------------------------------------ */
 
 /**
- * POST /website/auth/register
+ * POST /theme/auth/register
  *
  * A name, a mobile number and an email. Nothing else, and no password.
  *
@@ -136,7 +136,7 @@ const register = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /website/auth/request-otp
+ * POST /theme/auth/request-otp
  *
  * Signing in — and finding out that you need to register instead.
  *
@@ -210,7 +210,7 @@ const requestOtp = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /website/auth/verify
+ * POST /theme/auth/verify
  *
  * The code, and a token if it is right.
  *
@@ -283,7 +283,7 @@ const otpResponse = (otp, phone) => ({
  * Their details
  * ------------------------------------------------------------------ */
 
-/** GET /website/me — who is signed in, with their addresses. */
+/** GET /theme/me — who is signed in, with their addresses. */
 const me = asyncHandler(async (req, res) => {
   const { companyId, customerId } = meOf(req);
 
@@ -305,7 +305,7 @@ const me = asyncHandler(async (req, res) => {
 });
 
 /**
- * PUT /website/me
+ * PUT /theme/me
  *
  * The name and the email, and **not the phone**. The number is the identity —
  * changing it would move the account to a different person, silently take their
@@ -385,7 +385,7 @@ const updateAddress = asyncHandler(async (req, res) => {
 });
 
 /**
- * DELETE /website/me/addresses/:id
+ * DELETE /theme/me/addresses/:id
  *
  * Safe at any time, and needs no guard against orders that used it: an order
  * copies its address as text when it is placed, so the ones already delivered
@@ -420,7 +420,7 @@ const removeAddress = asyncHandler(async (req, res) => {
  * ------------------------------------------------------------------ */
 
 /**
- * GET /website/me/orders
+ * GET /theme/me/orders
  *
  * Their own orders, newest first, with the lines on each.
  *
@@ -464,7 +464,7 @@ const myOrders = asyncHandler(async (req, res) => {
 });
 
 /**
- * GET /website/me/services
+ * GET /theme/me/services
  *
  * What this customer has asked about, and where each enquiry got to.
  *

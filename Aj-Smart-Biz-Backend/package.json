@@ -12,6 +12,7 @@
     "db:seed": "cross-env NODE_ENV=development node src/scripts/seed.js",
     "db:seed:catalogue": "cross-env NODE_ENV=development node src/scripts/seedCatalogue.js",
     "db:seed:blog": "cross-env NODE_ENV=development node src/scripts/seedBlog.js",
+    "db:seed:marketing": "cross-env NODE_ENV=development node src/scripts/seedMarketing.js",
     "db:seed:salon": "cross-env NODE_ENV=development node src/scripts/seedSalon.js",
     "db:seed:decor": "cross-env NODE_ENV=development node src/scripts/seedDecorFraming.js"
   },
