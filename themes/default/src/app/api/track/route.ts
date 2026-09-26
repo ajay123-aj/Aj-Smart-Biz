@@ -18,8 +18,8 @@ import { resolveDomain } from '@/lib/company.server';
  *  - **The visitor's IP.** Only a server-side hop can state it truthfully;
  *    a browser cannot tell the API where it is calling from.
  *
- * This is the same shape the `/uploads` rewrite in `next.config.ts` uses, and
- * for the same reason: everything the visitor's browser talks to is this site.
+ * This is the same shape `uploads/[...path]/route.ts` uses, and for the same
+ * reason: everything the visitor's browser talks to is this site.
  */
 
 /** Read at runtime, exactly as `company.server.ts` reads it. Never inlined. */

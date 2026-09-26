@@ -20,17 +20,21 @@
 # components, server actions and middleware, so they are ordinary `docker run`
 # environment variables and the image stays environment-agnostic.
 #
-# Two things are exceptions, and both are ARGs below rather than ENVs:
+# One thing is an exception, and it is an ARG below rather than an ENV:
 #
-#   BACKEND_ORIGIN / API_URL   next.config.ts derives the `/uploads` rewrite
-#                              from these, and Next.js freezes rewrites into
-#                              the route manifest at build time.
-#   NEXT_PUBLIC_*              compiled into the browser bundle by definition.
+#   NEXT_PUBLIC_*   compiled into the browser bundle by definition. Setting it
+#                   at run time does nothing, silently.
 #
-# Setting those at run time does nothing, silently, which is exactly the kind
-# of failure worth a paragraph. The defaults leave `/uploads` unrewritten,
-# which is correct when a proxy in front of this container already serves the
-# API on the same origin.
+# `API_URL` and `BACKEND_ORIGIN` used to be here too, because `next.config.ts`
+# derived the `/uploads` rewrite from them and Next freezes rewrites into the
+# route manifest at build time. Nothing passed them, so every deployed theme
+# proxied its images to the `http://localhost:4000` fallback and answered 500
+# for every logo and photo on the site -- with the correct address sitting
+# right there in the container's environment, ignored.
+#
+# `/uploads` is now a route handler that reads the address per request, so
+# `API_URL` is an ordinary run-time variable like the rest and there is no
+# build-time knob left to get wrong.
 # ------------------------------------------------------------------ #
 
 # Node 24, matching the backend image. Next 15 requires >= 18.18.
@@ -69,14 +73,10 @@ RUN apk add --no-cache libc6-compat
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# See the note at the top of this file: these are build-time only, and are
-# ARGs so a `docker run -e` cannot appear to set them.
-ARG API_URL
-ARG BACKEND_ORIGIN
+# See the note at the top of this file: this is build-time only, and is an ARG
+# so a `docker run -e` cannot appear to set it.
 ARG NEXT_PUBLIC_FILES_URL
-ENV API_URL=${API_URL} \
-    BACKEND_ORIGIN=${BACKEND_ORIGIN} \
-    NEXT_PUBLIC_FILES_URL=${NEXT_PUBLIC_FILES_URL}
+ENV NEXT_PUBLIC_FILES_URL=${NEXT_PUBLIC_FILES_URL}
 
 # Anonymous usage stats, from a CI runner that is rebuilt every run. Off.
 ENV NEXT_TELEMETRY_DISABLED=1
