@@ -280,3 +280,14 @@
   margin: 0 0 8px;
   font-size: 1.05rem;
 }
+
+/*
+ * Shown only when this service keeps hours of its own -- see `BookingPanel`.
+ * Quiet: it explains a diary that looks short, it does not advertise.
+ */
+.ownHours {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  opacity: 0.75;
+}

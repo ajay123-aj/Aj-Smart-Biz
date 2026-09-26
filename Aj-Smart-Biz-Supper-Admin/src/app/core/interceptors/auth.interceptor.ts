@@ -25,7 +25,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
      */
     tap(() => status.markReachable()),
     catchError((error: HttpErrorResponse) => {
-      if (error.status === 0) {
+      if (isUnreachable(error.status)) {
         /**
          * No connection at all. One screen says so — see `ServerDownComponent`
          * — rather than one toast per failed request: a screen firing six calls
@@ -52,6 +52,26 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     })
   );
 };
+
+/**
+ * Did the API fail to answer at all?
+ *
+ * `0` is a connection the browser could not make — no DNS, refused, CORS.
+ *
+ * **502/503/504 mean the same thing through a proxy**, and that is the case
+ * that matters here: in development the console talks to the API through the
+ * dev server (see `proxy.conf.js`), so a backend that is down produces a *Bad
+ * Gateway from the proxy* rather than a refused connection. Treating that as an
+ * ordinary server error sent the guard down its "the session is over" path,
+ * which redirected to /login, which `guestGuard` bounced back to /dashboard
+ * because the token was still in storage — a redirect loop firing `/auth/me`
+ * sixty times a second at a server that was already down.
+ *
+ * In production the same codes come from nginx when the API container is not
+ * up, and mean exactly the same thing to the person looking at the screen.
+ */
+export const isUnreachable = (status: number): boolean =>
+  status === 0 || status === 502 || status === 503 || status === 504;
 
 /** Flattens `{ message, errors: [{ field, message }] }` into one string. */
 export function messageOf(error: HttpErrorResponse): string {

@@ -127,6 +127,30 @@ export default function BookingPanel({
 
       {/* The grid. Every slot, with the taken ones disabled rather than removed —
           a row of gaps says the shop is busy, and three times says nothing. */}
+      {/*
+        Said only when this service keeps its own hours.
+
+        Repeating the shop's hours here would be noise — the visitor is already
+        looking at the times. What is worth saying is when *this* service is the
+        exception, because a diary that runs 14:00-18:00 on a shop open from
+        10:30 otherwise looks like a fault.
+      */}
+      {day?.schedule?.ownHours || day?.schedule?.ownSlotMinutes ? (
+        <p className={styles.ownHours}>
+          {day.schedule.ownHours
+            ? `This one is only booked between ${timeLabel(day.schedule.openTime)} and ${timeLabel(day.schedule.closeTime)}`
+            : 'This one is booked'}
+          {day.schedule.ownSlotMinutes
+            ? `, in ${
+              day.schedule.slotMinutes >= 60
+                ? `${day.schedule.slotMinutes / 60}-hour`
+                : `${day.schedule.slotMinutes}-minute`
+            } slots`
+            : ''}
+          .
+        </p>
+      ) : null}
+
       <div className={styles.slots} aria-busy={loading}>
         {day && !day.open ? (
           <p className={styles.empty}>{SERVICES_COPY.bookClosed}</p>

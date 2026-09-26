@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
+import { isUnreachable } from '../interceptors/auth.interceptor';
 import { AuthService } from '../services/auth.service';
 import { ServerStatusService } from '../services/server-status.service';
 import { ToastService } from '../services/toast.service';
@@ -37,7 +38,7 @@ export const authGuard: CanActivateFn = (route, state) => {
        * status signal flips, and `App` puts the server-down screen over the
        * whole console until something answers.
        */
-      if (error.status === 0) {
+      if (isUnreachable(error.status)) {
         status.markUnreachable();
         return of(false);
       }

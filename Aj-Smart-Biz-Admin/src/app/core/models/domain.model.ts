@@ -960,6 +960,19 @@ export interface ServiceCard extends AuditFields {
    * is smaller.
    */
   slotCapacity?: number | null;
+  /**
+   * This service's own booking hours. **Null means "use the company's"**, the
+   * same rule `slotCapacity` follows.
+   *
+   * `openTime`/`closeTime` are `HH:MM` and go together — the API refuses one
+   * without the other. `slotMinutes` is the grid this service's day is cut into:
+   * 60 for hourly, 120 for two-hourly, whatever the shop's own grid is.
+   */
+  openTime?: string | null;
+  closeTime?: string | null;
+  slotMinutes?: number | null;
+  /** Which weekdays, 0 Sunday to 6 Saturday. Null uses the company's days. */
+  days?: number[] | null;
   /** Read this one first. The website gives it the wide cell. */
   featured?: boolean;
   sequence: number;

@@ -33,6 +33,8 @@ const {
   NAV_LABEL_MAX,
   SERVICE_DURATION_MAX,
   SERVICE_SLOT_CAPACITY_MAX,
+  SERVICE_SLOT_MINUTES_MIN,
+  SERVICE_SLOT_MINUTES_MAX,
   BOOKING_STATUS_VALUES,
   BOOKING_SLOT_MINUTES,
   BOOKING_LEAD_HOURS_MAX,
@@ -782,16 +784,101 @@ const serviceFields = {
    * colourist, one van - and it wins even when it is smaller.
    */
   slotCapacity: Joi.number().integer().min(1).max(SERVICE_SLOT_CAPACITY_MAX).allow(null),
+
+  /* ---------------- This service's own hours ---------------- */
+
+  /**
+   * When this service can be booked, `HH:MM` on a 24-hour clock.
+   *
+   * `null` hands the question back to the company's hours, which is the
+   * ordinary case. A pattern rather than a `Joi.date`: this is a time of day and
+   * not an instant, and it means the same thing whatever the date.
+   */
+  openTime: Joi.string()
+    .pattern(/^([01]\d|2[0-3]):[0-5]\d$/)
+    .message('openTime must be HH:mm')
+    .allow(null, ''),
+  closeTime: Joi.string()
+    .pattern(/^([01]\d|2[0-3]):[0-5]\d$/)
+    .message('closeTime must be HH:mm')
+    .allow(null, ''),
+
+  /**
+   * The grid this service's day is cut into — 60 for hourly, 120 for
+   * two-hourly. `null` uses the company's.
+   *
+   * **Any whole number of minutes**, not the company's short allow-list.
+   *
+   * The shop-wide grid is picked from `BOOKING_SLOT_MINUTES` because it is a
+   * default and a free-text box there invites a typo nobody notices. A service
+   * is where the odd one lives — a three-hour workshop, a half-day hire, a
+   * forty-minute lesson — so the console offers those presets *and* a custom
+   * value in minutes, hours or days, which arrives here already in minutes.
+   *
+   * Bounded rather than open: above one day a slot cannot fit inside the day it
+   * is cut from and would generate an empty calendar, and below five minutes a
+   * working day exceeds `BOOKING_SLOTS_PER_DAY_MAX` and is silently truncated.
+   * See `SERVICE_SLOT_MINUTES_MIN`/`MAX`.
+   */
+  slotMinutes: Joi.number()
+    .integer()
+    .min(SERVICE_SLOT_MINUTES_MIN)
+    .max(SERVICE_SLOT_MINUTES_MAX)
+    .allow(null),
+
+  /**
+   * Which weekdays, `0` Sunday to `6` Saturday. `null` or an empty array uses
+   * the company's days — "open on no days" is indistinguishable from "not
+   * answered", and the second is far more likely.
+   */
+  days: Joi.array()
+    .items(Joi.number().integer().min(0).max(6))
+    .max(7)
+    .unique()
+    .allow(null),
 };
+
+/**
+ * The one cross-field rule these hours have: **a window is a pair.**
+ *
+ * One time without the other is a half-answer that would leave the resolver
+ * guessing whether a missing close means "the company's" or "no end", and the
+ * diary it generated either way would be one nobody meant. Refused here so the
+ * person setting it finds out immediately rather than from an empty calendar.
+ *
+ * Applied to create and update alike, and on update only when the body carries
+ * one of the pair — sending neither is how a tenant edits the price without
+ * being asked about opening hours.
+ */
+const windowIsAPair = (schema) =>
+  schema.custom((value, helpers) => {
+    const hasOpen = value.openTime !== undefined && value.openTime !== null && value.openTime !== '';
+    const hasClose = value.closeTime !== undefined && value.closeTime !== null && value.closeTime !== '';
+
+    if (hasOpen !== hasClose) {
+      return helpers.message(
+        'openTime and closeTime go together — set both to give this service its own hours, or neither to use the company hours'
+      );
+    }
+    if (hasOpen && hasClose && value.closeTime <= value.openTime) {
+      return helpers.message('closeTime must be later than openTime');
+    }
+    return value;
+  });
 
 const serviceCreate = {
-  body: Joi.object({
-    ...serviceFields,
-    title: serviceFields.title.required(),
-  }),
+  body: windowIsAPair(
+    Joi.object({
+      ...serviceFields,
+      title: serviceFields.title.required(),
+    })
+  ),
 };
 
-const serviceUpdate = { params: idParam, body: Joi.object(serviceFields).min(1) };
+const serviceUpdate = {
+  params: idParam,
+  body: windowIsAPair(Joi.object(serviceFields).min(1)),
+};
 
 /* ------------------------------------------------------------------ *
  * Service enquiries

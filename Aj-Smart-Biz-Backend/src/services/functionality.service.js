@@ -1091,7 +1091,7 @@ async function publicBenefits(companyId, branchId, settings) {
  * every `.map` on it. A row written before the validator existed, or by hand,
  * cannot break a page from this side.
  */
-const publicService = (row, { categoryPath = [], bookingLive = false } = {}) => ({
+const publicService = (row, { categoryPath = [], bookingLive = false, booking = null } = {}) => ({
   id: row.id,
   /** The address of its own page - `/services/bridal-makeup`. */
   slug: row.slug,
@@ -1153,6 +1153,34 @@ const publicService = (row, { categoryPath = [], bookingLive = false } = {}) => 
    * slot.
    */
   bookable: Boolean(row.bookable) && bookingLive,
+  /**
+   * The hours **this** service is offered in, already resolved.
+   *
+   * The company's, unless the service keeps its own — see `scheduleFor` in the
+   * booking service, which is the single place that merges the two. Sent
+   * resolved rather than as an override the template has to apply, because two
+   * implementations of that rule is how a page ends up printing hours the diary
+   * does not honour.
+   *
+   * Null when the tenant is not taking bookings at all, so a template can test
+   * one field rather than three.
+   */
+  schedule:
+    bookingLive && booking
+      ? (() => {
+        const resolved = bookingService.scheduleFor(row, booking);
+        return {
+          openTime: resolved.openTime,
+          closeTime: resolved.closeTime,
+          slotMinutes: resolved.slotMinutes,
+          days: resolved.days,
+          /** True where this is the service's answer rather than the shop's. */
+          ownHours: resolved.ownHours,
+          ownSlotMinutes: resolved.ownSlotMinutes,
+          ownDays: resolved.ownDays,
+        };
+      })()
+      : null,
   /**
    * This service's own button label, or null to use the section's. Resolved by
    * the website rather than filled in here so a company that changes the
@@ -1236,7 +1264,9 @@ async function publicServices(companyId, branchId, settings, whatsappNumber = nu
     return path;
   };
 
-  const items = rows.map((row) => publicService(row, { categoryPath: pathOf(row.categoryId), bookingLive }));
+  const items = rows.map((row) =>
+    publicService(row, { categoryPath: pathOf(row.categoryId), bookingLive, booking: settings?.booking ?? null })
+  );
 
   /**
    * How many published services sit at or below each category.

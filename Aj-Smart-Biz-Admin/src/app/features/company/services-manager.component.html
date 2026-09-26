@@ -547,6 +547,80 @@
         </div>
       </div>
 
+      <!-- ------------------------------------------------------------------
+           This service's own hours.
+
+           Empty means "the same as the shop", which is why the shop's values
+           are the placeholders rather than the defaults: an empty box then
+           reads as inherited instead of unanswered, and clearing a field is
+           visibly how a service goes back to following the shop.
+           ------------------------------------------------------------------ -->
+      <div class="grid grid-3">
+        <div class="field">
+          <label for="svc-open">Opens at</label>
+          <input id="svc-open" class="input" type="time" formControlName="ownOpenTime"
+                 [placeholder]="companyOpenTime()" />
+        </div>
+
+        <div class="field">
+          <label for="svc-close">Closes at</label>
+          <input id="svc-close" class="input" type="time" formControlName="ownCloseTime"
+                 [placeholder]="companyCloseTime()" />
+        </div>
+
+        <div class="field">
+          <label for="svc-slot">Slot length</label>
+          <select id="svc-slot" class="select" formControlName="ownSlotMinutes">
+            <option value="">Same as the shop ({{ companySlotMinutes() }} min)</option>
+            @for (m of slotMinuteOptions; track m) {
+              <option [value]="m">{{ m >= 60 ? (m / 60) + (m === 60 ? ' hour' : ' hours') : m + ' min' }}</option>
+            }
+            <option [value]="CUSTOM">Custom&hellip;</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Only when Custom is picked. A number and the unit it is said in,
+           because "3 hours" is how somebody describes a workshop and making
+           them work out 180 is where a wrong number gets saved. -->
+      @if (slotIsCustom()) {
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="svc-slot-value">How long</label>
+            <input id="svc-slot-value" class="input" type="number" min="1" step="1"
+                   formControlName="customSlotValue" placeholder="3" />
+          </div>
+          <div class="field">
+            <label for="svc-slot-unit">Unit</label>
+            <select id="svc-slot-unit" class="select" formControlName="customSlotUnit">
+              @for (u of slotUnits; track u.value) {
+                <option [value]="u.value">{{ u.label }}</option>
+              }
+            </select>
+          </div>
+        </div>
+      }
+
+      <!-- What the chosen length actually produces. The one thing a free-text
+           slot length gets wrong is not fitting the day, and a number nobody
+           can picture is exactly where that goes unnoticed. -->
+      @if (slotPreview()) {
+        <span class="hint" style="margin-top:-6px">
+          @if (resolvedSlotMinutes()) {
+            <strong>{{ resolvedSlotMinutes() }} minutes</strong> &mdash;
+          }
+          {{ slotPreview() }}
+        </span>
+      }
+
+      <span class="hint" style="margin-top:-6px">
+        Leave all three empty and this service follows your shop&rsquo;s hours
+        (<strong>{{ companyOpenTime() }}&ndash;{{ companyCloseTime() }}</strong>, every
+        {{ companySlotMinutes() }} minutes). Set them where this one is different &mdash; a two-hour
+        consultation you only take in the afternoon, say. <strong>Both times go together:</strong> set
+        one and you must set the other.
+      </span>
+
       <div class="field">
         <label for="svc-description">The full description</label>
         <textarea id="svc-description" class="textarea" style="min-height:140px" formControlName="description"

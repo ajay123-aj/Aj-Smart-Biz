@@ -1520,6 +1520,27 @@ const BOOKING_HORIZON_MAX = 180;
 /** The most slots one day may be cut into - a guard on the generator, not a rule. */
 const BOOKING_SLOTS_PER_DAY_MAX = 96;
 
+/**
+ * The bounds a **service's own** slot length may take.
+ *
+ * The company's grid is still picked from `BOOKING_SLOT_MINUTES`, a short list
+ * of the sane answers — that is a shop-wide default and a free-text box there
+ * invites a typo nobody notices. A service is where the odd one lives: a
+ * three-hour workshop, a half-day hire, a forty-minute lesson. So the service
+ * takes any whole number of minutes between these.
+ *
+ * `1440` is one day, and it is the ceiling for a reason rather than a round
+ * number: the diary is cut **within** a day's opening hours, so a slot longer
+ * than the day it sits in produces no times at all. Anything above this could
+ * only ever generate an empty calendar.
+ *
+ * `5` at the bottom for the same kind of reason — below it a normal working day
+ * would exceed `BOOKING_SLOTS_PER_DAY_MAX` and be truncated, which reads as a
+ * diary that mysteriously stops at lunchtime.
+ */
+const SERVICE_SLOT_MINUTES_MIN = 5;
+const SERVICE_SLOT_MINUTES_MAX = 1440;
+
 /** The longest a service's own button label may be, matching the column. */
 const SERVICE_CTA_MAX = 40;
 
@@ -2242,6 +2263,8 @@ module.exports = {
   BOOKING_LEAD_HOURS_MAX,
   BOOKING_HORIZON_MAX,
   BOOKING_SLOTS_PER_DAY_MAX,
+  SERVICE_SLOT_MINUTES_MIN,
+  SERVICE_SLOT_MINUTES_MAX,
   SERVICE_HIGHLIGHTS_MAX,
   SERVICE_HIGHLIGHT_LENGTH,
   PRODUCT_DEFAULTS,

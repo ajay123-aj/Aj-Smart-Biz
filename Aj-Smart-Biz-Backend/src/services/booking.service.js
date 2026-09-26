@@ -115,6 +115,60 @@ function bookingSettings(stored) {
 }
 
 /**
+ * The hours in force for **this** service, on top of the company's.
+ *
+ * The one place the two are merged, so every caller — the diary the website
+ * paints, the check that accepts a booking, the next-open-day search — is
+ * working from the same answer. That matters more here than it looks: if the
+ * page were drawn from the company's hours and the write checked the service's,
+ * a visitor could be offered a time the API then refused.
+ *
+ * **Null on the service means "use the company's".** Same rule as
+ * `capacityFor`, and for the same reason — the shop's hours are a fact about the
+ * shop, said once rather than on forty treatments.
+ *
+ * Every value is validated here as well as on the way in, exactly as
+ * `bookingSettings` does: these decide what a stranger is promised, so a row
+ * holding nonsense has to fail closed onto the company's hours rather than
+ * generate an empty diary or an infinite one.
+ *
+ *   - a close at or before the open is dropped, not honoured,
+ *   - a grid of zero or less is dropped,
+ *   - an empty day list is dropped, because "open on no days" is indistinguishable
+ *     from "not answered" and the second is far more likely.
+ */
+const scheduleFor = (service, settings) => {
+  const openOwn = toMinutes(service?.openTime);
+  const closeOwn = toMinutes(service?.closeTime);
+
+  /* Both, and a real window, or neither. See the note on the columns. */
+  const ownWindow = openOwn !== null && closeOwn !== null && closeOwn > openOwn;
+
+  const stepOwn = Number(service?.slotMinutes);
+  const ownStep = Number.isFinite(stepOwn) && stepOwn > 0 ? stepOwn : null;
+
+  const daysOwn = Array.isArray(service?.days)
+    ? [...new Set(service.days.map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))]
+    : [];
+  const ownDays = daysOwn.length ? daysOwn.sort() : null;
+
+  return {
+    openTime: ownWindow ? toClock(openOwn) : settings.openTime,
+    closeTime: ownWindow ? toClock(closeOwn) : settings.closeTime,
+    slotMinutes: ownStep ?? settings.slotMinutes,
+    days: ownDays ?? settings.days,
+    /**
+     * Which of these the service actually overrides, so the console and the
+     * website can say "this service keeps its own hours" rather than leaving
+     * somebody to compare two screens.
+     */
+    ownHours: ownWindow,
+    ownSlotMinutes: ownStep !== null,
+    ownDays: ownDays !== null,
+  };
+};
+
+/**
  * How many bookings one slot of **this** service holds.
  *
  * The company's own limit, unless the service overrides it. Which is the right
@@ -248,11 +302,15 @@ function buildDay({ service, settings, date, taken = new Map() }) {
 
   if (date < first) return { date, open: false, reason: 'past', slots: [] };
   if (date > last) return { date, open: false, reason: 'beyond', slots: [] };
-  if (!settings.days.includes(day.getDay())) return { date, open: false, reason: 'closed', slots: [] };
+  /* This service's hours, which may be its own or the company's. One resolver
+     so the diary, the write check and the day search cannot disagree. */
+  const schedule = scheduleFor(service, settings);
 
-  const open = toMinutes(settings.openTime);
-  const close = toMinutes(settings.closeTime);
-  const step = settings.slotMinutes;
+  if (!schedule.days.includes(day.getDay())) return { date, open: false, reason: 'closed', slots: [] };
+
+  const open = toMinutes(schedule.openTime);
+  const close = toMinutes(schedule.closeTime);
+  const step = schedule.slotMinutes;
   const duration = service.durationMinutes || step;
   const capacity = capacityFor(service, settings);
 
@@ -313,6 +371,20 @@ function buildDay({ service, settings, date, taken = new Map() }) {
     minutes: duration,
     /** The limit in force for this service today - the company's, or its own. */
     capacity,
+    /**
+     * The hours these slots were cut from, and whether they are the service's
+     * own. The website prints them, so it never has to guess by reading the
+     * company's settings and hoping the service agrees.
+     */
+    schedule: {
+      openTime: schedule.openTime,
+      closeTime: schedule.closeTime,
+      slotMinutes: schedule.slotMinutes,
+      days: schedule.days,
+      ownHours: schedule.ownHours,
+      ownSlotMinutes: schedule.ownSlotMinutes,
+      ownDays: schedule.ownDays,
+    },
     slots,
   };
 }
@@ -325,7 +397,10 @@ function buildDay({ service, settings, date, taken = new Map() }) {
  * of queries for a page nobody has scrolled yet.
  */
 async function slotsFor({ company, service, settings, date, transaction = null }) {
-  const step = settings.slotMinutes;
+  /* The service's own grid, or the company's. Existing bookings have to be
+     bucketed on the same grid the day is drawn with, or a taken slot lands in
+     the wrong bucket and the page offers a time that is gone. */
+  const step = scheduleFor(service, settings).slotMinutes;
   const taken = await takenOn(company.id, service.id, date, step, transaction);
   return buildDay({ service, settings, date, taken });
 }
@@ -378,8 +453,12 @@ async function nextOpenDays({ company, service, settings, limit = 14 }) {
   const end = addDays(start, settings.horizonDays);
 
   /* **One** query for the whole horizon, then the arithmetic in memory. A query
-     per day would be thirty round trips to paint a date picker. */
-  const byDate = await takenBetween(company.id, service.id, start, end, settings.slotMinutes);
+     per day would be thirty round trips to paint a date picker.
+
+     Bucketed on this service's own grid, like `slotsFor` — the date picker and
+     the day it opens onto have to agree about what is taken. */
+  const step = scheduleFor(service, settings).slotMinutes;
+  const byDate = await takenBetween(company.id, service.id, start, end, step);
 
   const days = [];
   for (let offset = 0; offset <= settings.horizonDays && days.length < limit; offset += 1) {
@@ -400,6 +479,7 @@ const canMove = (from, to) => (BOOKING_TRANSITIONS[from] ?? []).includes(to);
 module.exports = {
   bookingSettings,
   capacityFor,
+  scheduleFor,
   buildDay,
   slotsFor,
   takenBetween,

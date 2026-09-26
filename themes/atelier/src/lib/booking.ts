@@ -42,6 +42,26 @@ export interface DiaryDay {
   minutes?: number;
   /** The limit in force for this service - the company's, or its own override. */
   capacity?: number;
+  /**
+   * The hours these slots were cut from, already resolved by the API.
+   *
+   * **This service's own, where it keeps them, and the shop's otherwise.** Sent
+   * resolved rather than as an override the page has to apply: the diary and the
+   * line of text describing it have to agree, and two implementations of that
+   * rule is how a page ends up printing hours the diary does not honour.
+   *
+   * The `own*` flags are what let the panel say "this service only" rather than
+   * repeating the shop's hours as though they were news.
+   */
+  schedule?: {
+    openTime: string;
+    closeTime: string;
+    slotMinutes: number;
+    days: number[];
+    ownHours: boolean;
+    ownSlotMinutes: boolean;
+    ownDays: boolean;
+  };
   slots: Slot[];
 }
 

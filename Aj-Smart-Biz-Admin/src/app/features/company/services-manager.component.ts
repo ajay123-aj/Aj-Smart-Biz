@@ -1,4 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { map, startWith } from 'rxjs';
 import { FormArray, FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../../core/services/api.service';
@@ -288,7 +290,132 @@ export class ServicesManagerComponent {
   });
 
   /** What one slot holds today, for the hint under the per-service box. */
-  readonly companyCapacity = computed(() => Number(this.copyForm.controls.bookingSlotCapacity.value) || 1);
+  /**
+   * The slot length this form is currently describing, in minutes.
+   *
+   * `null` means "use the shop's". One computed rather than the template
+   * reading three controls, so the preview, the warning and the value that gets
+   * saved cannot disagree about what was chosen.
+   */
+  readonly resolvedSlotMinutes = computed<number | null>(() => {
+    const picked = String(this.formValue().ownSlotMinutes ?? '');
+    if (!picked) return null;
+    if (picked !== this.CUSTOM) return Number(picked) || null;
+
+    const amount = Number(this.formValue().customSlotValue);
+    if (!Number.isFinite(amount) || amount <= 0) return null;
+
+    const unit = this.slotUnits.find((u) => u.value === this.formValue().customSlotUnit);
+    return Math.round(amount * (unit?.minutes ?? 1));
+  });
+
+  /** Whether the custom value and unit boxes are in play. */
+  readonly slotIsCustom = computed(() => String(this.formValue().ownSlotMinutes ?? '') === this.CUSTOM);
+
+  /**
+   * What the chosen length actually produces, said before it is saved.
+   *
+   * The one thing a free-text slot length gets wrong is not fitting the day:
+   * a three-hour slot in a four-hour window gives one time, and a longer one
+   * gives none at all. A number nobody can picture is exactly where that goes
+   * unnoticed, so the form says how many times it would offer.
+   *
+   * Uses this service's own hours where it has them and the shop's otherwise —
+   * the same precedence the API applies, so the preview matches the diary.
+   */
+  readonly slotPreview = computed(() => {
+    const step = this.resolvedSlotMinutes();
+    if (step === null) return '';
+
+    const toMinutes = (value: string): number | null => {
+      const match = /^(\d{1,2}):(\d{2})$/.exec(String(value ?? '').trim());
+      if (!match) return null;
+      const hours = Number(match[1]);
+      const mins = Number(match[2]);
+      return hours > 23 || mins > 59 ? null : hours * 60 + mins;
+    };
+
+    const open = toMinutes(String(this.formValue().ownOpenTime || '')) ?? toMinutes(this.companyOpenTime());
+    const close = toMinutes(String(this.formValue().ownCloseTime || '')) ?? toMinutes(this.companyCloseTime());
+    if (open === null || close === null || close <= open) return '';
+
+    const count = Math.floor((close - open) / step);
+    if (count < 1) {
+      return `That is longer than the ${Math.round((close - open) / 60)}-hour opening window, so no times would be offered.`;
+    }
+    return `${count} time${count === 1 ? '' : 's'} a day, starting ${this.clockOf(open)}.`;
+  });
+
+  /** Which option the Slot length select should show for a stored value. */
+  private slotSelectFor(minutes: number | null | undefined): string {
+    if (minutes === null || minutes === undefined) return '';
+    return this.slotMinuteOptions.includes(minutes) ? String(minutes) : this.CUSTOM;
+  }
+
+  /**
+   * The number to put in the custom box.
+   *
+   * Expressed in the largest unit it divides cleanly into, so 1440 reads as
+   * `1` day and 180 as `3` hours. Empty for a preset or an inherited value,
+   * because the box is not shown then.
+   */
+  private customValueFor(minutes: number | null | undefined): string {
+    if (minutes === null || minutes === undefined) return '';
+    if (this.slotMinuteOptions.includes(minutes)) return '';
+    if (minutes % 1440 === 0) return String(minutes / 1440);
+    if (minutes % 60 === 0) return String(minutes / 60);
+    return String(minutes);
+  }
+
+  /** The unit that goes with `customValueFor`. */
+  private customUnitFor(minutes: number | null | undefined): string {
+    if (minutes === null || minutes === undefined) return 'minutes';
+    if (this.slotMinuteOptions.includes(minutes)) return 'minutes';
+    if (minutes % 1440 === 0) return 'days';
+    if (minutes % 60 === 0) return 'hours';
+    return 'minutes';
+  }
+
+  /** `570` -> `09:30`. Only used by the preview above. */
+  private clockOf(minutes: number): string {
+    return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+  }
+
+  readonly companyCapacity = computed(() => Number(this.copyValue().bookingSlotCapacity) || 1);
+
+  /**
+   * The shop's own hours, for the placeholders on the per-service fields.
+   *
+   * Shown as the placeholder rather than as the value, so an empty box reads as
+   * "the same as the shop" instead of looking unanswered — and so clearing a
+   * field is visibly how a service goes back to inheriting.
+   */
+  readonly companyOpenTime = computed(() => String(this.copyValue().bookingOpenTime || '09:30'));
+  readonly companyCloseTime = computed(() => String(this.copyValue().bookingCloseTime || '18:30'));
+  readonly companySlotMinutes = computed(() => Number(this.copyValue().bookingSlotMinutes) || 30);
+
+  /** The grids the API accepts. Mirrors `BOOKING_SLOT_MINUTES` in its constants. */
+  readonly slotMinuteOptions = [10, 15, 20, 30, 45, 60, 90, 120];
+
+  /** The value the Slot length select takes when the length is typed by hand. */
+  readonly CUSTOM = 'custom';
+
+  /**
+   * The units a custom slot length can be given in.
+   *
+   * Minutes is what the API stores; hours and days are here because that is how
+   * people say it — "a three-hour workshop", "a half-day hire" — and making
+   * somebody work out 180 or 720 is how a wrong number gets saved.
+   *
+   * A day is the ceiling and not a stepping stone to a week: the diary is cut
+   * *within* a day's opening hours, so a slot longer than the day it sits in
+   * offers no times at all.
+   */
+  readonly slotUnits = [
+    { value: 'minutes', label: 'minutes', minutes: 1 },
+    { value: 'hours', label: 'hours', minutes: 60 },
+    { value: 'days', label: 'days', minutes: 1440 },
+  ];
 
   /** The grids the API accepts. A day has to divide into them sensibly. */
   readonly slotChoices = [10, 15, 20, 30, 45, 60, 90, 120];
@@ -320,11 +447,62 @@ export class ServicesManagerComponent {
     bookable: [false],
     /** Empty inherits the company's limit - see `BookingSettings.slotCapacity`. */
     slotCapacity: [''],
+    /**
+     * This service's own hours. Empty inherits the company's, which is the
+     * ordinary case — the shop's hours are said once on the booking settings
+     * rather than on every treatment.
+     *
+     * The two times go together: the API refuses one without the other, because
+     * a half-window would leave it guessing whether a missing close means "the
+     * company's" or "no end".
+     */
+    ownOpenTime: [''],
+    ownCloseTime: [''],
+    /** Empty inherits the company's grid. 60 for hourly, 120 for two-hourly. */
+    /**
+     * The Slot length select: '' inherits, a number is a preset, `custom` hands
+     * over to the two controls below.
+     */
+    ownSlotMinutes: [''],
+    /** Only read when `ownSlotMinutes` is `custom`. See `resolvedSlotMinutes`. */
+    customSlotValue: [''],
+    customSlotUnit: ['minutes'],
     /** Blank means "use the section's label" — see `ServiceCard.ctaLabel`. */
     ctaLabel: [''],
     featured: [false],
     status: ['active'],
   });
+
+  /**
+   * The service form's value, as a signal.
+   *
+   * **A reactive form's `.value` is a plain property, not a signal.** A
+   * `computed` that reads `form.controls.x.value` therefore never re-runs — it
+   * caches whatever was there the first time it was evaluated. That is not a
+   * subtle staleness either: it is why the custom slot-length boxes did not
+   * appear at all when the select changed, because the `@if` was asking a
+   * computed that had already made its mind up.
+   *
+   * `valueChanges` re-reads `getRawValue()` rather than using the emitted
+   * partial, so disabled controls are included and the shape is always the
+   * whole form.
+   */
+  private readonly formValue = toSignal(
+    this.form.valueChanges.pipe(
+      map(() => this.form.getRawValue()),
+      startWith(this.form.getRawValue())
+    ),
+    { initialValue: this.form.getRawValue() }
+  );
+
+  /** The same, for the section-copy form the placeholders read. */
+  private readonly copyValue = toSignal(
+    this.copyForm.valueChanges.pipe(
+      map(() => this.copyForm.getRawValue()),
+      startWith(this.copyForm.getRawValue())
+    ),
+    { initialValue: this.copyForm.getRawValue() }
+  );
 
   get highlights(): FormArray<FormControl<string>> {
     return this.form.controls.highlights;
@@ -626,6 +804,17 @@ export class ServicesManagerComponent {
       bookable: row?.bookable ?? false,
       slotCapacity:
         row?.slotCapacity === null || row?.slotCapacity === undefined ? '' : String(row.slotCapacity),
+      ownOpenTime: row?.openTime ?? '',
+      ownCloseTime: row?.closeTime ?? '',
+      /**
+       * A stored length is shown as the preset that matches it, and otherwise
+       * as Custom with the largest unit it divides cleanly into — 180 comes
+       * back as "3 hours" rather than "180 minutes", which is how whoever typed
+       * it thinks of it.
+       */
+      ownSlotMinutes: this.slotSelectFor(row?.slotMinutes),
+      customSlotValue: this.customValueFor(row?.slotMinutes),
+      customSlotUnit: this.customUnitFor(row?.slotMinutes),
       /* `?? true` rather than `|| true`: a stored `false` is the shop saying do
          not publish this, and treating it as "never set" would put the price back
          on the website every time somebody opened the card. */
@@ -677,6 +866,13 @@ export class ServicesManagerComponent {
       /* Empty is "use the company's limit", which is a real answer and not a
          missing one - so it goes as null rather than as 1. */
       slotCapacity: numberOrNull(raw.slotCapacity),
+      /* Empty means "use the company's hours" and has to reach the API as null,
+         not as '' — null is what clears an override, '' would be a time. */
+      openTime: raw.ownOpenTime || null,
+      closeTime: raw.ownCloseTime || null,
+      /* The select, or the custom value and unit folded into minutes — one
+         computed decides, so what is previewed is what is saved. */
+      slotMinutes: this.resolvedSlotMinutes(),
       /* Blank means "use the section's", so it goes as null rather than as an
          empty string that would render an empty button. */
       ctaLabel: raw.ctaLabel || null,

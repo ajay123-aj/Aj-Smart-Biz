@@ -196,6 +196,58 @@ module.exports = (sequelize) =>
        */
       slotCapacity: { type: DataTypes.INTEGER, allowNull: true },
 
+      /* ---------------- This service's own hours ---------------- */
+
+      /**
+       * When this service can be booked, and how the day is cut for it.
+       *
+       * **Null means "use the company's".** Exactly the rule `slotCapacity`
+       * follows, and for the same reason: the shop's hours are a fact about the
+       * shop, said once on the booking settings rather than on all forty
+       * treatments. These exist because a service sometimes keeps its own:
+       *
+       *   - bridal work only on Sundays, when the shop is otherwise closed,
+       *   - colour only 10:00-16:00 because the colourist leaves at four,
+       *   - a two-hour consultation on a shop whose grid is thirty minutes.
+       *
+       * `openTime` and `closeTime` are `HH:MM` on a 24-hour clock, stored as
+       * text because they are a time of day and not an instant — they mean the
+       * same thing whatever the date, and a `TIME` column would invite a
+       * timezone nobody wants here.
+       *
+       * **Set as a pair or not at all.** One without the other is the
+       * half-answer that produces a diary nobody meant, so the validator
+       * refuses it: the resolver would otherwise have to guess whether a
+       * missing close means "the company's" or "no end".
+       */
+      openTime: { type: DataTypes.STRING(5), allowNull: true },
+      closeTime: { type: DataTypes.STRING(5), allowNull: true },
+
+      /**
+       * The grid this service's day is cut into, in minutes — 60 for hourly,
+       * 120 for two-hourly.
+       *
+       * Null means the company's. Its own grid is the point of the field: a
+       * salon on a thirty-minute grid still wants a two-hour bridal trial
+       * offered at 10:00 and 12:00, not at 10:00, 10:30, 11:00.
+       *
+       * It is also the grid this service's existing bookings are bucketed on,
+       * so changing it re-reads the diary rather than only re-drawing it. That
+       * is safe — bookings store their own start and duration — but it does
+       * mean a change can make two previously separate appointments share a
+       * slot.
+       */
+      slotMinutes: { type: DataTypes.INTEGER, allowNull: true },
+
+      /**
+       * Which weekdays this service is offered, `0` Sunday to `6` Saturday.
+       *
+       * Null means the company's days. A JSON array rather than seven columns
+       * or a bitmask: it is read as a set, written as a set, and the one query
+       * that touches it does not filter on it.
+       */
+      days: { type: DataTypes.JSON, allowNull: true },
+
       /**
        * Whether the website actually prints that price.
        *
