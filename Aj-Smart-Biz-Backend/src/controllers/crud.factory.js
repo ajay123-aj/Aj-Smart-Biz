@@ -19,6 +19,9 @@ const { STATUS } = require('../constants');
  * @param {Function} [options.beforeDelete] async (instance, req) => void — blocks deletes.
  * @param {Function} [options.decorateRows] async (rows) => rows — adds derived
  *        fields (counts, rollups) that do not belong on the table itself.
+ * @param {Function} [options.scopeWhere] (req) => where | null — narrows what
+ *        list, dropdown and getById can return for the caller, for a master
+ *        some tokens may only partly see.
  */
 module.exports = ({
   model,
@@ -29,6 +32,7 @@ module.exports = ({
   include = [],
   beforeDelete = null,
   decorateRows = null,
+  scopeWhere = null,
 }) => {
   const assertUnique = async (payload, excludeId = null) => {
     for (const field of uniqueFields) {
@@ -42,8 +46,11 @@ module.exports = ({
     }
   };
 
-  const findOrFail = async (id) => {
-    const record = await model.findByPk(id, { include });
+  const findOrFail = async (id, req = null) => {
+    const scoped = req && scopeWhere ? scopeWhere(req) : null;
+    const record = scoped
+      ? await model.findOne({ where: { id, ...scoped }, include })
+      : await model.findByPk(id, { include });
     if (!record) throw ApiError.notFound(`${label} not found`);
     return record;
   };
@@ -53,7 +60,8 @@ module.exports = ({
       const { page, limit, offset } = getPagination(req.query);
       const where = mergeWhere(
         req.query.status ? { status: req.query.status } : null,
-        buildSearch(req.query.search, searchFields)
+        buildSearch(req.query.search, searchFields),
+        scopeWhere ? scopeWhere(req) : null
       );
 
       const result = await model.findAndCountAll({
@@ -72,7 +80,7 @@ module.exports = ({
     /** Lightweight id/name pairs for dropdowns. */
     dropdown: asyncHandler(async (req, res) => {
       const rows = await model.findAll({
-        where: { status: STATUS.ACTIVE },
+        where: { status: STATUS.ACTIVE, ...(scopeWhere ? scopeWhere(req) : null) },
         attributes: ['id', 'name'],
         order: [['name', 'ASC']],
       });
@@ -80,7 +88,7 @@ module.exports = ({
     }),
 
     getById: asyncHandler(async (req, res) => {
-      const record = await findOrFail(req.params.id);
+      const record = await findOrFail(req.params.id, req);
       return success(res, { message: `${label} fetched successfully`, data: record });
     }),
 

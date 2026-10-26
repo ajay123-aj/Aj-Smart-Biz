@@ -50,9 +50,21 @@ module.exports = (sequelize) =>
        * what happened before this column existed.
        *
        * So the marketing site shows nothing until somebody says it should.
-       * Only `/website/plans` reads this; every console still sees every plan.
+       * Only `/website/plans` reads this. The company workspace has its own
+       * switch, `showInAdmin`, below.
        */
       isPublic: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+      /**
+       * Whether company admins see this plan in their workspace: the plans
+       * they can compare and ask to move to.
+       *
+       * **Defaults to false**, for the same reason as `isPublic`: a plan built
+       * for one tenant, a theme's bundle or the sample companies' plan is not
+       * something every company should be offered. A company always still sees
+       * the plan it is on, ticked or not. The platform console sees every plan
+       * regardless.
+       */
+      showInAdmin: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
       sequence: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       status: { type: DataTypes.ENUM(...STATUS_VALUES), allowNull: false, defaultValue: STATUS.ACTIVE },
       createdBy: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },

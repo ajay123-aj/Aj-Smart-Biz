@@ -160,6 +160,7 @@ export class ShellComponent {
       label: 'Our website',
       items: [
         { label: 'Website Content', route: '/website/content', icon: '📝' },
+        { label: 'Website Templates', route: '/website/templates', icon: '🖼️' },
         { label: 'Website FAQ', route: '/website/faq', icon: '❓' },
         { label: 'Website Enquiries', route: '/website/enquiries', icon: '📨' },
         { label: 'Website Leads', route: '/website/leads', icon: '📡' },

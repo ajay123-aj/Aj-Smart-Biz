@@ -124,6 +124,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'website/templates',
+        title: 'Website Templates · Aj Smart Biz',
+        loadComponent: () =>
+          import('./features/marketing/marketing-template.component').then(
+            (m) => m.MarketingTemplateComponent
+          ),
+      },
+      {
         path: 'website/faq',
         title: 'Website FAQ · Aj Smart Biz',
         loadComponent: () =>

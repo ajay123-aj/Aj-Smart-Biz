@@ -50,13 +50,19 @@ const runningSubscription = (companyId, transaction) =>
 const availablePlans = asyncHandler(async (req, res) => {
   const companyId = req.auth.companyId;
 
-  const [plans, current, pending] = await Promise.all([
+  const current = await runningSubscription(companyId);
+
+  /* Only plans the platform has ticked "show in admin", plus the one the
+     company is on, so its own plan is never missing from the comparison. */
+  const [plans, pending] = await Promise.all([
     db.Plan.findAll({
-      where: { status: STATUS.ACTIVE },
+      where: {
+        status: STATUS.ACTIVE,
+        [Op.or]: [{ showInAdmin: true }, ...(current ? [{ id: current.planId }] : [])],
+      },
       attributes: PLAN_ATTRIBUTES,
       order: [['sequence', 'ASC'], ['price', 'ASC']],
     }),
-    runningSubscription(companyId),
     db.PlanRequest.findOne({
       where: { companyId, status: PLAN_REQUEST_STATUS.PENDING },
       include: [{ model: db.Plan, as: 'requestedPlan', attributes: ['id', 'name'] }],
@@ -110,7 +116,8 @@ const createRequest = asyncHandler(async (req, res) => {
 
   const plan = await db.Plan.findByPk(req.body.planId);
   if (!plan) throw ApiError.notFound('Plan not found');
-  if (plan.status !== STATUS.ACTIVE) throw ApiError.badRequest('That plan is not available');
+  // A plan the workspace does not show cannot be asked for by id either.
+  if (plan.status !== STATUS.ACTIVE || !plan.showInAdmin) throw ApiError.badRequest('That plan is not available');
 
   const open = await db.PlanRequest.findOne({
     where: { companyId, status: PLAN_REQUEST_STATUS.PENDING },

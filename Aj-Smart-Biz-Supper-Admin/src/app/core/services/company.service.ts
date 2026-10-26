@@ -2,10 +2,14 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ListQuery, PagedResult } from '../models/api.model';
 import {
+  AiContentJob,
+  AiContentRequest,
   Branch,
   Company,
   CompanyAdmin,
   CompanyCreateResult,
+  CompanyDuplicateResult,
+  SampleCompaniesResult,
   QuotaView,
   Status,
   Subscription,
@@ -50,6 +54,16 @@ export class CompanyService {
     return this.api.post<CompanyCreateResult>('/super-admin/companies', payload);
   }
 
+  /** Creates whichever of the five sample companies are missing; existing ones are left alone. */
+  createSamples(): Observable<SampleCompaniesResult> {
+    return this.api.post<SampleCompaniesResult>('/super-admin/companies/samples');
+  }
+
+  /** A new company from `payload`, with the `include` sections of company `id` copied in. */
+  duplicate(id: number, payload: Record<string, unknown>): Observable<CompanyDuplicateResult> {
+    return this.api.post<CompanyDuplicateResult>(`/super-admin/companies/${id}/duplicate`, payload);
+  }
+
   update(id: number, payload: Record<string, unknown>): Observable<Company> {
     return this.api.put<Company>(`/super-admin/companies/${id}`, payload);
   }
@@ -64,6 +78,17 @@ export class CompanyService {
 
   restore(id: number): Observable<{ id: number }> {
     return this.api.post<{ id: number }>(`/super-admin/companies/${id}/restore`);
+  }
+
+  /* ------------------------- AI content creator ------------------------ */
+
+  /** Starts writing the company's website content; answers at once with the job. */
+  startAiContent(id: number, payload: AiContentRequest): Observable<AiContentJob> {
+    return this.api.post<AiContentJob>(`/super-admin/companies/${id}/ai-content`, payload);
+  }
+
+  aiContentJob(id: number, jobId: string): Observable<AiContentJob> {
+    return this.api.get<AiContentJob>(`/super-admin/companies/${id}/ai-content/${jobId}`);
   }
 
   /* ------------------------------ billing ------------------------------ */

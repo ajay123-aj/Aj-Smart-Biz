@@ -57,6 +57,16 @@ const config = {
    */
   customerOtpDevCode: process.env.CUSTOMER_OTP_DEV_CODE || '123456',
 
+  /**
+   * The AI content creator. The key here is only a fallback: the super admin
+   * normally pastes one into the form, and that one is used for the one job and
+   * never stored. Leave it unset and the form's key is required.
+   */
+  ai: {
+    apiKey: process.env.ANTHROPIC_API_KEY || null,
+    model: process.env.AI_CONTENT_MODEL || 'claude-opus-5-5',
+  },
+
   uploads: {
     // Directory on disk; served read-only at `publicPath`.
     dir: process.env.UPLOAD_DIR || 'uploads',

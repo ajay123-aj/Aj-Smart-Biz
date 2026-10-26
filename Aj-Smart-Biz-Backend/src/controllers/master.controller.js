@@ -4,7 +4,7 @@ const db = require('../models');
 const ApiError = require('../utils/ApiError');
 const { fn, col, Op } = require('sequelize');
 const crudFactory = require('./crud.factory');
-const { OCCUPYING_SUBSCRIPTION_STATUSES, SUBSCRIPTION_STATUS } = require('../constants');
+const { AUTH_SCOPE, OCCUPYING_SUBSCRIPTION_STATUSES, SUBSCRIPTION_STATUS } = require('../constants');
 
 /** Refuses the delete when other records still point at the master row. */
 const blockIfReferenced = (checks) => async (record) => {
@@ -95,6 +95,9 @@ const plan = crudFactory({
   sortFields: ['name', 'price', 'sequence', 'created_at'],
   uniqueFields: ['name'],
   decorateRows: attachPlanUsage,
+  /* `/masters` is readable by any signed-in token. Only the platform console
+     sees every plan; anyone else sees the ones ticked "show in admin". */
+  scopeWhere: (req) => (req.auth?.scope === AUTH_SCOPE.SUPER_ADMIN ? null : { showInAdmin: true }),
   beforeDelete: async (record) => {
     // Suspended tenants count too - they are still occupying the plan.
     const active = await db.CompanySubscription.count({

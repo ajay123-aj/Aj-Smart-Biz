@@ -1,7 +1,7 @@
 'use strict';
 
 const { Joi, id, idParam, listQuery, email, phone, password, status, hexColor } = require('./common');
-const { PAYMENT_MODE, TRANSACTION_STATUS, SUBSCRIPTION_STATUS } = require('../constants');
+const { PAYMENT_MODE, TRANSACTION_STATUS, SUBSCRIPTION_STATUS, AI_CONTENT_MODULE_VALUES, DUPLICATE_SECTION_VALUES, DUPLICATE_SECTION_DEFAULTS } = require('../constants');
 
 /** An upload path returned by `POST /uploads/:folder`, or an absolute URL. */
 const imagePath = Joi.string()
@@ -244,6 +244,42 @@ const transactionList = {
   }),
 };
 
+/**
+ * Everything `companyCreate` takes, for the new company, plus which sections
+ * of company `:id` to copy into it.
+ */
+const companyDuplicate = {
+  params: idParam,
+  body: companyCreate.body.keys({
+    include: Joi.array()
+      .items(Joi.string().valid(...DUPLICATE_SECTION_VALUES))
+      .unique()
+      .default(DUPLICATE_SECTION_DEFAULTS),
+  }),
+};
+
+/* ------------------------ AI content creator ------------------------ */
+/**
+ * The key is optional only because the server may hold one of its own
+ * (`ANTHROPIC_API_KEY`); the service refuses the job when neither is set.
+ */
+const aiContentStart = {
+  params: idParam,
+  body: Joi.object({
+    prompt: Joi.string().trim().min(20).max(8000).required(),
+    apiKey: Joi.string().trim().max(300).allow('', null),
+    modules: Joi.array()
+      .items(Joi.string().valid(...AI_CONTENT_MODULE_VALUES))
+      .min(1)
+      .unique()
+      .default(AI_CONTENT_MODULE_VALUES),
+  }),
+};
+
+const aiContentJob = {
+  params: Joi.object({ id: id.required(), jobId: Joi.string().guid().required() }),
+};
+
 /* ------------------------ Company domains ------------------------ */
 /** Bare hostname: no scheme, no port, no path. */
 const hostname = Joi.string()
@@ -279,4 +315,7 @@ module.exports = {
   subscriptionCreate,
   transactionCreate,
   transactionList,
+  companyDuplicate,
+  aiContentStart,
+  aiContentJob,
 };

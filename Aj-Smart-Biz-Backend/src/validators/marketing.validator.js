@@ -5,6 +5,7 @@ const {
   MARKETING_CONTENT_KEY_VALUES,
   MARKETING_ENQUIRY_KIND_VALUES,
   MARKETING_ENQUIRY_STATUS_VALUES,
+  TEMPLATE_DESIGN_VALUES,
 } = require('../constants');
 
 /**
@@ -147,7 +148,44 @@ const faqUpdate = {
   body: Joi.object(faqFields).min(1),
 };
 
+/* ------------------------------------------------------------------ *
+ * The template showcase
+ * ------------------------------------------------------------------ */
+
+const templateFields = {
+  companyId: Joi.number().integer().positive(),
+  design: Joi.string().valid(...TEMPLATE_DESIGN_VALUES),
+  title: Joi.string().trim().max(150).allow('', null),
+  summary: Joi.string().trim().max(400).allow('', null),
+  /* An absolute http(s) address: it is printed as a link on a public page. */
+  demoUrl: Joi.string().trim().uri({ scheme: ['http', 'https'] }).max(255).allow('', null),
+  featured: Joi.boolean(),
+  sequence: Joi.number().integer().min(0).max(9999),
+  status,
+};
+
+const templateCreate = {
+  body: Joi.object({
+    ...templateFields,
+    companyId: templateFields.companyId.required(),
+    design: templateFields.design.required(),
+  }),
+};
+
+const templateUpdate = {
+  params: idParam,
+  body: Joi.object(templateFields).min(1),
+};
+
+/** `?design=` on the public list narrows it to one design. */
+const templatePublicList = {
+  query: Joi.object({ design: Joi.string().valid(...TEMPLATE_DESIGN_VALUES) }),
+};
+
 module.exports = {
+  templateCreate,
+  templateUpdate,
+  templatePublicList,
   enquiryCreate,
   enquiryList,
   enquiryUpdate,

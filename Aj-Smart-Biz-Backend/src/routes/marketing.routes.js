@@ -161,6 +161,37 @@ router.post('/faqs', validate(schema.faqCreate), controller.adminFaqCreate);
 router.put('/faqs/:id', validate(schema.faqUpdate), controller.adminFaqUpdate);
 router.delete('/faqs/:id', validate({ params: schema.idParam }), controller.adminFaqRemove);
 
+/**
+ * @openapi
+ * /super-admin/marketing/templates:
+ *   get:
+ *     tags: [Super Admin]
+ *     summary: The template showcase entries
+ *     description: |
+ *       Every entry, inactive included, with its company, plus `designs`: the
+ *       three tenant site designs an entry can be shown as.
+ *   post:
+ *     tags: [Super Admin]
+ *     summary: Add a company to the template showcase
+ *     description: |
+ *       `companyId` and `design` are required. `title` and `summary` replace the
+ *       company's own name and description on the card; leave them blank to use
+ *       the company's. `demoUrl` is the live demo; left blank, the company's
+ *       primary domain is offered when it is a public one.
+ * /super-admin/marketing/templates/{id}:
+ *   put:
+ *     tags: [Super Admin]
+ *     summary: Edit a showcase entry
+ *   delete:
+ *     tags: [Super Admin]
+ *     summary: Remove a showcase entry
+ *     description: The demo company itself is not touched.
+ */
+router.get('/templates', controller.adminTemplateList);
+router.post('/templates', validate(schema.templateCreate), controller.adminTemplateCreate);
+router.put('/templates/:id', validate(schema.templateUpdate), controller.adminTemplateUpdate);
+router.delete('/templates/:id', validate({ params: schema.idParam }), controller.adminTemplateRemove);
+
 /* ------------------------------ the enquiries ---------------------------- */
 
 /**

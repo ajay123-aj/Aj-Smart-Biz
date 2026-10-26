@@ -179,6 +179,21 @@ export interface SiteContent {
   };
   contact_page?: { eyebrow?: string; title?: string; lede?: string; formTitle?: string };
   faq_intro?: { eyebrow?: string; title?: string };
+  templates_page?: {
+    eyebrow?: string;
+    title?: string;
+    lede?: string;
+    allLabel?: string;
+    demoLabel?: string;
+    noDemoLabel?: string;
+    sectionsLabel?: string;
+    emptyTitle?: string;
+    emptyBody?: string;
+    homeEyebrow?: string;
+    homeTitle?: string;
+    homeLede?: string;
+    homeLink?: string;
+  };
 }
 
 export interface Site {
@@ -275,6 +290,71 @@ export type EnquiryResult = { ok: true; id: number } | { ok: false; error: strin
  * filled in. The caller decides what to show, and still offers the WhatsApp
  * handoff either way — so a failure here costs us the record, not the lead.
  */
+/* ------------------------------------------------------------------ *
+ * The template showcase
+ * ------------------------------------------------------------------ */
+
+/** One of the tenant site designs in `themes/`, as the API names it. */
+export interface TemplateDesign {
+  key: string;
+  name: string;
+  /** `light`, `dark` or `glass`: which preview surface the card draws. */
+  look: string;
+  summary: string;
+}
+
+/**
+ * One demo company in the showcase. Read live from that company by the API,
+ * so every field here is true of the demo it links to.
+ */
+export interface ShowcaseTemplate {
+  id: number;
+  title: string;
+  summary: string | null;
+  featured: boolean;
+  businessType: { name: string; icon: string | null } | null;
+  design: TemplateDesign;
+  /** The company's brand colours, or nulls when it uses the design's own. */
+  palette: { primary: string | null; secondary: string | null; accent: string | null; mode: string | null };
+  headline: { eyebrow: string | null; title: string; subtitle: string | null } | null;
+  /** Up to four featured service or product names. */
+  highlights: string[];
+  /** The website sections that are live on the demo. */
+  sections: string[];
+  demoUrl: string | null;
+}
+
+export interface Showcase {
+  designs: TemplateDesign[];
+  templates: ShowcaseTemplate[];
+}
+
+/**
+ * The template showcase, optionally narrowed to one design.
+ *
+ * Its own request rather than part of `getSite`: it is only on two pages,
+ * and the API reads every demo company to build it, which is not work every
+ * page on the site should wait for. A failure gives an empty showcase rather
+ * than an error page, because the rest of the page is still worth showing.
+ */
+export const getTemplates = cache(async (design?: string): Promise<Showcase> => {
+  const query = design ? `?design=${encodeURIComponent(design)}` : '';
+  try {
+    const response = await fetch(`${API_URL}/website/templates${query}`, {
+      headers: { Accept: 'application/json' },
+      next: { revalidate: REVALIDATE_SECONDS, tags: ['templates'] },
+    });
+    if (!response.ok) return { designs: [], templates: [] };
+    const payload = (await response.json()) as ApiEnvelope<Showcase>;
+    return {
+      designs: payload?.data?.designs ?? [],
+      templates: payload?.data?.templates ?? [],
+    };
+  } catch {
+    return { designs: [], templates: [] };
+  }
+});
+
 export async function submitEnquiry(payload: EnquiryPayload): Promise<EnquiryResult> {
   try {
     const response = await fetch(`${API_URL}/website/enquiries`, {

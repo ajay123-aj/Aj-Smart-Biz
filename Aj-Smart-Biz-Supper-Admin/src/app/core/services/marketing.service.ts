@@ -12,6 +12,8 @@ import {
   MarketingLeadAnalytics,
   MarketingLeadSummary,
   MarketingLeadVisit,
+  MarketingTemplate,
+  MarketingTemplateList,
 } from '../models/marketing.model';
 import { ApiService } from './api.service';
 
@@ -53,6 +55,25 @@ export class MarketingService {
     body: { payload: Record<string, unknown>; label?: string | null; status?: string }
   ): Observable<MarketingContent> {
     return this.api.put<MarketingContent>(`${this.base}/content/${key}`, body);
+  }
+
+  /* ------------------------- the template showcase ------------------------ */
+
+  listTemplates(): Observable<MarketingTemplateList> {
+    return this.api.get<MarketingTemplateList>(`${this.base}/templates`);
+  }
+
+  createTemplate(body: Partial<MarketingTemplate>): Observable<MarketingTemplate> {
+    return this.api.post<MarketingTemplate>(`${this.base}/templates`, body);
+  }
+
+  updateTemplate(id: number, body: Partial<MarketingTemplate>): Observable<MarketingTemplate> {
+    return this.api.put<MarketingTemplate>(`${this.base}/templates/${id}`, body);
+  }
+
+  /** Takes the entry off the Templates page. The demo company is not touched. */
+  removeTemplate(id: number): Observable<{ id: number }> {
+    return this.api.delete<{ id: number }>(`${this.base}/templates/${id}`);
   }
 
   /* -------------------------------- the FAQ ------------------------------- */

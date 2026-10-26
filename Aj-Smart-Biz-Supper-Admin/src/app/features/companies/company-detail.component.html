@@ -4,6 +4,7 @@
   <app-page-header [title]="c.name" [subtitle]="c.code + ' · ' + c.email">
     <a class="btn btn-ghost" routerLink="/companies">← All companies</a>
     <a class="btn btn-ghost" [routerLink]="['/companies', c.id, 'edit']">Edit</a>
+    <a class="btn btn-ghost" routerLink="/companies/new" [queryParams]="{ duplicate: c.id }">Duplicate</a>
     @if (c.activeSubscription; as active) {
       <a class="btn btn-ghost" [routerLink]="['/subscriptions', active.id]">🗓️ Manage plan</a>
     }

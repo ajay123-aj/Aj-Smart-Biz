@@ -1,4 +1,7 @@
 <app-page-header title="Company Management" subtitle="Every tenant on the platform, with its plan and branches">
+  <button type="button" class="btn btn-ghost" [disabled]="creatingSamples()" (click)="createSamples()">
+    {{ creatingSamples() ? 'Creating samples…' : 'Create sample companies' }}
+  </button>
   <a class="btn btn-primary" routerLink="/companies/new">＋ New company</a>
 </app-page-header>
 
@@ -93,6 +96,7 @@
                   <div class="row-end">
                     <a class="btn btn-sm btn-ghost" [routerLink]="['/companies', row.id]">View</a>
                     <a class="btn btn-sm btn-ghost" [routerLink]="['/companies', row.id, 'edit']">Edit</a>
+                    <a class="btn btn-sm btn-ghost" routerLink="/companies/new" [queryParams]="{ duplicate: row.id }">Duplicate</a>
                     <button type="button" class="btn btn-sm btn-ghost" (click)="toggleStatus(row)">
                       {{ row.status === 'active' ? 'Deactivate' : 'Activate' }}
                     </button>
@@ -109,3 +113,59 @@
     }
   </div>
 </div>
+
+@if (sampleResult(); as result) {
+  <app-modal
+    title="Sample companies"
+    [subtitle]="result.created ? result.created + ' created, ' + result.existing + ' already existed' : 'All five already exist, so nothing was created'"
+    [closeOnBackdrop]="false"
+    (closed)="sampleResult.set(null)"
+  >
+    <table class="table">
+      <thead>
+        <tr><th>Company</th><th>Status</th><th>Admin login</th></tr>
+      </thead>
+      <tbody>
+        @for (sample of result.samples; track sample.key) {
+          <tr>
+            <td>
+              @if (sample.companyId) {
+                <a class="strong" [routerLink]="['/companies', sample.companyId]" (click)="sampleResult.set(null)">{{ sample.name }}</a>
+              } @else {
+                <span class="strong">{{ sample.name }}</span>
+              }
+              <div class="tiny muted">{{ sample.label }}{{ sample.domain ? ' · ' + sample.domain : '' }}</div>
+              @if (sampleSummary(sample.created)) {
+                <div class="tiny muted">{{ sampleSummary(sample.created) }}</div>
+              }
+              @if (sample.message) {
+                <div class="tiny" [style.color]="sample.status === 'failed' ? 'var(--danger)' : 'var(--text-muted, inherit)'">{{ sample.message }}</div>
+              }
+            </td>
+            <td><app-status-badge [value]="sample.status === 'exists' ? 'already_exists' : sample.status" /></td>
+            <td>
+              @if (sample.adminPassword) {
+                <div class="tiny">{{ sample.adminEmail }}</div>
+                <code class="tiny">{{ sample.adminPassword }}</code>
+              } @else {
+                <span class="tiny muted">—</span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    @if (result.created) {
+      <p class="tiny muted" style="margin-top:12px">
+        Passwords are shown only once. Each admin signs in at the company workspace and is asked to change it.
+      </p>
+    }
+
+    <ng-container footer>
+      @if (result.created) {
+        <button type="button" class="btn btn-ghost" (click)="copySampleLogins()">Copy logins</button>
+      }
+      <button type="button" class="btn btn-primary" (click)="sampleResult.set(null)">Done</button>
+    </ng-container>
+  </app-modal>
+}

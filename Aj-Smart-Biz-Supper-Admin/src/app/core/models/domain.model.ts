@@ -118,10 +118,14 @@ export interface Plan extends AuditFields {
    * **Defaults to false, and that default is the point.** This table also holds
    * plans built for one tenant and plans bundled with a theme; those were never
    * meant to be read by strangers, and a public pricing page that showed every
-   * active plan would list them. Only `/website/plans` reads this — every
-   * console still sees every plan.
+   * active plan would list them. Only `/website/plans` reads this.
    */
   isPublic: boolean;
+  /**
+   * Whether company admins see this plan in their workspace, to compare and ask
+   * for. Off by default; a company always still sees the plan it is on.
+   */
+  showInAdmin: boolean;
   sequence: number;
   /** Attached by the API so the plan list can show what each plan is carrying. */
   usage?: { companies: number; expiringSoon: number };
@@ -657,6 +661,68 @@ export interface CompanyCreateResult {
   mainAdminPassword: string | null;
   subscription: Subscription | null;
   transaction: Transaction | null;
+}
+
+/* ---------------------------- sample companies ---------------------------- */
+/** One of the five sample companies, after the button was pressed. */
+export interface SampleCompanyOutcome {
+  key: string;
+  label: string;
+  name: string;
+  code: string;
+  status: 'created' | 'exists' | 'failed';
+  companyId: number | null;
+  domain?: string | null;
+  adminEmail?: string;
+  /** Generated for a sample created just now; shown this once. */
+  adminPassword?: string | null;
+  created?: Record<string, number>;
+  message: string | null;
+}
+
+export interface SampleCompaniesResult {
+  created: number;
+  existing: number;
+  failed: number;
+  samples: SampleCompanyOutcome[];
+}
+
+/* ---------------------------- duplicate company --------------------------- */
+/** What "Duplicate company" can copy; see `DUPLICATE_SECTION` in the API. */
+export type DuplicateSection = 'website' | 'services' | 'products' | 'blog' | 'testimonials' | 'branches' | 'roles';
+
+export interface CompanyDuplicateResult extends CompanyCreateResult {
+  /** Rows copied, by kind: `services`, `products`, `branches`, … */
+  copied: Record<string, number>;
+  /** What was left out: `branchesOverPlan`, `branchContent`. */
+  skipped: Record<string, number>;
+}
+
+/* --------------------------- AI content creator -------------------------- */
+/** What the AI content creator can write; one Claude call each. */
+export type AiContentModule = 'site' | 'services' | 'products' | 'blog';
+
+export interface AiContentRequest {
+  prompt: string;
+  /** Used for this one job and never stored. Optional when the API has its own. */
+  apiKey?: string;
+  modules: AiContentModule[];
+}
+
+/** A content job: `running` until every module has been written or has failed. */
+export interface AiContentJob {
+  id: string;
+  companyId: number;
+  status: 'running' | 'completed' | 'partial' | 'failed';
+  modules: AiContentModule[];
+  startedAt: string;
+  finishedAt: string | null;
+  /** Rows written, keyed by what they are: `services`, `products`, `blog`, … */
+  created: Record<string, number>;
+  failed: { module: AiContentModule; reason: string }[];
+  /** Sections that now have content but that the plan or subscription keeps off the site. */
+  notLive: { key: string; name: string; reason: string | null }[];
+  error: string | null;
 }
 
 /* ----------------------------- super admins ---------------------------- */

@@ -49,6 +49,7 @@ const LeadVisit = require('./leadVisit.model')(sequelize);
 /* Our own marketing site. No tenant, no company — see each model's note. */
 const MarketingContent = require('./marketingContent.model')(sequelize);
 const MarketingFaq = require('./marketingFaq.model')(sequelize);
+const MarketingTemplate = require('./marketingTemplate.model')(sequelize);
 const MarketingEnquiry = require('./marketingEnquiry.model')(sequelize);
 const MarketingLead = require('./marketingLead.model')(sequelize);
 const MarketingLeadVisit = require('./marketingLeadVisit.model')(sequelize);
@@ -226,6 +227,11 @@ ServiceLead.belongsTo(CompanyService, { foreignKey: 'serviceId', as: 'service' }
 
 Company.hasMany(CompanyDomain, { foreignKey: 'companyId', as: 'domains', onDelete: 'CASCADE' });
 CompanyDomain.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+
+/* The template showcase points at a demo company and reads it live. Deleting
+   the company removes it from the showcase. */
+Company.hasMany(MarketingTemplate, { foreignKey: 'companyId', as: 'showcaseEntries', onDelete: 'CASCADE' });
+MarketingTemplate.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 CompanyDomain.belongsTo(Branch, { foreignKey: 'subCompanyId', as: 'branch' });
 Branch.hasMany(CompanyDomain, { foreignKey: 'subCompanyId', as: 'domains' });
 
@@ -463,6 +469,7 @@ const db = {
   LeadVisit,
   MarketingContent,
   MarketingFaq,
+  MarketingTemplate,
   MarketingEnquiry,
   MarketingLead,
   MarketingLeadVisit,

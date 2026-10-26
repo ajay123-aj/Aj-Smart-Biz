@@ -93,6 +93,44 @@ export interface MarketingFaq extends AuditFields {
 }
 
 /* ------------------------------------------------------------------ *
+ * The template showcase
+ * ------------------------------------------------------------------ */
+
+export type TemplateDesignKey = 'default' | 'midnight' | 'atelier';
+
+/** One of the tenant site designs an entry can be shown as. From the API. */
+export interface TemplateDesign {
+  key: TemplateDesignKey;
+  name: string;
+  look: string;
+  summary: string;
+}
+
+/**
+ * One demo company on the marketing site's Templates page. Only what the
+ * company cannot say about itself lives here; the card reads the rest from
+ * the company.
+ */
+export interface MarketingTemplate extends AuditFields {
+  companyId: number;
+  company?: { id: number; name: string; code: string; status: string } | null;
+  design: TemplateDesignKey;
+  /** Replaces the company's name on the card; null uses the company's. */
+  title: string | null;
+  /** Replaces the company's description; null uses the company's. */
+  summary: string | null;
+  /** The live demo; null offers the company's public primary domain. */
+  demoUrl: string | null;
+  featured: boolean;
+  sequence: number;
+}
+
+export interface MarketingTemplateList {
+  designs: TemplateDesign[];
+  items: MarketingTemplate[];
+}
+
+/* ------------------------------------------------------------------ *
  * The enquiries
  * ------------------------------------------------------------------ */
 

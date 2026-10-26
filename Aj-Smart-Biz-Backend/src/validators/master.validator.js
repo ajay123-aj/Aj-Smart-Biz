@@ -97,6 +97,8 @@ const planFields = {
   isPopular: Joi.boolean(),
   /** Whether the marketing site advertises this. Defaults to false; see the model. */
   isPublic: Joi.boolean(),
+  /** Whether company admins see it in their workspace. Defaults to false; see the model. */
+  showInAdmin: Joi.boolean(),
   sequence: Joi.number().integer(),
   status,
 };
@@ -114,6 +116,7 @@ const planCreate = {
     storageMb: planFields.storageMb.default(1024),
     isPopular: planFields.isPopular.default(false),
     isPublic: planFields.isPublic.default(false),
+    showInAdmin: planFields.showInAdmin.default(false),
     sequence: planFields.sequence.default(0),
   }),
 };

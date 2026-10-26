@@ -1,4 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { switchMap, takeWhile, timer } from 'rxjs';
 import { DatePipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -11,8 +13,13 @@ import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { messageOf } from '../../core/interceptors/auth.interceptor';
 import {
+  AiContentJob,
+  AiContentModule,
   Company,
+  CompanyCreateResult,
+  CompanyDuplicateResult,
   CompanyPlanView,
+  DuplicateSection,
   Option,
   Plan,
   PlanChangePreview,
@@ -33,6 +40,31 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
  * list replaces it, so this exists to stop the select being empty for the one
  * render before that, not to be a second source of truth.
  */
+/** The AI content creator's choices, in the order the form lists them. */
+const AI_MODULE_OPTIONS: { key: AiContentModule; label: string; hint: string }[] = [
+  { key: 'site', label: 'Website pages', hint: 'Hero slides, About, Contact, benefits, and figures or team if your prompt gives them' },
+  { key: 'services', label: 'Services', hint: 'Service categories and services, with prices and durations' },
+  { key: 'products', label: 'Products', hint: 'Product categories and products, with prices and specs' },
+  { key: 'blog', label: 'Blog', hint: 'Four helpful articles for customers' },
+];
+
+/**
+ * What "Duplicate company" offers to copy. Testimonials start unticked: they
+ * are what customers said about the original business.
+ */
+const DUPLICATE_OPTIONS: { key: DuplicateSection; label: string; hint: string; checked: boolean }[] = [
+  { key: 'website', label: 'Website pages', hint: 'Slides, About, Contact, benefits, figures, team, gallery, social links, WhatsApp, section settings and theme', checked: true },
+  { key: 'services', label: 'Services', hint: 'Service categories and services', checked: true },
+  { key: 'products', label: 'Products', hint: 'Product categories and products (not stock counts)', checked: true },
+  { key: 'blog', label: 'Blog', hint: 'Every post, with its publish date', checked: true },
+  { key: 'branches', label: 'Branches', hint: 'Branches and their contacts, up to the new plan’s branch limit', checked: true },
+  { key: 'roles', label: 'Roles & permissions', hint: 'Custom roles and what each may see and do', checked: true },
+  { key: 'testimonials', label: 'Testimonials', hint: 'Approved reviews of the original business, without reviewers’ contact details', checked: false },
+];
+
+/** How often a running content job is asked how it is going. */
+const AI_POLL_MS = 3000;
+
 const PAYMENT_MODE_FALLBACK: PaymentModeOption[] = [
   { value: 'cash', label: 'Cash' },
   { value: 'upi', label: 'UPI' },
@@ -75,6 +107,8 @@ const PAYMENT_MODE_FALLBACK: PaymentModeOption[] = [
 export class CompanyFormComponent {
   /** Bound from the `companies/:id/edit` route by `withComponentInputBinding()`. */
   readonly id = input<string | undefined>();
+  /** `?duplicate=<id>`: start from that company's details and copy its content. */
+  readonly duplicate = input<string | undefined>();
 
   private readonly fb = inject(FormBuilder);
   private readonly companies = inject(CompanyService);
@@ -84,6 +118,7 @@ export class CompanyFormComponent {
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
   /**
    * The platform's payment modes, from the catalogue endpoint. A signal rather
@@ -97,10 +132,101 @@ export class CompanyFormComponent {
   readonly themes = signal<Option[]>([]);
   readonly states = signal<Option[]>([]);
   readonly plans = signal<Plan[]>([]);
-  readonly credentials = signal<{ companyName: string; code: string; email: string; password: string } | null>(null);
+  /** The new company, for the modal shown after saving. `password` is null when one was typed in. */
+  readonly credentials = signal<{ companyName: string; code: string; email: string; password: string | null } | null>(null);
+
+  /* --------------------------- AI content creator -------------------------- */
+
+  readonly aiModuleOptions = AI_MODULE_OPTIONS;
+  readonly aiJob = signal<AiContentJob | null>(null);
+  /** Set when the job could not start or could not be followed: a missing key, a lost connection. */
+  readonly aiStartError = signal<string | null>(null);
+  readonly aiRunning = computed(() => this.aiJob()?.status === 'running');
+
+  /**
+   * Its own form, not part of the company payload: none of it is saved on the
+   * company. The key in particular goes to the API once, for one job.
+   */
+  readonly aiForm = this.fb.nonNullable.group({
+    enabled: [false],
+    prompt: ['', [Validators.required, Validators.minLength(20), Validators.maxLength(8000)]],
+    apiKey: [''],
+    modules: this.fb.nonNullable.group({
+      site: [true],
+      services: [true],
+      products: [true],
+      blog: [true],
+    }),
+  });
+
+  /** "12 services, 18 products, …" from a job's counts. */
+  readonly aiSummary = computed(() => {
+    const created = this.aiJob()?.created ?? {};
+    const labels: Record<string, string> = {
+      sliders: 'hero slides',
+      about: 'About page',
+      contactPage: 'Contact page',
+      features: 'benefit cards',
+      figures: 'figures',
+      team: 'team members',
+      serviceCategories: 'service categories',
+      services: 'services',
+      productCategories: 'product categories',
+      products: 'products',
+      blog: 'blog posts',
+    };
+    return Object.entries(labels)
+      .filter(([key]) => created[key])
+      .map(([key, label]) => `${created[key]} ${label}`);
+  });
 
   readonly companyId = computed(() => (this.id() ? Number(this.id()) : null));
   readonly isEdit = computed(() => this.companyId() !== null);
+
+  /* ---------------------------- duplicate company --------------------------- */
+
+  readonly duplicateOptions = DUPLICATE_OPTIONS;
+  /** The company being copied, once loaded. Null when this is a plain create. */
+  readonly duplicateSource = signal<Company | null>(null);
+  /** Rows copied, by kind, for the modal after saving. */
+  readonly copied = signal<Record<string, number> | null>(null);
+  readonly copySkipped = signal<Record<string, number> | null>(null);
+
+  readonly duplicateForm = this.fb.nonNullable.group(
+    Object.fromEntries(DUPLICATE_OPTIONS.map((option) => [option.key, [option.checked]])) as Record<
+      DuplicateSection,
+      [boolean]
+    >
+  );
+
+  /** "21 services, 25 products, …" from what the duplicate copied. */
+  readonly copiedSummary = computed(() => {
+    const copied = this.copied() ?? {};
+    const labels: Record<string, string> = {
+      sliders: 'slides',
+      about: 'About page',
+      contactPage: 'Contact page',
+      features: 'benefit cards',
+      figures: 'figures',
+      team: 'team members',
+      gallery: 'gallery photos',
+      socialLinks: 'social links',
+      whatsapp: 'WhatsApp numbers',
+      sections: 'section settings',
+      serviceCategories: 'service categories',
+      services: 'services',
+      productCategories: 'product categories',
+      products: 'products',
+      blog: 'blog posts',
+      testimonials: 'testimonials',
+      branches: 'branches',
+      branchContacts: 'branch contacts',
+      roles: 'roles',
+    };
+    return Object.entries(labels)
+      .filter(([key]) => copied[key])
+      .map(([key, label]) => `${copied[key]} ${label}`);
+  });
 
   /* ----------------------------- plan, on edit ---------------------------- */
 
@@ -223,6 +349,28 @@ export class CompanyFormComponent {
 
       this.loadPlan(companyId);
     });
+
+    // Duplicate mode: the source's profile pre-fills the form. What must be
+    // unique (name aside) is cleared, for the new company's own values.
+    effect(() => {
+      const sourceId = this.duplicate() ? Number(this.duplicate()) : null;
+      if (this.isEdit() || !sourceId) return;
+
+      this.loading.set(true);
+      this.companies.getById(sourceId).subscribe({
+        next: (company) => {
+          this.patchForm(company);
+          this.form.patchValue({ name: `${company.name} (copy)`, code: '', email: '', domain: '', status: 'active' });
+          this.duplicateSource.set(company);
+          this.loading.set(false);
+        },
+        error: (error: HttpErrorResponse) => {
+          this.loading.set(false);
+          this.toast.error('Could not load the company to duplicate', messageOf(error));
+          void this.router.navigate(['/companies']);
+        },
+      });
+    });
   }
 
   private loadPlan(companyId: number): void {
@@ -282,9 +430,13 @@ export class CompanyFormComponent {
   }
 
   submit(): void {
-    if (this.form.invalid) {
+    const withAi = !this.isEdit() && this.aiForm.controls.enabled.value;
+    if (this.form.invalid || (withAi && (this.aiForm.invalid || !this.aiModules().length))) {
       touchAll(this.form);
-      this.toast.warning('Please fix the highlighted fields');
+      if (withAi) touchAll(this.aiForm);
+      this.toast.warning(
+        withAi && !this.aiModules().length ? 'Pick at least one thing for the AI to write' : 'Please fix the highlighted fields'
+      );
       return;
     }
 
@@ -339,12 +491,30 @@ export class CompanyFormComponent {
       };
     }
 
-    this.companies.create(payload).subscribe({
-      next: (result) => {
-        this.saving.set(false);
-        this.toast.success('Company created', `${result.company.name} is ready to use.`);
+    const source = this.duplicateSource();
+    if (source) {
+      const picked = this.duplicateForm.getRawValue();
+      payload['include'] = DUPLICATE_OPTIONS.map((option) => option.key).filter((key) => picked[key]);
+    }
+    const request = source
+      ? this.companies.duplicate(source.id, payload)
+      : this.companies.create(payload);
 
-        if (result.mainAdminPassword) {
+    request.subscribe({
+      next: (result: CompanyCreateResult | CompanyDuplicateResult) => {
+        this.saving.set(false);
+        if ('copied' in result) {
+          this.copied.set(result.copied);
+          this.copySkipped.set(result.skipped);
+        }
+        this.toast.success(
+          source ? 'Company duplicated' : 'Company created',
+          source ? `${result.company.name} was made from ${source.name}.` : `${result.company.name} is ready to use.`
+        );
+
+        if (withAi) this.startAiContent(result.company.id);
+
+        if (result.mainAdminPassword || withAi || source) {
           this.credentials.set({
             companyName: result.company.name,
             code: result.company.code,
@@ -360,6 +530,44 @@ export class CompanyFormComponent {
         this.toast.error('Could not create the company', messageOf(error));
       },
     });
+  }
+
+  /* --------------------------- AI content creator -------------------------- */
+
+  private aiModules(): AiContentModule[] {
+    const picked = this.aiForm.controls.modules.getRawValue();
+    return AI_MODULE_OPTIONS.map((option) => option.key).filter((key) => picked[key]);
+  }
+
+  /**
+   * Starts the job, then asks how it is going every few seconds until it is
+   * no longer running. The company already exists by now, so a failure here
+   * is shown in the modal rather than undoing anything.
+   */
+  private startAiContent(companyId: number): void {
+    const { prompt, apiKey } = this.aiForm.getRawValue();
+    this.aiStartError.set(null);
+
+    this.companies
+      .startAiContent(companyId, { prompt: prompt.trim(), apiKey: apiKey.trim() || undefined, modules: this.aiModules() })
+      .subscribe({
+        next: (job) => {
+          this.aiJob.set(job);
+          // The key has done its job; it does not stay on the page.
+          this.aiForm.controls.apiKey.reset('');
+          timer(AI_POLL_MS, AI_POLL_MS)
+            .pipe(
+              switchMap(() => this.companies.aiContentJob(companyId, job.id)),
+              takeWhile((latest) => latest.status === 'running', true),
+              takeUntilDestroyed(this.destroyRef)
+            )
+            .subscribe({
+              next: (latest) => this.aiJob.set(latest),
+              error: (error: HttpErrorResponse) => this.aiStartError.set(messageOf(error)),
+            });
+        },
+        error: (error: HttpErrorResponse) => this.aiStartError.set(messageOf(error)),
+      });
   }
 
   /* ------------------------------ plan actions ----------------------------- */
@@ -501,7 +709,7 @@ export class CompanyFormComponent {
     const creds = this.credentials();
     if (!creds) return;
     void navigator.clipboard
-      ?.writeText(`Company: ${creds.companyName}\nEmail: ${creds.email}\nPassword: ${creds.password}`)
+      ?.writeText(`Company: ${creds.companyName}\nEmail: ${creds.email}\nPassword: ${creds.password ?? '(as entered)'}`)
       .then(() => this.toast.success('Credentials copied'));
   }
 

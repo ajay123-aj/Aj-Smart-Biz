@@ -738,6 +738,61 @@ const WHATSAPP_TYPE_CATALOGUE = [
  */
 const WHATSAPP_FALLBACK_TYPE = WHATSAPP_TYPE.CONTACT;
 
+/**
+ * What the AI content creator can write, one Claude call each. `site` is the
+ * hero, About, Contact, benefit cards, figures and team; the rest are the
+ * sections they name. See `services/aiContent.service.js`.
+ */
+const AI_CONTENT_MODULE = { SITE: 'site', SERVICES: 'services', PRODUCTS: 'products', BLOG: 'blog' };
+const AI_CONTENT_MODULE_VALUES = Object.values(AI_CONTENT_MODULE);
+
+/**
+ * The tenant site templates in `themes/`, as the marketing site's template
+ * showcase names them. One per deployable design; adding a design to
+ * `themes/` means adding it here so the showcase can label it.
+ */
+const TEMPLATE_DESIGN = { DEFAULT: 'default', MIDNIGHT: 'midnight', ATELIER: 'atelier' };
+const TEMPLATE_DESIGN_VALUES = Object.values(TEMPLATE_DESIGN);
+const TEMPLATE_DESIGN_CATALOGUE = [
+  {
+    key: TEMPLATE_DESIGN.DEFAULT,
+    name: 'Classic',
+    look: 'light',
+    summary: 'Light and airy: white pages, clear type, your brand colour on the buttons.',
+  },
+  {
+    key: TEMPLATE_DESIGN.MIDNIGHT,
+    name: 'Midnight',
+    look: 'dark',
+    summary: 'Near-black surfaces with your colour glowing on top. Made for evenings and premium trades.',
+  },
+  {
+    key: TEMPLATE_DESIGN.ATELIER,
+    name: 'Atelier',
+    look: 'glass',
+    summary: 'Frosted glass on a soft gradient, with brass accents. For studios and crafted goods.',
+  },
+];
+
+/**
+ * What "Duplicate company" can copy into the new tenant. `website` is the
+ * hero, pages, cards, figures, team, gallery, social links, WhatsApp numbers,
+ * section switches and the company's theme. Testimonials are off by default:
+ * they are what customers said about the *original* business.
+ * See `services/companyDuplicate.service.js`.
+ */
+const DUPLICATE_SECTION = {
+  WEBSITE: 'website',
+  SERVICES: 'services',
+  PRODUCTS: 'products',
+  BLOG: 'blog',
+  TESTIMONIALS: 'testimonials',
+  BRANCHES: 'branches',
+  ROLES: 'roles',
+};
+const DUPLICATE_SECTION_VALUES = Object.values(DUPLICATE_SECTION);
+const DUPLICATE_SECTION_DEFAULTS = DUPLICATE_SECTION_VALUES.filter((key) => key !== DUPLICATE_SECTION.TESTIMONIALS);
+
 /** Where a visitor may send the page. `copy` is the clipboard, not a network. */
 const SHARE_CHANNEL = {
   COPY: 'copy',
@@ -2168,6 +2223,7 @@ const MARKETING_CONTENT_KEY = {
   ABOUT_PAGE: 'about_page',
   CONTACT_PAGE: 'contact_page',
   FAQ_INTRO: 'faq_intro',
+  TEMPLATES_PAGE: 'templates_page',
 };
 const MARKETING_CONTENT_KEY_VALUES = Object.values(MARKETING_CONTENT_KEY);
 
@@ -2232,6 +2288,14 @@ module.exports = {
   WHATSAPP_TYPE_CATALOGUE,
   WHATSAPP_FALLBACK_TYPE,
   SHARE_CHANNEL,
+  AI_CONTENT_MODULE,
+  AI_CONTENT_MODULE_VALUES,
+  TEMPLATE_DESIGN,
+  TEMPLATE_DESIGN_VALUES,
+  TEMPLATE_DESIGN_CATALOGUE,
+  DUPLICATE_SECTION,
+  DUPLICATE_SECTION_VALUES,
+  DUPLICATE_SECTION_DEFAULTS,
   SHARE_CHANNEL_VALUES,
   SHARE_LINK_DEFAULTS,
   STAT_MODE,

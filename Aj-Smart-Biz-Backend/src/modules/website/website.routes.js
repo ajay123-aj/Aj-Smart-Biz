@@ -279,6 +279,22 @@ router.get('/faqs', readLimit, controller.faqs);
 
 /**
  * @openapi
+ * /website/templates:
+ *   get:
+ *     tags: [Website]
+ *     summary: The template showcase
+ *     description: |
+ *       Real demo companies, each in the design that serves it (`designs`
+ *       lists the three: Classic, Midnight and Atelier). Every card is read
+ *       live from its company: business type, brand colours (`palette`), the
+ *       hero headline, up to four featured services or products, the website
+ *       sections that are live, and a `demoUrl` to open. `?design=` narrows
+ *       the list to one design. Featured entries come first.
+ */
+router.get('/templates', readLimit, validate(schema.templatePublicList), controller.templates);
+
+/**
+ * @openapi
  * /website/enquiries:
  *   post:
  *     tags: [Website]

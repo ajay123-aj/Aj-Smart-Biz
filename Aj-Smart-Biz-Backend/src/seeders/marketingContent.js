@@ -36,6 +36,10 @@ const MARKETING_CONTENT = {
           "href": "/services"
         },
         {
+          "label": "Templates",
+          "href": "/templates"
+        },
+        {
           "label": "Plans",
           "href": "/plans"
         },
@@ -317,6 +321,24 @@ const MARKETING_CONTENT = {
     {
       "eyebrow": "Questions",
       "title": "The things everyone asks."
+    }
+  ],
+  "templates_page": [
+    "Templates page and home-page teaser",
+    {
+      "eyebrow": "Templates",
+      "title": "See a site for a business like yours.",
+      "lede": "Every card below is a real working website on the platform, built for a different kind of business. Pick a design, open the live demo on your phone, and imagine your name at the top.",
+      "allLabel": "All designs",
+      "demoLabel": "Open live demo",
+      "noDemoLabel": "Demo shown on the call",
+      "sectionsLabel": "On this site",
+      "emptyTitle": "Templates are on their way",
+      "emptyBody": "Ask for a free demo and we will show you a real site for your trade on the call.",
+      "homeEyebrow": "Templates",
+      "homeTitle": "Real sites, for real kinds of business.",
+      "homeLede": "A shop, a studio, an events firm, a consultancy. Same platform, each in a design that suits it.",
+      "homeLink": "See all templates"
     }
   ]
 };

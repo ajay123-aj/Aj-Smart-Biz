@@ -1,9 +1,11 @@
 <app-page-header
-  [title]="isEdit() ? 'Edit company' : 'Create company'"
+  [title]="isEdit() ? 'Edit company' : duplicateSource() ? 'Duplicate ' + duplicateSource()!.name : 'Create company'"
   [subtitle]="
     isEdit()
       ? 'Update the tenant profile'
-      : 'Creating a company also provisions its head office branch, the Company Admin role and the main admin login'
+      : duplicateSource()
+        ? 'A new company with this one’s details. Give it its own name, email, domain and main admin, then pick what to copy'
+        : 'Creating a company also provisions its head office branch, the Company Admin role and the main admin login'
   "
 >
   <a class="btn btn-ghost" routerLink="/companies">← Back to list</a>
@@ -507,6 +509,81 @@
           }
         </div>
       </div>
+
+      @if (duplicateSource(); as source) {
+        <div class="card" style="margin-bottom:18px" [formGroup]="duplicateForm">
+          <div class="card-head">
+            <h3>Copy from {{ source.name }}</h3>
+            <span class="tiny muted">Copied into the new company when it is saved</span>
+          </div>
+          <div class="card-body">
+            @for (option of duplicateOptions; track option.key) {
+              <label class="check">
+                <input type="checkbox" [formControlName]="option.key" />
+                {{ option.label }} <span class="tiny muted">· {{ option.hint }}</span>
+              </label>
+            }
+            <p class="tiny muted" style="margin:10px 0 0">
+              Never copied: admins, customers, orders, leads, stock counts, subscriptions and payments. Images are copied as new
+              files, so changing one company never affects the other. Everything is created together, or nothing is.
+            </p>
+          </div>
+        </div>
+      }
+
+      <!-- Its own form group: nothing here is saved on the company -->
+      <div class="card" style="margin-bottom:18px" [formGroup]="aiForm">
+        <div class="card-head">
+          <h3>AI content creator</h3>
+          <span class="tiny muted">Optional: Claude writes the website content after the company is saved</span>
+        </div>
+        <div class="card-body">
+          <label class="check">
+            <input type="checkbox" formControlName="enabled" />
+            Write this company's website content with AI
+          </label>
+
+          @if (aiForm.controls.enabled.value) {
+            <div class="field" style="margin-top:14px">
+              <label for="aiPrompt">Describe the business <span class="req">*</span></label>
+              <textarea
+                id="aiPrompt"
+                class="textarea"
+                rows="6"
+                formControlName="prompt"
+                placeholder="A family-run optician in Surat since 2009. We do computerised eye tests, contact lens fittings and repairs, and sell frames, sunglasses and lenses from Ray-Ban, Titan and Vogue. Eye test ₹300, free with any frame. Owner: Ramesh Shah. Warm, plain-spoken tone."
+              ></textarea>
+              <span class="hint">
+                What you do, what you sell, prices, location, years in business, the people to name, and the tone you want.
+                The company details above are sent along with it.
+              </span>
+              <app-field-error [control]="aiForm.controls.prompt" label="Description" />
+            </div>
+
+            <div class="field" style="max-width:420px">
+              <label for="aiKey">Claude API key</label>
+              <input id="aiKey" class="input" type="password" formControlName="apiKey" autocomplete="off" placeholder="sk-ant-…" />
+              <span class="hint">Used for this one job and never saved. Leave blank if the server has its own key.</span>
+            </div>
+
+            <div class="field" formGroupName="modules">
+              <label>What to write</label>
+              @for (option of aiModuleOptions; track option.key) {
+                <label class="check">
+                  <input type="checkbox" [formControlName]="option.key" />
+                  {{ option.label }} <span class="tiny muted">· {{ option.hint }}</span>
+                </label>
+              }
+            </div>
+
+            <p class="tiny muted" style="margin:6px 0 0">
+              Only content is written, as ordinary rows you can edit or delete in the company workspace. No code or theme changes.
+              The AI never invents customer reviews, and adds team members and figures only when your description gives them.
+              Images are left for the company to upload.
+            </p>
+          }
+        </div>
+      </div>
     } @else {
       <div class="card" style="margin-bottom:18px">
         <div class="card-head"><h3>Status</h3></div>
@@ -534,8 +611,8 @@
 
 @if (credentials(); as creds) {
   <app-modal
-    title="Company created"
-    subtitle="Hand these credentials over — the password is shown only once"
+    [title]="duplicateSource() ? 'Company duplicated' : 'Company created'"
+    [subtitle]="creds.password ? 'Hand these credentials over — the password is shown only once' : 'The main admin signs in with the password you set'"
     size="sm"
     [closeOnBackdrop]="false"
     (closed)="finishCreate()"
@@ -544,11 +621,74 @@
       <div class="dl-item"><dt>Company</dt><dd>{{ creds.companyName }}</dd></div>
       <div class="dl-item"><dt>Tenant code</dt><dd>{{ creds.code }}</dd></div>
       <div class="dl-item"><dt>Admin email</dt><dd>{{ creds.email }}</dd></div>
-      <div class="dl-item"><dt>Password</dt><dd><code>{{ creds.password }}</code></dd></div>
+      @if (creds.password) {
+        <div class="dl-item"><dt>Password</dt><dd><code>{{ creds.password }}</code></dd></div>
+      }
     </div>
-    <p class="tiny muted" style="margin-top:14px">
-      The main admin signs in at the Aj-Smart-Biz-Admin portal and will be asked to change this password.
-    </p>
+    @if (creds.password) {
+      <p class="tiny muted" style="margin-top:14px">
+        The main admin signs in at the Aj-Smart-Biz-Admin portal and will be asked to change this password.
+      </p>
+    }
+
+    @if (copiedSummary().length) {
+      <div class="preview" style="margin-top:16px">
+        <div class="preview-row total" style="border-top:0;margin-top:0;padding-top:0">
+          <span>Copied from {{ duplicateSource()?.name }}</span>
+        </div>
+        <p class="tiny" style="margin:6px 0 0">{{ copiedSummary().join(', ') }}.</p>
+        @if (copySkipped()?.['branchesOverPlan']; as over) {
+          <p class="tiny" style="margin:6px 0 0;color:var(--warning)">
+            {{ over }} branch{{ over === 1 ? ' was' : 'es were' }} not copied: the new plan’s branch limit is reached.
+          </p>
+        }
+        @if (copySkipped()?.['branchContent']; as left) {
+          <p class="tiny" style="margin:6px 0 0;color:var(--warning)">
+            {{ left }} branch-specific item{{ left === 1 ? ' was' : 's were' }} left out because {{ left === 1 ? 'its' : 'their' }} branch was not copied.
+          </p>
+        }
+      </div>
+    }
+
+    @if (aiJob() || aiStartError()) {
+      <div class="preview" style="margin-top:16px">
+        <div class="preview-row total" style="border-top:0;margin-top:0;padding-top:0">
+          <span>AI website content</span>
+          <span>
+            @switch (aiJob()?.status) {
+              @case ('running') { Writing… }
+              @case ('completed') { Done }
+              @case ('partial') { Partly done }
+              @default { Failed }
+            }
+          </span>
+        </div>
+
+        @if (aiRunning()) {
+          <p class="tiny muted" style="margin:6px 0 0">
+            Claude is writing {{ aiJob()!.modules.join(', ') }}. This usually takes one to three minutes.
+            You can close this window; the work carries on and appears in the company's workspace.
+          </p>
+        }
+        @if (aiSummary().length) {
+          <p class="tiny" style="margin:6px 0 0">Written: {{ aiSummary().join(', ') }}.</p>
+        }
+        @for (failure of aiJob()?.failed ?? []; track failure.module) {
+          <p class="tiny" style="margin:6px 0 0;color:var(--danger)">{{ failure.module }}: {{ failure.reason }}</p>
+        }
+        @if (aiJob()?.error && !aiJob()?.failed?.length) {
+          <p class="tiny" style="margin:6px 0 0;color:var(--danger)">{{ aiJob()!.error }}</p>
+        }
+        @if (aiStartError(); as error) {
+          <p class="tiny" style="margin:6px 0 0;color:var(--danger)">{{ error }}</p>
+        }
+        @for (section of aiJob()?.notLive ?? []; track section.key) {
+          <p class="tiny" style="margin:6px 0 0;color:var(--warning)">
+            {{ section.name }} has content but is not on the website yet{{ section.reason ? ': ' + section.reason : '.' }}
+          </p>
+        }
+      </div>
+    }
 
     <ng-container footer>
       <button type="button" class="btn btn-ghost" (click)="copyCredentials()">Copy</button>

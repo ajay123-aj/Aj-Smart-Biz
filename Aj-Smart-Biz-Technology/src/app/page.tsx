@@ -3,6 +3,7 @@ import StepsSection from '@/components/StepsSection';
 import PromisesSection from '@/components/PromisesSection';
 import CapabilitiesSection from '@/components/CapabilitiesSection';
 import BusinessTypesSection from '@/components/BusinessTypesSection';
+import TemplatesSection from '@/components/TemplatesSection';
 import PlansSection from '@/components/PlansSection';
 import FaqSection from '@/components/FaqSection';
 import CtaBand from '@/components/CtaBand';
@@ -13,7 +14,8 @@ import { getSite } from '@/lib/api';
  *
  * The argument in order: *what this is* (hero), *how the day goes* (steps),
  * *what stops being your job* (promises), *what a site can be made of*
- * (capabilities), *who it is for* (business types), *what it costs* (plans),
+ * (capabilities), *what one looks like* (templates), *who it is for*
+ * (business types), *what it costs* (plans),
  * *the awkward questions* (FAQ), *do something* (CTA).
  *
  * Each section reads its own content, so this file is the running order and
@@ -39,6 +41,8 @@ export default async function HomePage() {
            is on /services, which is what the counter underneath points at. */
         limit={6}
       />
+
+      <TemplatesSection />
 
       <BusinessTypesSection
         eyebrow="Who it is for"

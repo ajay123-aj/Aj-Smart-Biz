@@ -3,12 +3,17 @@
 </app-page-header>
 
 <div class="card">
-  <div class="card-head">
-    <input class="input" style="max-width:280px" type="search" placeholder="Search plan name or code…" (input)="page.onSearch($event)" />
-    <select class="select" style="width:auto" (change)="page.onStatus($event)">
+  <div class="card-head plan-toolbar">
+    <input class="input" type="search" placeholder="Search plan name or code…" (input)="page.onSearch($event)" />
+    <select class="select" (change)="page.onStatus($event)" aria-label="Filter by status">
       <option value="">All statuses</option>
       <option value="active">Active</option>
       <option value="inactive">Inactive</option>
+    </select>
+    <select class="select" (change)="onSort($event)" aria-label="Sort plans">
+      @for (option of sortOptions; track option.value) {
+        <option [value]="option.value">{{ option.label }}</option>
+      }
     </select>
   </div>
 
@@ -22,92 +27,115 @@
     />
 
     @if (!page.store.loading() && page.store.items().length > 0) {
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th class="sortable" (click)="page.store.toggleSort('name')">Plan{{ page.store.sortIcon('name') }}</th>
-              <th class="sortable text-right" (click)="page.store.toggleSort('price')">Price{{ page.store.sortIcon('price') }}</th>
-              <th>Billing</th>
-              <th>Limits</th>
-              <th>Functionality</th>
-              <th class="text-right">Companies</th>
-              <th>Status</th>
-              <th class="text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (row of page.store.items(); track row.id) {
-              <tr>
-                <td>
-                  <span class="strong">{{ row.name }}</span>
-                  @if (row.isPopular) {
-                    <span class="badge badge-warning" style="margin-left:6px">Popular</span>
-                  }
-                  <!-- Whether the public pricing page advertises this plan.
-                       Most rows here are not a price list - a plan built for
-                       one tenant, or bundled with a theme - so this is off
-                       unless somebody says otherwise. -->
-                  @if (row.isPublic) {
-                    <span class="badge badge-info" style="margin-left:6px">On website</span>
-                  }
-                  @if (row.description) {
-                    <div class="tiny muted">{{ row.description }}</div>
-                  }
-                </td>
-                <td class="text-right nowrap">
-                  <span class="strong">{{ money(row.discountPrice ?? row.price, row.currency) }}</span>
-                  @if (row.discountPrice) {
-                    <div class="tiny muted"><s>{{ money(row.price, row.currency) }}</s></div>
-                  }
-                </td>
-                <td class="muted nowrap">
-                  {{ cycleLabel(row.billingCycle) }}
-                  @if (row.trialDays > 0) {
-                    <div class="tiny">{{ row.trialDays }}-day trial</div>
-                  }
-                </td>
-                <td class="tiny muted nowrap">
-                  {{ row.maxBranches }} branches · {{ row.maxAdmins }} admins<br />
-                  {{ row.maxUsers }} users · {{ row.storageMb }} MB
-                </td>
-                <!-- What the plan grants, as opposed to the free-text features. -->
-                <td>
-                  @if (grantNames(row).length) {
-                    <div class="grant-badges">
-                      @for (name of grantNames(row); track name) {
-                        <span class="badge badge-info">{{ name }}</span>
-                      }
-                    </div>
-                  } @else {
-                    <span class="tiny muted">—</span>
-                  }
-                </td>
-                <!-- What this plan is actually carrying today; deleting is blocked while it is in use. -->
-                <td class="text-right nowrap">
-                  <span class="strong">{{ row.usage?.companies ?? 0 }}</span>
-                  @if (row.usage?.expiringSoon) {
-                    <div class="tiny" style="color:var(--warning)">{{ row.usage?.expiringSoon }} expiring</div>
-                  }
-                </td>
-                <td>
-                  <!-- Status switch: flips the plan between active and inactive -->
-                  <label class="switch" [title]="row.status === 'active' ? 'Deactivate plan' : 'Activate plan'">
-                    <input type="checkbox" [checked]="row.status === 'active'" (change)="page.toggleStatus(row)" />
-                    <span class="slider"></span>
-                  </label>
-                  <app-status-badge [value]="row.status" />
-                </td>
-                <td>
-                  <div class="row-end">
-                    <button type="button" class="btn btn-sm btn-ghost" (click)="page.openEdit(row)">Edit</button>
-                    <button type="button" class="btn btn-sm btn-danger" (click)="page.remove(row)">Delete</button>
-                  </div>
-                </td>
-              </tr>
+      <div class="plan-grid">
+        @for (row of page.store.items(); track row.id) {
+          <article class="plan-card" [class.is-popular]="row.isPopular" [class.is-inactive]="row.status !== 'active'">
+            @if (row.isPopular) {
+              <span class="plan-ribbon">★ Most popular</span>
             }
-          </tbody>
-        </table>
+
+            <!-- Name, code and the on/off switch -->
+            <header class="plan-head">
+              <div class="plan-title">
+                <h3>{{ row.name }}</h3>
+                @if (row.code) {
+                  <code class="plan-code">{{ row.code }}</code>
+                }
+              </div>
+              <div class="plan-status">
+                <label class="switch" [title]="row.status === 'active' ? 'Deactivate plan' : 'Activate plan'">
+                  <input type="checkbox" [checked]="row.status === 'active'" (change)="page.toggleStatus(row)" />
+                  <span class="slider"></span>
+                </label>
+                <app-status-badge [value]="row.status" />
+              </div>
+            </header>
+
+            @if (row.description) {
+              <p class="plan-desc" [title]="row.description">{{ row.description }}</p>
+            }
+
+            <!-- What it costs -->
+            <div class="plan-price">
+              <span class="plan-amount">{{ money(row.discountPrice ?? row.price, row.currency) }}</span>
+              <span class="plan-cycle">{{ cycleSuffix(row.billingCycle) }}</span>
+            </div>
+            <div class="plan-price-notes">
+              @if (row.discountPrice) {
+                <s class="muted">{{ money(row.price, row.currency) }}</s>
+                @if (savingPercent(row); as saving) {
+                  <span class="badge badge-success">Save {{ saving }}%</span>
+                }
+              }
+              @if (row.trialDays > 0) {
+                <span class="badge badge-brand">{{ row.trialDays }}-day trial</span>
+              }
+              @if (row.durationDays) {
+                <span class="badge badge-muted">{{ row.durationDays }} days per term</span>
+              }
+            </div>
+
+            <!-- Limits, as four small figures -->
+            <dl class="plan-limits">
+              <div><dt>Branches</dt><dd>{{ row.maxBranches }}</dd></div>
+              <div><dt>Admins</dt><dd>{{ row.maxAdmins }}</dd></div>
+              <div><dt>Users</dt><dd>{{ row.maxUsers }}</dd></div>
+              <div><dt>Storage</dt><dd>{{ storage(row.storageMb) }}</dd></div>
+            </dl>
+
+            <!-- Where the plan is visible -->
+            <div class="plan-visibility">
+              <span class="plan-flag" [class.on]="row.isPublic" [title]="row.isPublic ? 'Shown on the pricing page' : 'Not on the pricing page'">
+                {{ row.isPublic ? '✓' : '✕' }} Marketing site
+              </span>
+              <span class="plan-flag" [class.on]="row.showInAdmin" [title]="row.showInAdmin ? 'Company admins can see and request it' : 'Hidden from company admins'">
+                {{ row.showInAdmin ? '✓' : '✕' }} Company admins
+              </span>
+            </div>
+
+            <!-- What the plan grants: a count and bar, then the names -->
+            <div class="plan-features">
+              <div class="plan-features-head">
+                <span>Functionality</span>
+                <span class="muted">{{ grantNames(row).length }} of {{ functionalities().length || '—' }}</span>
+              </div>
+              <div class="plan-bar" aria-hidden="true">
+                <span [style.width.%]="grantPercent(row)"></span>
+              </div>
+              @if (grantNames(row).length) {
+                <div class="plan-chips">
+                  @for (name of visibleGrants(row); track name) {
+                    <span class="plan-chip">{{ name }}</span>
+                  }
+                  @if (hiddenGrantCount(row) > 0) {
+                    <button type="button" class="plan-chip plan-chip-more" (click)="toggleExpanded(row.id)">
+                      + {{ hiddenGrantCount(row) }} more
+                    </button>
+                  } @else if (isExpanded(row.id) && grantNames(row).length > chipLimit) {
+                    <button type="button" class="plan-chip plan-chip-more" (click)="toggleExpanded(row.id)">Show less</button>
+                  }
+                </div>
+              } @else {
+                <p class="tiny muted mb-0">No functionality granted yet.</p>
+              }
+            </div>
+
+            <!-- Usage and actions -->
+            <footer class="plan-foot">
+              <div class="plan-usage">
+                <span class="strong">{{ row.usage?.companies ?? 0 }}</span>
+                {{ (row.usage?.companies ?? 0) === 1 ? 'company' : 'companies' }}
+                @if (row.usage?.expiringSoon) {
+                  <span class="plan-expiring">· {{ row.usage?.expiringSoon }} expiring soon</span>
+                }
+              </div>
+              <div class="plan-actions">
+                <button type="button" class="btn btn-sm btn-ghost" (click)="page.openEdit(row)">Edit</button>
+                <button type="button" class="btn btn-sm btn-danger" (click)="page.remove(row)">Delete</button>
+              </div>
+            </footer>
+          </article>
+        }
       </div>
 
       <app-pager [meta]="page.store.meta()" (pageChange)="page.store.setPage($event)" (limitChange)="page.store.setLimit($event)" />
@@ -253,6 +281,15 @@
         The pricing page on the Technology site shows only the plans ticked here, in sequence
         order. Leave it off for a plan built for one tenant or bundled with a theme — those are
         not a price list, and a public page that showed every plan would list them all.
+      </span>
+
+      <label class="check">
+        <input type="checkbox" formControlName="showInAdmin" />
+        Show this plan to company admins
+      </label>
+      <span class="hint">
+        Company admins see only the plans ticked here when they compare plans or ask to change
+        theirs. A company always still sees the plan it is on.
       </span>
     </form>
 

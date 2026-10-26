@@ -45,11 +45,15 @@ async function grantFullPermissions({ companyId, roleId, actorId, transaction })
  *   -> main admin login -> optional plan subscription + payment transaction.
  *
  * The generated main-admin password is returned once and never stored in clear.
+ *
+ * Runs in its own transaction, or inside `options.transaction` when a caller
+ * has more to write that must stand or fall with the company (see
+ * `companyDuplicate.service`).
  */
-async function createCompany(payload, actorId) {
+async function createCompany(payload, actorId, options = {}) {
   const { mainAdmin, subscription, domain, ...companyData } = payload;
 
-  return db.sequelize.transaction(async (transaction) => {
+  const run = async (transaction) => {
     if (!(await assertEmailFree(db.Company, companyData.email, {}, transaction))) {
       throw ApiError.conflict('A company with this email already exists');
     }
@@ -166,7 +170,9 @@ async function createCompany(payload, actorId) {
       subscription: subscriptionResult?.subscription ?? null,
       transaction: subscriptionResult?.transaction ?? null,
     };
-  });
+  };
+
+  return options.transaction ? run(options.transaction) : db.sequelize.transaction(run);
 }
 
 /** Detail payload used by the "view company" screen. */

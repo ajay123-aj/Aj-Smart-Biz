@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
 const TONES: Record<string, string> = {
   active: 'success',
   success: 'success',
+  created: 'success',
   inactive: 'muted',
   pending: 'info',
   /** Queued to start later — informational, not a problem. */

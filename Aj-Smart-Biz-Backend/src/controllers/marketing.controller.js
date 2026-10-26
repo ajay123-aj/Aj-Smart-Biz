@@ -6,6 +6,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { success, created, paginated } = require('../utils/response');
 const { getPagination, getSort, buildSearch, mergeWhere } = require('../utils/query');
 const marketingLeadService = require('../services/marketingLead.service');
+const templateService = require('../services/marketingTemplate.service');
 const {
   STATUS,
   FUNCTIONALITY_CATALOGUE,
@@ -322,6 +323,37 @@ const adminContentUpsert = asyncHandler(async (req, res) => {
   return created(res, 'Section saved successfully', row);
 });
 
+/** GET /website/templates - the template showcase, read live from each demo company. */
+const templates = asyncHandler(async (req, res) =>
+  success(res, {
+    message: 'Templates fetched successfully',
+    data: await templateService.listPublic({ design: req.query.design }),
+  })
+);
+
+/** GET /super-admin/marketing/templates - every entry, inactive included, with the designs. */
+const adminTemplateList = asyncHandler(async (req, res) =>
+  success(res, { message: 'Templates fetched successfully', data: await templateService.listAdmin() })
+);
+
+/** POST /super-admin/marketing/templates */
+const adminTemplateCreate = asyncHandler(async (req, res) =>
+  created(res, 'Template added', await templateService.create(req.body, req.auth?.id))
+);
+
+/** PUT /super-admin/marketing/templates/:id */
+const adminTemplateUpdate = asyncHandler(async (req, res) =>
+  success(res, {
+    message: 'Template saved',
+    data: await templateService.update(req.params.id, req.body, req.auth?.id),
+  })
+);
+
+/** DELETE /super-admin/marketing/templates/:id */
+const adminTemplateRemove = asyncHandler(async (req, res) =>
+  success(res, { message: 'Template removed', data: await templateService.remove(req.params.id) })
+);
+
 /** GET /super-admin/marketing/faqs — all of them, inactive included. */
 const adminFaqList = asyncHandler(async (req, res) => {
   const rows = await db.MarketingFaq.findAll({
@@ -410,6 +442,11 @@ module.exports = {
   capabilities,
   businessTypes,
   faqs,
+  templates,
+  adminTemplateList,
+  adminTemplateCreate,
+  adminTemplateUpdate,
+  adminTemplateRemove,
   bootstrap,
   submitEnquiry,
   track,

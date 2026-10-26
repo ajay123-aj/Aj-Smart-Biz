@@ -1,0 +1,166 @@
+<app-page-header
+  title="Website Templates"
+  subtitle="Demo companies shown on the Templates page of the Aj Smart Biz Technology site, each in its design."
+/>
+
+<div class="card">
+  <div class="card-body">
+    <div class="row-end" style="margin-bottom:12px">
+      <button type="button" class="btn btn-primary" (click)="open()">Add template</button>
+    </div>
+
+    @if (failed()) {
+      <div class="empty-state">
+        <div class="empty-icon">⚠️</div>
+        <h3>Could not load the templates</h3>
+        <p class="muted">The API did not answer. Nothing has been changed.</p>
+        <button type="button" class="btn btn-primary" (click)="load()">Try again</button>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:70px">Order</th>
+              <th>Template</th>
+              <th>Design</th>
+              <th>Live demo</th>
+              <th>Status</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.id) {
+              <tr>
+                <td class="muted">{{ row.sequence }}</td>
+                <td>
+                  <span class="strong">{{ row.title || row.company?.name || 'Deleted company' }}</span>
+                  @if (row.featured) {
+                    <span class="badge badge-warning" style="margin-left:6px">Featured</span>
+                  }
+                  @if (row.company) {
+                    <div class="tiny muted">
+                      <a [routerLink]="['/companies', row.company.id]">{{ row.company.name }}</a> · {{ row.company.code }}
+                      @if (row.company.status !== 'active') {
+                        · <span style="color:var(--warning)">company inactive, so hidden on the site</span>
+                      }
+                    </div>
+                  }
+                </td>
+                <td>{{ designName(row.design) }}</td>
+                <td class="tiny">
+                  @if (row.demoUrl) {
+                    <a [href]="row.demoUrl" target="_blank" rel="noopener noreferrer">{{ row.demoUrl }}</a>
+                  } @else {
+                    <span class="muted">Company's primary domain, if public</span>
+                  }
+                </td>
+                <td>
+                  <label class="switch" [title]="row.status === 'active' ? 'Hide from the website' : 'Show on the website'">
+                    <input type="checkbox" [checked]="row.status === 'active'" (change)="toggleStatus(row)" />
+                    <span class="slider"></span>
+                  </label>
+                  <app-status-badge [value]="row.status" />
+                </td>
+                <td>
+                  <div class="row-end">
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="open(row)">Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" (click)="remove(row)">Remove</button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <app-table-state
+          [loading]="loading()"
+          [empty]="!loading() && rows().length === 0"
+          icon="🖼️"
+          title="No templates yet"
+          message="The Templates page and the home-page section stay hidden until there is at least one. Add a demo company, such as one of the sample companies."
+        />
+      </div>
+    }
+  </div>
+</div>
+
+@if (editing()) {
+  <app-modal [title]="isNew ? 'Add template' : 'Edit template'" size="lg" [closeOnBackdrop]="false" (closed)="close()">
+    <form [formGroup]="form" class="form-grid">
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="companyId">Demo company <span class="req">*</span></label>
+          <select id="companyId" class="select" formControlName="companyId">
+            <option [ngValue]="null">Choose a company</option>
+            @for (company of companyOptions(); track company.id) {
+              <option [ngValue]="company.id">{{ company.name }} ({{ company.code }})</option>
+            }
+          </select>
+          <span class="hint">The card shows this company's real headline, colours, services and live sections.</span>
+          <app-field-error [control]="form.controls.companyId" label="Demo company" />
+        </div>
+        <div class="field">
+          <label for="design">Design <span class="req">*</span></label>
+          <select id="design" class="select" formControlName="design">
+            @for (design of designs(); track design.key) {
+              <option [ngValue]="design.key">{{ design.name }}</option>
+            }
+          </select>
+          @if (pickedDesign(); as design) {
+            <span class="hint">{{ design.summary }} Pick the design the live demo is actually served in.</span>
+          }
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="demoUrl">Live demo address</label>
+        <input id="demoUrl" class="input" formControlName="demoUrl" placeholder="https://smart-biz-white.ajtechhub.com" />
+        <span class="hint">
+          Opens in a new tab from the card. Leave blank to use the company's primary domain when it is a public one; with
+          neither, the card says the demo is shown on the call.
+        </span>
+        <app-field-error [control]="form.controls.demoUrl" label="Live demo address" />
+      </div>
+
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="title">Title on the card</label>
+          <input id="title" class="input" formControlName="title" placeholder="Leave blank to use the company name" />
+        </div>
+        <div class="field">
+          <label for="sequence">Order</label>
+          <input id="sequence" class="input" type="number" formControlName="sequence" min="0" />
+          <span class="hint">Low to high, after featured ones.</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="summary">Summary on the card</label>
+        <textarea id="summary" class="textarea" rows="3" formControlName="summary" placeholder="Leave blank to use the company description"></textarea>
+        <app-field-error [control]="form.controls.summary" label="Summary" />
+      </div>
+
+      <div class="grid grid-2">
+        <label class="check">
+          <input type="checkbox" formControlName="featured" />
+          Featured: listed first, and shown on the home page
+        </label>
+        <div class="field">
+          <label for="status">Status</label>
+          <select id="status" class="select" formControlName="status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+    </form>
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="close()">Cancel</button>
+      <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="save()">
+        {{ saving() ? 'Saving…' : 'Save' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}

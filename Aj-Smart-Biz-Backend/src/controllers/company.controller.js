@@ -9,6 +9,9 @@ const { getPagination, buildSearch, getSort, mergeWhere } = require('../utils/qu
 const companyService = require('../services/company.service');
 const subscriptionService = require('../services/subscription.service');
 const themeService = require('../services/theme.service');
+const aiContentService = require('../services/aiContent.service');
+const { duplicateCompany } = require('../services/companyDuplicate.service');
+const { createSampleCompanies } = require('../services/sampleCompany.service');
 const { activateSubscription } = subscriptionService;
 const { generateInvoiceNo } = require('../services/code.service');
 const { removeUploadedFile } = require('../middlewares/upload');
@@ -164,6 +167,39 @@ const create = asyncHandler(async (req, res) => {
     subscription: result.subscription,
     transaction: result.transaction,
   });
+});
+
+/**
+ * POST /companies/:id/duplicate - a new company made like `create`, with the
+ * sections named in `include` copied from company `:id`.
+ */
+const duplicate = asyncHandler(async (req, res) => {
+  const { include, ...payload } = req.body;
+  const result = await duplicateCompany(Number(req.params.id), payload, include, req.auth?.id);
+  const company = await db.Company.findByPk(result.company.id, {
+    include: companyService.companyDetailInclude(),
+  });
+  return created(res, 'Company duplicated successfully', {
+    company,
+    mainAdmin: result.admin,
+    mainAdminPassword: result.mainAdminPassword,
+    subscription: result.subscription,
+    transaction: result.transaction,
+    copied: result.copied,
+    skipped: result.skipped,
+  });
+});
+
+/**
+ * POST /companies/samples - creates whichever of the five sample companies
+ * do not exist yet, and reports on all five.
+ */
+const createSamples = asyncHandler(async (req, res) => {
+  const result = await createSampleCompanies(req.auth?.id);
+  const message = result.created
+    ? `${result.created} sample ${result.created === 1 ? 'company' : 'companies'} created`
+    : 'All sample companies already exist';
+  return success(res, { statusCode: result.created ? 201 : 200, message, data: result });
 });
 
 /** PUT /companies/:id */
@@ -528,10 +564,34 @@ const resetMyTheme = asyncHandler(async (req, res) => {
     data: themePayload(context),
   });
 });
+/**
+ * POST /companies/:id/ai-content
+ *
+ * Starts the AI content creator for a company and answers at once with the
+ * job; the work runs on after the response. See `aiContent.service`.
+ */
+const startAiContent = asyncHandler(async (req, res) => {
+  const job = await aiContentService.startJob({
+    companyId: Number(req.params.id),
+    prompt: req.body.prompt,
+    apiKey: req.body.apiKey,
+    modules: req.body.modules,
+    actorId: req.auth?.id,
+  });
+  success(res, { statusCode: 202, message: 'Content generation started', data: job });
+});
+
+/** GET /companies/:id/ai-content/:jobId - how a content job is going. */
+const aiContentStatus = asyncHandler(async (req, res) => {
+  success(res, { data: aiContentService.getJob(Number(req.params.id), req.params.jobId) });
+});
+
 module.exports = {
   list,
   getById,
   create,
+  duplicate,
+  createSamples,
   update,
   toggleStatus,
   remove,
@@ -546,4 +606,6 @@ module.exports = {
   getMyTheme,
   saveMyTheme,
   resetMyTheme,
+  startAiContent,
+  aiContentStatus,
 };

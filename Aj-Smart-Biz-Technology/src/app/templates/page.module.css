@@ -1,0 +1,139 @@
+/*
+ * The template showcase page: the heading block every inner page opens with,
+ * a row of design filters, and the grid of cards.
+ */
+
+.head {
+  padding-block: 64px 12px;
+}
+
+.title {
+  max-width: 20ch;
+  font-size: clamp(2.2rem, 5vw, 3.2rem);
+  line-height: 1.06;
+  letter-spacing: -0.032em;
+}
+
+.lede {
+  margin-top: 18px;
+  max-width: 62ch;
+  color: var(--text-muted);
+  font-size: 1.06rem;
+  line-height: 1.66;
+}
+
+.showcase {
+  padding-top: 24px;
+}
+
+/* ----------------------------- filters ----------------------------- */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--hairline);
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+
+.filter:hover {
+  border-color: var(--hairline-strong);
+  color: var(--text);
+}
+
+.filterActive {
+  background: var(--glass-strong);
+  border-color: var(--hairline-strong);
+  color: var(--text);
+}
+
+/* A swatch of the look in front of each design's name. */
+.filter[data-look]::before {
+  content: '';
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  border: 1px solid var(--hairline-strong);
+  background: #ffffff;
+}
+
+.filter[data-look='dark']::before {
+  background: #09090b;
+}
+
+.filter[data-look='glass']::before {
+  background: linear-gradient(140deg, #f6ebe0, #dde9f2);
+}
+
+.count {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.designSummary {
+  margin-top: 16px;
+  max-width: 62ch;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+/* ------------------------------ grid ------------------------------ */
+
+.grid {
+  display: grid;
+  /* `min()` so a card never asks for more than the phone has. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
+  gap: 22px;
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.none {
+  margin-top: 28px;
+  color: var(--text-muted);
+}
+
+/* ------------------------------ empty ------------------------------ */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  max-width: 620px;
+  padding: 32px;
+}
+
+.empty:hover {
+  transform: none;
+}
+
+.emptyTitle {
+  font-size: 1.3rem;
+}
+
+.emptyBody {
+  color: var(--text-muted);
+  line-height: 1.6;
+}
