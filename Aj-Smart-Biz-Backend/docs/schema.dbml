@@ -181,6 +181,19 @@ Table company_order_items {
   Note: 'One line of one order — a product, a quantity, and what it cost that day.'
 }
 
+Table company_files {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  path varchar(255) [not null, unique, note: 'Public upload path, e.g. /uploads/product/abc.png']
+  folder varchar(40)
+  size_bytes bigint [not null, default: 0]
+  mime_type varchar(100)
+  uploaded_by int [note: 'admins.id, when a company admin uploaded it']
+  created_at datetime
+  updated_at datetime
+  Note: 'Storage ledger: one row per uploaded file, charged to a company. Usage = SUM(size_bytes); the limit is companies.storage_limit_mb, else the plan\'s storage_mb.'
+}
+
 Table company_warehouses {
   id int [pk, increment]
   company_id int [not null, ref: > companies.id]
@@ -375,6 +388,7 @@ Table companies {
   favicon varchar(255) [note: 'upload path; ICO only, enforced on upload']
   currency varchar(10) [not null, default: 'INR']
   timezone varchar(60) [not null, default: 'Asia/Kolkata']
+  storage_limit_mb int [null, note: 'This company\'s own upload storage in MB; NULL follows the plan\'s storage_mb']
   current_subscription_id int [note: 'denormalised pointer; no FK, breaks the cycle with company_subscriptions']
   subscription_end_date date
   status enum_status [not null, default: 'active']
@@ -1075,6 +1089,17 @@ Table role_permissions {
   created_at datetime
   updated_at datetime
   deleted_at datetime
+}
+
+Table admin_roles {
+  id int [pk, increment]
+  company_id int [not null, ref: > companies.id]
+  admin_id int [not null, ref: > admins.id]
+  role_id int [not null, ref: > roles.id]
+  created_by int
+  created_at datetime
+  updated_at datetime
+  Note: 'Extra roles beyond admins.role_id (the primary). Access = union of all active roles held.'
 }
 
 Table admins {

@@ -8,6 +8,7 @@ const { success } = require('../utils/response');
 const subscriptionService = require('../services/subscription.service');
 const functionalityService = require('../services/functionality.service');
 const bookingService = require('../services/booking.service');
+const storageService = require('../services/storage.service');
 const {
   STATUS,
   TRANSACTION_STATUS,
@@ -471,10 +472,15 @@ const adminDashboard = asyncHandler(async (req, res) => {
   const timer = subscription ? subscriptionService.decorate(subscription).timer : null;
   const daysRemaining = timer ? Math.max(0, timer.daysRemaining) : null;
 
+  /* Upload storage: used vs the company's own limit or its plan's. Shown on
+     the dashboard's Plan usage card. Never fatal for the dashboard. */
+  const storage = await storageService.getStorage(companyId).catch(() => null);
+
   return success(res, {
     message: 'Dashboard fetched successfully',
     data: {
       admins: { total: totalAdmins, active: activeAdmins, inactive: inactiveAdmins },
+      storage,
       branches: { total: totalBranches, active: activeBranches },
       roles: { total: totalRoles },
       /* Null unless the tenant bought it — see the note above. */

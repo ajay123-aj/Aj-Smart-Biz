@@ -61,7 +61,7 @@
             <tr>
               <th class="sortable" (click)="store.toggleSort('name')">Admin{{ store.sortIcon('name') }}</th>
               <th class="sortable" (click)="store.toggleSort('email')">Email{{ store.sortIcon('email') }}</th>
-              <th>Role</th>
+              <th>Roles</th>
               <th>Branch</th>
               <th>Last login</th>
               <th>Status</th>
@@ -87,7 +87,23 @@
                   </div>
                 </td>
                 <td class="muted">{{ row.email }}</td>
-                <td class="muted">{{ row.role?.name || '—' }}</td>
+                <td>
+                  @if (row.roles?.length) {
+                    <div class="role-chips">
+                      @for (role of row.roles; track role.id) {
+                        <span
+                          class="badge"
+                          [class.badge-brand]="role.primary"
+                          [class.badge-muted]="!role.primary"
+                          [class.role-off]="role.status && role.status !== 'active'"
+                          [title]="(role.primary ? 'Primary role' : 'Extra role') + (role.status && role.status !== 'active' ? ' (inactive, grants nothing)' : '')"
+                        >{{ role.name }}</span>
+                      }
+                    </div>
+                  } @else {
+                    <span class="muted">{{ row.role?.name || '—' }}</span>
+                  }
+                </td>
                 <td class="muted">{{ row.branch?.name || 'All branches' }}</td>
                 <td class="tiny muted nowrap">{{ row.lastLoginAt ? (row.lastLoginAt | date: 'dd MMM yyyy, HH:mm') : 'Never' }}</td>
                 <td><app-status-badge [value]="row.status" /></td>
@@ -147,26 +163,47 @@
         <label for="phone">Phone</label>
         <input id="phone" class="input" formControlName="phone" />
       </div>
-      <div class="grid grid-2">
+      @if (editingMain()) {
         <div class="field">
-          <label for="roleId">Role <span class="req">*</span></label>
-          <select id="roleId" class="select" formControlName="roleId">
-            <option [ngValue]="null">Select a role…</option>
+          <label>Role</label>
+          <div class="tiny muted">Company Admin. The main admin always has full access, so this role cannot be changed.</div>
+        </div>
+      } @else {
+        <div class="field">
+          <label>Roles <span class="req">*</span></label>
+          <div class="role-picker" role="group" aria-label="Roles">
             @for (role of assignableRoles(); track role.id) {
-              <option [ngValue]="role.id">{{ role.name }}</option>
+              <div class="role-option" [class.on]="hasRole(role.id)">
+                <label class="check">
+                  <input type="checkbox" [checked]="hasRole(role.id)" (change)="toggleRole(role.id)" />
+                  <span>{{ role.name }}</span>
+                </label>
+                @if (hasRole(role.id)) {
+                  @if (isPrimary(role.id)) {
+                    <span class="badge badge-brand">Primary</span>
+                  } @else {
+                    <button type="button" class="btn btn-sm btn-ghost" (click)="makePrimary(role.id)">Make primary</button>
+                  }
+                }
+              </div>
+            } @empty {
+              <div class="tiny muted">No roles yet. Create one in Role Management first.</div>
             }
-          </select>
-          <app-field-error [control]="form.controls.roleId" label="Role" />
+          </div>
+          <span class="hint">Tick every role this person needs. They get everything any ticked role allows.</span>
+          @if (form.controls.roleIds.touched && form.controls.roleIds.invalid) {
+            <span class="error-text">Choose at least one role.</span>
+          }
         </div>
-        <div class="field">
-          <label for="branchId">Branch</label>
-          <select id="branchId" class="select" formControlName="branchId">
-            <option [ngValue]="null">All branches</option>
-            @for (branch of branches(); track branch.id) {
-              <option [ngValue]="branch.id">{{ branch.name }}</option>
-            }
-          </select>
-        </div>
+      }
+      <div class="field">
+        <label for="branchId">Branch</label>
+        <select id="branchId" class="select" formControlName="branchId">
+          <option [ngValue]="null">All branches</option>
+          @for (branch of branches(); track branch.id) {
+            <option [ngValue]="branch.id">{{ branch.name }}</option>
+          }
+        </select>
       </div>
 
       @if (!editing()) {

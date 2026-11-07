@@ -3,7 +3,10 @@ import { Suspense, type ReactNode } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import LeadTracker from '@/components/LeadTracker';
+import FloatingWhatsApp from '@/components/FloatingWhatsApp';
+import Motion from '@/components/Motion';
 import { getSite } from '@/lib/api';
+import { baseOpenGraph, jsonLd, siteUrl } from '@/lib/seo';
 import './globals.css';
 
 /**
@@ -68,19 +71,32 @@ export async function generateMetadata(): Promise<Metadata> {
   const shortName = site?.shortName ?? 'Aj Smart Biz';
 
   return {
+    metadataBase: new URL(await siteUrl()),
     title: {
       default: title,
       /** Every page sets its own title; this is the suffix they share. */
       template: `%s · ${shortName}`,
     },
     description: site?.description,
+    applicationName: site?.name ?? shortName,
+    alternates: { canonical: '/' },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
+    },
     icons: { icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }] },
+    /* Share image: `app/opengraph-image.tsx`, picked up automatically. */
     openGraph: {
+      ...(await baseOpenGraph()),
+      url: '/',
       title,
       description: site?.description,
-      siteName: site?.name ?? shortName,
-      type: 'website',
     },
+    twitter: { card: 'summary_large_image', title, description: site?.description },
+    /* Stops iOS turning random digit runs in copy into phone links; the real
+       phone links are explicit `tel:` anchors. */
+    formatDetection: { telephone: false },
   };
 }
 
@@ -93,7 +109,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * anything anybody edits in the console.
  */
 export const viewport: Viewport = {
-  themeColor: '#07070e',
+  themeColor: '#0b0f2a',
   colorScheme: 'dark',
 };
 
@@ -105,10 +121,49 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const { content } = await getSite();
   const site = content.site;
   const contact = content.contact;
+  const url = await siteUrl();
+
+  /**
+   * Structured data: who the business is and how to reach it, so search can
+   * show the name, phone and hours directly — every value from the API, and
+   * any that is missing simply left out.
+   */
+  const organization = {
+    '@context': 'https://schema.org',
+    '@type': 'ProfessionalService',
+    '@id': `${url}/#organization`,
+    name: site?.name ?? site?.shortName,
+    alternateName: site?.shortName,
+    description: site?.description,
+    slogan: site?.tagline,
+    url,
+    image: `${url}/opengraph-image`,
+    logo: `${url}/favicon.svg`,
+    ...(contact?.phoneHref ? { telephone: contact.phoneHref } : {}),
+    ...(contact?.email ? { email: contact.email } : {}),
+    ...(contact?.addressLine
+      ? { address: { '@type': 'PostalAddress', streetAddress: contact.addressLine, addressCountry: 'IN' } }
+      : {}),
+    areaServed: { '@type': 'Country', name: 'India' },
+    ...(contact?.whatsapp ? { sameAs: [`https://wa.me/${contact.whatsapp}`] } : {}),
+  };
+  const website = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    '@id': `${url}/#website`,
+    url,
+    name: site?.name ?? site?.shortName,
+    inLanguage: 'en-IN',
+    publisher: { '@id': `${url}/#organization` },
+  };
 
   return (
-    <html lang="en">
+    <html lang="en-IN">
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: jsonLd([organization, website]) }}
+        />
         <a className="skip-link" href="#main">
           Skip to content
         </a>
@@ -120,6 +175,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         />
         <main id="main">{children}</main>
         <Footer />
+        <FloatingWhatsApp whatsapp={contact?.whatsapp} />
+        {/* Scroll reveals and the card spotlight. Renders nothing. */}
+        <Motion />
         {/*
           Renders nothing. Reports every page open to the API so the campaign
           report in the super admin has something to report on — see

@@ -3,7 +3,16 @@
 const router = require('express').Router();
 const controller = require('../controllers/auth.controller');
 const validate = require('../middlewares/validate');
-const { authenticate } = require('../middlewares/auth');
+const { authenticate, requireScope } = require('../middlewares/auth');
+const { AUTH_SCOPE } = require('../constants');
+
+/**
+ * The staff portals' own account routes. A website customer's token also passes
+ * `authenticate`, but these read and write `Admin` / `SuperAdmin` rows by
+ * `req.auth.id` — so a customer token would be resolved to the admin with the
+ * same id. Customers have their own account routes under `/theme/me`.
+ */
+const staffOnly = [authenticate, requireScope(AUTH_SCOPE.ADMIN, AUTH_SCOPE.SUPER_ADMIN)];
 const schema = require('../validators/auth.validator');
 
 // Public
@@ -136,9 +145,9 @@ router.post('/refresh', validate(schema.refresh), controller.refresh);
  *                         menus: { type: array, items: { type: object } }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
-router.get('/me', authenticate, controller.me);
-router.patch('/profile', authenticate, validate(schema.updateProfile), controller.updateProfile);
-router.post('/change-password', authenticate, validate(schema.changePassword), controller.changePassword);
-router.post('/logout', authenticate, controller.logout);
+router.get('/me', ...staffOnly, controller.me);
+router.patch('/profile', ...staffOnly, validate(schema.updateProfile), controller.updateProfile);
+router.post('/change-password', ...staffOnly, validate(schema.changePassword), controller.changePassword);
+router.post('/logout', ...staffOnly, controller.logout);
 
 module.exports = router;

@@ -359,6 +359,29 @@ export interface Company extends AuditFields {
   /** A renewal queued to start when the running term ends. */
   scheduledSubscription?: Subscription | null;
   summary?: CompanySummary;
+  /** This company's own storage limit in MB; null follows the plan. */
+  storageLimitMb?: number | null;
+  /** Upload storage used vs allowed. Only on the detail response. */
+  storage?: CompanyStorage;
+}
+
+/** `GET /super-admin/companies/:id` → `storage`, and `PATCH …/storage`. */
+export interface CompanyStorage {
+  usedBytes: number;
+  usedMb: number;
+  usedLabel: string;
+  limitMb: number | null;
+  limitLabel: string;
+  remainingBytes: number | null;
+  percentUsed: number;
+  atLimit: boolean;
+  unlimited: boolean;
+  /** Where the limit comes from. */
+  source: 'company' | 'plan' | 'none';
+  companyStorageLimitMb: number | null;
+  planStorageMb: number | null;
+  planName: string | null;
+  fileCount: number;
 }
 
 export interface CompanySummary {

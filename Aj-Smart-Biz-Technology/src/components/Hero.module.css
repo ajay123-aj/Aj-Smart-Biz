@@ -1,39 +1,173 @@
-/*
- * The hero is not a panel.
- *
- * Every other band on this site sits on a sheet of glass; this one sits
- * directly on the aurora, and that is the point — it is the only place the
- * ground is shown undiluted, which is what makes the glass everywhere else read
- * as glass rather than as the page's ordinary background.
- */
 .hero {
-  padding-block: 84px 72px;
+  position: relative;
+  padding-block: 72px 64px;
+  background: transparent;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* ---------------------------- background ---------------------------- *
+ * Three blurred colour orbs drifting slowly behind a fine grid that fades out
+ * at the edges. The movement is slow enough to feel alive, not busy.
+ */
+.bg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.orbA,
+.orbB,
+.orbC {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.35;
+  animation: drift 18s ease-in-out infinite alternate;
+}
+
+.orbA {
+  width: 520px;
+  height: 520px;
+  top: -180px;
+  right: -80px;
+  background: #6366f1;
+}
+
+.orbB {
+  width: 440px;
+  height: 440px;
+  top: 40px;
+  left: -160px;
+  background: #3b82f6;
+  animation-duration: 22s;
+  animation-delay: -6s;
+}
+
+.orbC {
+  width: 380px;
+  height: 380px;
+  bottom: -120px;
+  left: 42%;
+  background: #ec4899;
+  opacity: 0.22;
+  animation-duration: 26s;
+  animation-delay: -12s;
+}
+
+.grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 20%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 20%, transparent 75%);
+}
+
+@keyframes drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(40px, 30px) scale(1.08);
+  }
+  100% {
+    transform: translate(-30px, 50px) scale(0.95);
+  }
+}
+
+/* Entrance: copy rises in, then the dashboard. */
+.copy {
+  animation: rise 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.stage {
+  animation: rise 1s 0.15s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .inner {
   display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
+  grid-template-columns: 1fr 1fr;
   gap: 56px;
   align-items: center;
 }
 
+/* Grid items default to `min-width: auto`, so one long API word would widen
+   the column past the viewport. Let them shrink and wrap instead. */
+.inner > * {
+  min-width: 0;
+}
+
 /* -------------------------------- copy -------------------------------- */
 
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+  padding: 5px 14px 5px 5px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.badgeNew {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--gradient);
+  color: #ffffff;
+}
+
+.badgeNew svg {
+  width: 14px;
+  height: 14px;
+}
+
 .title {
-  font-size: clamp(2.5rem, 6vw, 4rem);
-  /* Tighter than the global heading rule: at 4rem the default 1.14 opens a gap
-     between two lines of an 800-weight grotesque that reads as a paragraph
-     break rather than as one sentence. */
-  line-height: 1.04;
-  letter-spacing: -0.035em;
+  font-size: clamp(2.1rem, 5.4vw, 4rem);
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: -0.038em;
+}
+
+.title :global(.gradient-text) {
+  background-image: linear-gradient(110deg, #93c5fd 0%, #a5b4fc 25%, #c084fc 50%, #f9a8d4 62%, #a5b4fc 80%, #93c5fd 100%);
+  background-size: 220% 100%;
+  animation: shimmer 7s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -220% 0;
+  }
 }
 
 .body {
-  margin-top: 22px;
+  margin-top: 20px;
   max-width: 52ch;
   color: var(--text-muted);
-  font-size: 1.08rem;
-  line-height: 1.66;
+  font-size: 1.14rem;
 }
 
 .actions {
@@ -43,243 +177,591 @@
   margin-top: 32px;
 }
 
-.btnIcon {
-  width: 17px;
-  height: 17px;
-  /* Nudged down a hair: an arrow centred on a cap-height label sits optically
-     high, because the label has no descenders to balance it. */
-  transform: translateY(0.5px);
-}
-
 .assurances {
   display: grid;
-  gap: 11px;
-  margin: 32px 0 0;
+  gap: 10px;
+  margin: 28px 0 0;
   padding: 0;
   list-style: none;
 }
 
 .assurances li {
   display: flex;
-  align-items: flex-start;
-  gap: 11px;
-  color: var(--text-muted);
-  font-size: 0.95rem;
-  line-height: 1.5;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-size: 0.96rem;
+  font-weight: 500;
 }
 
 .tick {
+  display: grid;
+  place-items: center;
   flex: none;
-  width: 19px;
-  height: 19px;
-  margin-top: 2px;
-  color: var(--aurora-3);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.tick svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: 2.6;
 }
 
 /* -------------------------------- stage -------------------------------- */
 
 .stage {
   position: relative;
+  padding: 36px 24px 44px;
 }
 
-/*
- * The browser frame.
- *
- * Tilted very slightly and lifted — just enough to read as an object sitting on
- * the page rather than as a diagram of one. Any more rotation and the type
- * inside starts to look like a mistake.
- */
-.frame {
+/* The coloured glow behind the window. */
+.blob {
+  position: absolute;
+  inset: 4% 2% 6% 8%;
+  border-radius: 40% 60% 55% 45% / 50% 45% 55% 50%;
+  background: var(--gradient);
+  opacity: 0.35;
+  filter: blur(56px);
+}
+
+.stage {
+  perspective: 1400px;
+}
+
+.window {
+  position: relative;
   border-radius: var(--radius-lg);
-  background: var(--glass-strong);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--hairline-strong);
-  box-shadow: var(--shadow-lg), var(--glass-sheen);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: 0 40px 100px -20px rgba(79, 70, 229, 0.55), 0 10px 30px rgba(0, 0, 0, 0.4);
   overflow: hidden;
-  transform: rotate(-1.2deg);
+  transform: rotateY(-12deg) rotateX(6deg);
+  transform-style: preserve-3d;
+  transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.stage:hover .window {
+  transform: rotateY(0) rotateX(0);
+}
+
+/* A sheet of light that sweeps across the glass every few seconds. */
+.shine {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.1) 48%, transparent 60%);
+  transform: translateX(-120%);
+  animation: sweep 7s ease-in-out 1.5s infinite;
+  pointer-events: none;
+}
+
+@keyframes sweep {
+  0%,
+  70% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+/* "Switched on" notifications: one at a time, sliding in over the window. */
+.toasts {
+  position: absolute;
+  right: -18px;
+  top: 42%;
+  z-index: 3;
+  width: 250px;
+  height: 64px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toast {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 14px 10px 10px;
+  border-radius: var(--radius);
+  background: rgba(18, 23, 56, 0.9);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  animation: toast 9s ease-in-out infinite;
+}
+
+.toast strong {
+  display: block;
+  max-width: 150px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toast small {
+  display: block;
+  color: var(--success);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.toastIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--tone-soft);
+  color: var(--tone);
+}
+
+.toastIcon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.toastCheck {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-left: auto;
+  color: var(--success);
+}
+
+@keyframes toast {
+  0% {
+    opacity: 0;
+    transform: translateX(30px) scale(0.96);
+  }
+  4%,
+  30% {
+    opacity: 1;
+    transform: none;
+  }
+  34%,
+  100% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.98);
+  }
 }
 
 .chrome {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 13px 16px;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface-2);
   border-bottom: 1px solid var(--hairline);
-  background: rgba(255, 255, 255, 0.04);
 }
 
-.dot {
-  width: 9px;
-  height: 9px;
+.dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dots i {
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.22);
+}
+
+.dots i:nth-child(1) {
+  background: #ff6b6b;
+}
+
+.dots i:nth-child(2) {
+  background: #ffc542;
+}
+
+.dots i:nth-child(3) {
+  background: #3ddc84;
 }
 
 .url {
-  margin-left: 10px;
-  padding: 4px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  max-width: 260px;
+  padding: 5px 12px;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-faint);
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.url svg {
+  width: 12px;
+  height: 12px;
+  color: var(--success);
 }
 
 .screen {
-  padding: 26px 24px 24px;
+  padding: 18px;
 }
 
-/* The suggestion of a site's own header inside the frame: a mark and two
-   lines of nav. Abstract on purpose — a legible fake nav invites reading. */
-.screenBrand {
+.screenHead {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 26px;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
-.screenMark {
+.logo {
+  display: grid;
+  place-items: center;
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: var(--accent-ramp);
-  opacity: 0.9;
+  background: var(--gradient);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
 }
 
-.screenLines {
-  display: flex;
-  gap: 8px;
+.lines {
+  display: grid;
+  gap: 6px;
+  flex: 1;
 }
 
-.screenLines i {
+.lines i {
   display: block;
   height: 7px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.screenLines i:first-child {
-  width: 48px;
+.lines i:first-child {
+  width: 46%;
+  background: rgba(255, 255, 255, 0.16);
 }
 
-.screenLines i:last-child {
-  width: 30px;
+.lines i:last-child {
+  width: 30%;
 }
 
-/* -------------------------------- tiles -------------------------------- */
+.liveDot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.liveDot::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
 
 .tiles {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tiles > li {
+  display: flex;
+  min-width: 0;
 }
 
 .tile {
-  padding: 16px 16px 14px;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--surface);
   border: 1px solid var(--hairline);
+  border-top: 3px solid var(--tone);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.tileValue {
-  font-family: var(--font-display);
-  font-size: 1.6rem;
+.tile:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.tile :global(.icon-tile) {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+}
+
+.tile :global(.icon-tile) svg {
+  width: 20px;
+  height: 20px;
+}
+
+.tileName {
+  overflow-wrap: anywhere;
+  font-weight: 800;
+  font-size: 0.98rem;
+  letter-spacing: -0.01em;
+}
+
+.tileTools {
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+/* Floating fact cards. */
+.float {
+  position: absolute;
+  max-width: calc(100% - 8px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px 12px 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-lg);
+  animation: bob 6s ease-in-out infinite;
+}
+
+.float strong {
+  display: block;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.float small {
+  display: block;
+  color: var(--text-faint);
+  font-size: 0.76rem;
+}
+
+.float em {
+  font-style: normal;
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.floatTop {
+  top: 0;
+  right: -6px;
+}
+
+.floatBottom {
+  bottom: 4px;
+  left: -10px;
+  animation-delay: -3s;
+}
+
+.floatIcon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--tone-soft);
+  color: var(--tone);
+}
+
+.floatIcon svg {
+  width: 20px;
+  height: 20px;
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* -------------------------------- facts -------------------------------- */
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  margin: 56px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fact {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border-radius: var(--radius);
+  background: rgba(18, 23, 56, 0.72);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.fact:hover {
+  transform: translateY(-3px);
+  border-color: var(--tone);
+  box-shadow: var(--shadow);
+}
+
+.factValue {
+  display: block;
+  font-size: 1.5rem;
   font-weight: 800;
   line-height: 1.1;
   letter-spacing: -0.03em;
-  /* Gradient numerals: large and heavy enough that the ramp's lightest stop is
-     still comfortably legible — the threshold set in globals.css for when a
-     gradient may carry type. */
-  color: var(--accent-text);
-  background: var(--accent-ramp);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
 
-.tileLabel {
-  margin: 6px 0 0;
-  color: var(--text-faint);
-  font-size: 0.78rem;
-  line-height: 1.35;
-}
-
-.screenFoot {
-  display: flex;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.screenPill {
-  width: 104px;
-  height: 30px;
-  border-radius: var(--radius-pill);
-  background: var(--accent-ramp);
-  opacity: 0.85;
-}
-
-.screenPillGhost {
-  width: 78px;
-  height: 30px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--hairline-strong);
-}
-
-/* -------------------------------- badge -------------------------------- */
-
-.badge {
-  position: absolute;
-  left: -14px;
-  bottom: -18px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 11px 18px;
-  border-radius: var(--radius-pill);
-  background: var(--glass-strong);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--hairline-strong);
-  box-shadow: var(--shadow), var(--glass-sheen);
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-
-.badgeIcon {
-  width: 17px;
-  height: 17px;
-  color: var(--aurora-3);
+.factLabel {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 0.88rem;
 }
 
 /* ------------------------------ responsive ------------------------------ */
 
-@media (max-width: 980px) {
-  .inner {
-    grid-template-columns: 1fr;
-    gap: 48px;
-  }
-
-  /* Upright once it is the full width. The tilt reads as a lean into the
-     column beside it, and with no column beside it it reads as crooked. */
-  .frame {
+@media (max-width: 1000px) {
+  .window {
     transform: none;
   }
 
+  .toasts {
+    right: 0;
+  }
+
+  .inner {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
   .stage {
-    max-width: 520px;
+    max-width: 580px;
+    width: 100%;
+    margin-inline: auto;
   }
 }
 
 @media (max-width: 640px) {
   .hero {
-    padding-block: 52px 56px;
+    padding-block: 44px 56px;
   }
 
-  .badge {
+  .actions :global(.btn) {
+    width: 100%;
+  }
+
+  .stage {
+    padding: 44px 0 52px;
+  }
+
+  .screen {
+    padding: 12px;
+  }
+
+  .tiles {
+    gap: 8px;
+  }
+
+  .tile {
+    padding: 12px;
+  }
+
+  .tileTools {
+    display: none;
+  }
+
+  .floatTop {
+    right: 0;
+  }
+
+  .floatBottom {
     left: 0;
-    bottom: -14px;
-    font-size: 0.8rem;
+  }
+
+  .facts {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 40px;
+  }
+
+  .fact {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .factValue {
+    font-size: 1.2rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .toasts {
+    top: auto;
+    bottom: 70px;
+    right: 4px;
+    width: 220px;
+  }
+
+  .orbA,
+  .orbB,
+  .orbC {
+    filter: blur(50px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orbA,
+  .orbB,
+  .orbC,
+  .shine,
+  .copy,
+  .stage,
+  .float,
+  .title :global(.gradient-text) {
+    animation: none;
+  }
+
+  /* Without motion, show the first notification and keep it. */
+  .toast {
+    animation: none;
+  }
+
+  .toast:first-child {
+    opacity: 1;
   }
 }

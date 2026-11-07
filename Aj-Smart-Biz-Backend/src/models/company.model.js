@@ -59,6 +59,15 @@ module.exports = (sequelize) =>
       favicon: { type: DataTypes.STRING(255), allowNull: true },
       currency: { type: DataTypes.STRING(10), allowNull: false, defaultValue: 'INR' },
       timezone: { type: DataTypes.STRING(60), allowNull: false, defaultValue: 'Asia/Kolkata' },
+      /**
+       * Upload storage for this company, in MB, overriding its plan.
+       *
+       * NULL — the ordinary case — means "whatever the running plan allows"
+       * (`plans.storage_mb`, read from the subscription snapshot). A number
+       * gives this one company more or less than its plan, without inventing a
+       * one-off plan for it. See `services/storage.service`.
+       */
+      storageLimitMb: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
       /** Denormalised pointer to the currently running subscription, kept in sync by the service. */
       currentSubscriptionId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
       subscriptionEndDate: { type: DataTypes.DATEONLY, allowNull: true },

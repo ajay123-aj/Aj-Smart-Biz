@@ -24,8 +24,16 @@ module.exports = (sequelize) =>
     'MarketingContent',
     {
       id: { type: DataTypes.INTEGER.UNSIGNED, primaryKey: true, autoIncrement: true },
-      /** The section this is, e.g. `hero`. Unique: one row per section. */
-      key: { type: DataTypes.STRING(60), allowNull: false, unique: true },
+      /**
+       * The section this is, e.g. `hero`. Unique: one row per section.
+       *
+       * Uniqueness is declared **only** in `indexes` below, never as
+       * `unique: true` here. With both, `sync({ alter: true })` re-ran
+       * `CHANGE key ... UNIQUE` on every boot and MySQL added a fresh `key_N`
+       * index each time, until the table hit the 64-key limit and the server
+       * refused to start (ER_TOO_MANY_KEYS).
+       */
+      key: { type: DataTypes.STRING(60), allowNull: false },
       /** What the section is, for whoever edits it. Never rendered. */
       label: { type: DataTypes.STRING(150), allowNull: true },
       /** The section's own shape. See the note above. */

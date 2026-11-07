@@ -74,6 +74,12 @@ const menuCreate = {
 };
 const menuUpdate = { params: idParam, body: Joi.object(menuFields).min(1) };
 
+/* ------------- Admins holding a role ------------- */
+const roleAdminsSync = {
+  params: idParam,
+  body: Joi.object({ adminIds: Joi.array().items(id).max(500).unique().required() }),
+};
+
 /* ------------- Role permissions ------------- */
 const permissionSync = {
   params: Joi.object({ roleId: id.required() }),
@@ -98,6 +104,8 @@ const adminFields = {
   avatar: Joi.string().allow('', null).max(255),
   branchId: id.allow(null),
   roleId: id.allow(null),
+  /** Every role the admin holds, primary first. Replaces `roleId` when sent. */
+  roleIds: Joi.array().items(id).min(1).max(20).unique(),
   status,
 };
 const adminCreate = {
@@ -105,10 +113,13 @@ const adminCreate = {
     ...adminFields,
     name: adminFields.name.required(),
     email: email.required(),
-    roleId: id.required(),
+    /* One of the two: `roleIds` (multiple roles) or the older single `roleId`. */
+    roleId: id,
     password: password.optional(),
     mustChangePassword: Joi.boolean().default(true),
-  }),
+  })
+    .or('roleId', 'roleIds')
+    .messages({ 'object.missing': 'Choose at least one role' }),
 };
 const adminUpdate = {
   params: idParam,
@@ -121,6 +132,7 @@ const adminResetPassword = {
 const adminList = { query: listQuery({ roleId: id, branchId: id }) };
 
 module.exports = {
+  roleAdminsSync,
   superAdminCreate,
   superAdminUpdate,
   superAdminResetPassword,

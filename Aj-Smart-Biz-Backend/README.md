@@ -75,6 +75,7 @@ DB_DIALECT=sqlite DB_STORAGE=aj.sqlite npm run dev
 | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | MySQL connection |
 | `DB_STORAGE` | SQLite file path, when `DB_DIALECT=sqlite` |
 | `DB_SYNC_MODE` | `alter` (default in dev), `force` (drop + recreate, dev only), `none` (recommended in prod) |
+| `DB_SETUP_ON_START` | `true` (default): on boot create the database if missing, sync the schema per `DB_SYNC_MODE` and run the seeders. `false`: connect and start immediately — run `npm run db:setup` after pulling a change that adds tables, columns or menus |
 | `JWT_SECRET`, `JWT_EXPIRES_IN` | Access token |
 | `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN` | Refresh token |
 | `SUPER_ADMIN_NAME/EMAIL/PHONE/PASSWORD` | Root account created on boot |

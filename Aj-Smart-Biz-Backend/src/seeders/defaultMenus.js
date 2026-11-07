@@ -73,9 +73,35 @@ const menus = [
    * handing them the whole customer list and everyone's phone number.
    */
   { name: 'Customers', slug: 'customers', icon: 'user-round', route: '/customers', sequence: 8 },
-  { name: 'Role Management', slug: 'role-management', icon: 'shield', route: '/roles', sequence: 9 },
-  { name: 'Menu Permission', slug: 'menu-permission', icon: 'list-checks', route: '/menu-permissions', sequence: 10 },
-  { name: 'Admin Management', slug: 'admin-management', icon: 'users', route: '/admins', sequence: 11 },
+  /**
+   * Bills raised at the counter. Directly under the order book and the
+   * customer list because it is the same money from the other door: orders come
+   * in from the website, invoices are written by the person at the till.
+   * Shown only when the plan carries Invoice management.
+   */
+  { name: 'Invoices', slug: 'invoices', icon: 'receipt', route: '/invoices', sequence: 9 },
+  /**
+   * Invoices, split by whose they are.
+   *
+   * `invoices` (the parent) is the right to bill at all: a role with it sees and
+   * writes **its own** invoices — the ones that admin created — under "My
+   * invoices", which follows the parent's permission rather than having its own.
+   *
+   * "All invoices" is a separate grant on purpose. A counter clerk should see
+   * the bills they raised, not every colleague's takings; a manager should see
+   * all of them. Ticking View on this row in Menu Permission is what turns one
+   * into the other. The company's main admin always sees everything.
+   *
+   * "Invoice analysis" is the reports screen — product-wise, admin-wise,
+   * revenue and collections. It has its own grant too, and it reports on the
+   * same invoices the role may see: its own, or everyone's with "All invoices".
+   */
+  { name: 'My invoices', slug: 'invoices-mine', icon: 'receipt', route: '/invoices', sequence: 91, parent: 'invoices' },
+  { name: 'All invoices', slug: 'invoices-all', icon: 'files', route: '/invoices/all', sequence: 92, parent: 'invoices' },
+  { name: 'Invoice analysis', slug: 'invoice-analysis', icon: 'chart', route: '/invoices/analysis', sequence: 93, parent: 'invoices' },
+  { name: 'Role Management', slug: 'role-management', icon: 'shield', route: '/roles', sequence: 10 },
+  { name: 'Menu Permission', slug: 'menu-permission', icon: 'list-checks', route: '/menu-permissions', sequence: 11 },
+  { name: 'Admin Management', slug: 'admin-management', icon: 'users', route: '/admins', sequence: 12 },
 
   /* ------------------------------------------------------------------ *
    * Company Details submenus
@@ -202,6 +228,8 @@ const menus = [
  * permission row and always has, so it keeps deciding for itself.
  */
 const MENU_INHERITS_PARENT = new Set([
+  /* The billing list itself: whoever may bill, may see their own bills. */
+  'invoices-mine',
   'company-profile',
   'company-services',
   'company-service-categories',
@@ -285,6 +313,11 @@ const MENU_FUNCTIONALITY = {
    * entry is left out rather than shown leading to an empty list.
    */
   customers: FUNCTIONALITY.CUSTOMERS,
+  /** The billing counter is its own purchase. */
+  invoices: FUNCTIONALITY.INVOICES,
+  'invoices-mine': FUNCTIONALITY.INVOICES,
+  'invoices-all': FUNCTIONALITY.INVOICES,
+  'invoice-analysis': FUNCTIONALITY.INVOICES,
   /**
    * The blog's screen, gated on the blog's own grant. A tenant whose plan does
    * not carry it has nothing to write here, so the entry is left out rather than

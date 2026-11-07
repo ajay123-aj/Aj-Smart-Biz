@@ -1,0 +1,103 @@
+/* Every inner page opens on the same soft gradient wash as the hero. */
+.head {
+  position: relative;
+  padding-block: 60px 64px;
+  background:
+    radial-gradient(40rem 24rem at 100% 0%, rgba(168, 85, 247, 0.2) 0%, transparent 60%),
+    radial-gradient(30rem 20rem at 0% 0%, rgba(59, 130, 246, 0.18) 0%, transparent 60%),
+    transparent;
+  border-bottom: 1px solid var(--hairline);
+  overflow: hidden;
+}
+
+/* Breadcrumb and eyebrow: two badges on one row, the same height,
+   with clear space between them (they wrap on narrow screens). */
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.crumbs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--hairline);
+  color: var(--text-faint);
+  font-size: 0.85rem;
+  font-weight: 500;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* A long page title from the API must not push the breadcrumb pill wider
+   than the phone; the current page truncates instead. */
+.crumbs [aria-current='page'] {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.crumbs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+
+.crumbs a:hover {
+  color: #ffffff;
+}
+
+.home {
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+
+.sep {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  opacity: 0.55;
+}
+
+.crumbs [aria-current='page'] {
+  color: var(--brand-strong);
+  font-weight: 700;
+}
+
+.eyebrow {
+  min-height: 34px;
+  margin-bottom: 0;
+  padding: 4px 14px;
+}
+
+.title {
+  max-width: 20ch;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1.06;
+  letter-spacing: -0.038em;
+}
+
+.lede {
+  margin-top: 18px;
+  max-width: 60ch;
+  color: var(--text-muted);
+  font-size: 1.14rem;
+}
+
+@media (max-width: 640px) {
+  .head {
+    padding-block: 36px 44px;
+  }
+}

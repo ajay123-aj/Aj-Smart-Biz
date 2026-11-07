@@ -24,7 +24,7 @@ export default async function TemplatesSection({ panel = false }: { panel?: bool
   return (
     <section className={`section ${panel ? 'section--panel' : ''}`} id="templates">
       <div className="container">
-        <header className="section-head">
+        <header className="section-head section-head--center">
           {page?.homeEyebrow ? <span className="eyebrow">{page.homeEyebrow}</span> : null}
           <h2 className="section-title">{page?.homeTitle ?? page?.title}</h2>
           {page?.homeLede ? <p className="section-lede">{page.homeLede}</p> : null}

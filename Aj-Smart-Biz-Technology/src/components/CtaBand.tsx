@@ -26,23 +26,25 @@ export default async function CtaBand() {
       <div className="container">
         <div className={styles.band}>
           <div className={styles.copy}>
-            <span className="eyebrow">{cta.eyebrow}</span>
+            {cta.eyebrow ? <span className={styles.eyebrow}>{cta.eyebrow}</span> : null}
             <h2 className={styles.title}>{cta.title}</h2>
             <p className={styles.body}>{cta.body}</p>
           </div>
 
           <div className={styles.actions}>
             {cta.primary?.href ? (
-              <Link className="btn btn--primary" href={cta.primary.href}>
-                {cta.primary.label}
-                <Glyph name="arrow-right" className={styles.icon} />
+              <Link className={`btn btn--lg ${styles.primary}`} href={cta.primary.href}>
+                <span>{cta.primary.label}</span>
+                <span className={styles.arrow} aria-hidden="true">
+                  <Glyph name="arrow-right" className={styles.icon} />
+                </span>
               </Link>
             ) : null}
 
             {/* Dropped rather than rendered as `tel:` with nothing after it —
                 a button that dials silence is worse than no button. */}
             {contact?.phoneHref ? (
-              <a className="btn btn--ghost" href={`tel:${contact.phoneHref}`}>
+              <a className={`btn btn--lg ${styles.secondary}`} href={`tel:${contact.phoneHref}`}>
                 <Glyph name="phone" className={styles.icon} />
                 {contact.phone ?? contact.phoneHref}
               </a>

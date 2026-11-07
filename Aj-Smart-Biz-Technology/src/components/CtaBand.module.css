@@ -1,77 +1,183 @@
-/*
- * The one place on the site where a surface is allowed to carry colour.
- *
- * Everywhere else the accent ramp is text, a hairline or a single button — see
- * the note at the top of globals.css. Here the panel itself takes a low-opacity
- * wash of it, because this band closes the page and has to stop the eye. It is
- * kept to a tint *over* the glass rather than a fill: at full saturation it
- * would stop being a surface and become a billboard, and it would also be the
- * only opaque thing on the page.
- */
+/* The closing band: the brand gradient, white type, two clear actions. */
 .band {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1.4fr auto;
+  gap: 36px;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 30px;
-  padding: 46px 44px;
-  border-radius: var(--radius-lg);
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--aurora-1) 24%, transparent),
-      color-mix(in srgb, var(--aurora-2) 14%, transparent) 55%,
-      color-mix(in srgb, var(--aurora-3) 16%, transparent)
-    ),
-    var(--glass-strong);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--hairline-strong);
-  box-shadow: var(--shadow-lg), var(--glass-sheen);
+  padding: 56px 60px;
+  border-radius: 28px;
+  /* The gradient slowly flows, so the last thing on the page is alive. */
+  background: linear-gradient(120deg, #2563eb, #4f46e5, #7c3aed, #c026d3, #4f46e5, #2563eb);
+  background-size: 300% 300%;
+  animation: flow 14s ease-in-out infinite;
+  color: #ffffff;
+  box-shadow: 0 30px 70px rgba(79, 70, 229, 0.3);
   overflow: hidden;
 }
 
-.copy {
-  max-width: 40rem;
+@keyframes flow {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .band {
+    animation: none;
+  }
+}
+
+/* Two soft light circles for depth. */
+.band::before,
+.band::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+}
+
+.band::before {
+  width: 340px;
+  height: 340px;
+  top: -160px;
+  right: -60px;
+}
+
+.band::after {
+  width: 220px;
+  height: 220px;
+  bottom: -120px;
+  left: 30%;
+}
+
+.copy,
+.actions {
+  position: relative;
+  z-index: 1;
+  /* Grid items: let long API words wrap instead of widening the band. */
+  min-width: 0;
+}
+
+.eyebrow {
+  display: inline-block;
+  margin-bottom: 14px;
+  padding: 5px 14px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .title {
-  font-size: clamp(1.7rem, 3.4vw, 2.3rem);
+  color: #ffffff;
+  font-size: clamp(1.8rem, 3.4vw, 2.6rem);
 }
 
 .body {
-  margin-top: 14px;
-  max-width: 46ch;
-  color: var(--text-muted);
-  font-size: 1rem;
-  line-height: 1.6;
+  margin-top: 12px;
+  max-width: 56ch;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 1.06rem;
 }
 
 .actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
   gap: 12px;
+  min-width: 260px;
+}
+
+/* Main action: solid white pill, dark indigo label, arrow in its own disc. */
+.primary {
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 8px 8px 26px;
+  background: #ffffff;
+  color: #1e1b4b;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  box-shadow: 0 14px 30px rgba(14, 19, 48, 0.25), inset 0 -2px 0 rgba(79, 70, 229, 0.12);
+}
+
+.primary:hover {
+  background: #ffffff;
+  color: #312e81;
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px rgba(14, 19, 48, 0.32), inset 0 -2px 0 rgba(79, 70, 229, 0.18);
+}
+
+.primary:focus-visible,
+.secondary:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 3px;
+}
+
+.arrow {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #ffffff;
+  flex: none;
+  transition: transform 0.2s ease;
+}
+
+.primary:hover .arrow {
+  transform: translateX(3px);
+}
+
+/* Second action: call — clear outline on the gradient, no competing fill. */
+.secondary {
+  background: transparent;
+  border: 1.5px solid rgba(255, 255, 255, 0.65);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.secondary:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: #ffffff;
 }
 
 .icon {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 860px) {
   .band {
-    padding: 34px 26px;
-    gap: 24px;
+    grid-template-columns: 1fr;
+    padding: 40px 24px;
   }
 
-  /* Full width once they stack, so the pair reads as one decision with two
-     answers rather than as two stray pills. */
   .actions {
+    min-width: 0;
+  }
+
+  .actions :global(.btn) {
     width: 100%;
   }
+}
 
-  .actions > * {
-    flex: 1 1 200px;
+@media (max-width: 400px) {
+  .band {
+    padding: 36px 20px;
+    border-radius: 22px;
+  }
+
+  .primary {
+    padding-left: 20px;
   }
 }

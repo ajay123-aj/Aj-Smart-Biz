@@ -9,6 +9,7 @@ const { AUTH_SCOPE, STATUS, PERMISSION_ACTIONS } = require('../constants');
 const { Op } = require('sequelize');
 const { MENU_INHERITS_PARENT, MENU_FUNCTIONALITY } = require('../seeders/defaultMenus');
 const functionalityService = require('../services/functionality.service');
+const adminRoles = require('../services/adminRole.service');
 
 const publicSuperAdmin = (row) => ({
   id: row.id,
@@ -94,7 +95,16 @@ const adminLogin = asyncHandler(async (req, res) => {
   if (account.status !== STATUS.ACTIVE) throw ApiError.forbidden('Your account is inactive');
   if (!account.company) throw ApiError.forbidden('Your company no longer exists');
   if (account.company.status !== STATUS.ACTIVE) throw ApiError.forbidden('Your company is inactive');
-  if (account.role && account.role.status !== STATUS.ACTIVE) throw ApiError.forbidden('Your role is inactive');
+  /* Refused only when the admin holds roles and every one is switched off;
+     one active role among several is enough to sign in. */
+  if (!account.isCompanyAdmin) {
+    const { held, active } = await adminRoles.activeRoleIds({
+      adminId: account.id,
+      roleId: account.roleId,
+      companyId: account.companyId,
+    });
+    if (held.length && !active.length) throw ApiError.forbidden('Your role is inactive');
+  }
 
   await account.update({ lastLoginAt: new Date() });
   const tokens = issueTokens({
@@ -110,18 +120,37 @@ const adminLogin = asyncHandler(async (req, res) => {
   });
 });
 
-/** POST /auth/refresh - works for both portals, scope is carried in the token. */
+/**
+ * POST /auth/refresh - for the two staff portals; the scope is carried in the token.
+ *
+ * **Only `super_admin` and `admin` refresh tokens are accepted.** Customer
+ * tokens (the tenant websites' sign-in) are signed with the same secret, and
+ * this used to treat every scope that was not super admin as an admin — so a
+ * customer's refresh token was exchanged for an *admin* token of whichever
+ * admin had the same numeric id, in any company. Any other scope is now refused
+ * outright, and the account is re-checked against the scope it claims.
+ */
 const refresh = asyncHandler(async (req, res) => {
   const payload = verifyRefreshToken(req.body.refreshToken);
-  const model = payload.scope === AUTH_SCOPE.SUPER_ADMIN ? db.SuperAdmin : db.Admin;
-  const account = await model.findByPk(payload.id);
-  if (!account || account.status !== STATUS.ACTIVE) throw ApiError.unauthorized('Account is not active');
 
-  const tokens = issueTokens(
-    payload.scope === AUTH_SCOPE.SUPER_ADMIN
-      ? { id: account.id, scope: AUTH_SCOPE.SUPER_ADMIN, role: account.role }
-      : { id: account.id, scope: AUTH_SCOPE.ADMIN, companyId: account.companyId, roleId: account.roleId }
-  );
+  let tokens;
+  if (payload.scope === AUTH_SCOPE.SUPER_ADMIN) {
+    const account = await db.SuperAdmin.findByPk(payload.id);
+    if (!account || account.status !== STATUS.ACTIVE) throw ApiError.unauthorized('Account is not active');
+    tokens = issueTokens({ id: account.id, scope: AUTH_SCOPE.SUPER_ADMIN, role: account.role });
+  } else if (payload.scope === AUTH_SCOPE.ADMIN) {
+    const account = await db.Admin.findByPk(payload.id);
+    if (!account || account.status !== STATUS.ACTIVE) throw ApiError.unauthorized('Account is not active');
+    tokens = issueTokens({
+      id: account.id,
+      scope: AUTH_SCOPE.ADMIN,
+      companyId: account.companyId,
+      roleId: account.roleId,
+    });
+  } else {
+    throw ApiError.unauthorized('This token cannot be refreshed here');
+  }
+
   return success(res, { message: 'Token refreshed', data: tokens });
 });
 
@@ -150,16 +179,9 @@ const me = asyncHandler(async (req, res) => {
       acc[menu.slug] = PERMISSION_ACTIONS.reduce((p, action) => ({ ...p, [action]: true }), {});
       return acc;
     }, {});
-  } else if (req.auth.roleId) {
-    const rows = await db.RolePermission.findAll({
-      where: { roleId: req.auth.roleId, companyId: req.auth.companyId },
-      include: [{ model: db.Menu, as: 'menu', attributes: ['id', 'slug'] }],
-    });
-    permissionMap = rows.reduce((acc, row) => {
-      if (!row.menu) return acc;
-      acc[row.menu.slug] = PERMISSION_ACTIONS.reduce((p, action) => ({ ...p, [action]: row[action] }), {});
-      return acc;
-    }, {});
+  } else {
+    /* Every active role the admin holds, OR-ed together. */
+    permissionMap = await adminRoles.permissionMap(req.auth.companyId, await adminRoles.authRoleIds(req));
   }
 
   /**

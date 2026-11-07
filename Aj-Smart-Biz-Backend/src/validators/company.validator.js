@@ -276,6 +276,17 @@ const aiContentStart = {
   }),
 };
 
+/**
+ * `PATCH /super-admin/companies/:id/storage`. A whole number of MB, up to 10 TB,
+ * or `null` to follow the plan again.
+ */
+const storageUpdate = {
+  params: idParam,
+  body: Joi.object({
+    storageLimitMb: Joi.number().integer().min(1).max(10 * 1024 * 1024).allow(null).required(),
+  }),
+};
+
 const aiContentJob = {
   params: Joi.object({ id: id.required(), jobId: Joi.string().guid().required() }),
 };
@@ -300,6 +311,7 @@ const domainCreate = { body: Joi.object({ ...domainFields, domain: hostname.requ
 const domainUpdate = { params: idParam, body: Joi.object(domainFields).min(1) };
 
 module.exports = {
+  storageUpdate,
   companyCreate,
   companyUpdate,
   domainCreate,

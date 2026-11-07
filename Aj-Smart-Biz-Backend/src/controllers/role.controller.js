@@ -2,6 +2,7 @@
 
 const { Op } = require('sequelize');
 const db = require('../models');
+const adminRoles = require('../services/adminRole.service');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 const { success, created, paginated } = require('../utils/response');
@@ -32,13 +33,8 @@ const list = asyncHandler(async (req, res) => {
   });
 
   // Admin counts make the list actionable ("can I delete this role?").
-  const counts = await db.Admin.findAll({
-    where: { companyId: req.auth.companyId },
-    attributes: ['roleId', [db.Sequelize.fn('COUNT', db.Sequelize.col('id')), 'total']],
-    group: ['roleId'],
-    raw: true,
-  });
-  const byRole = counts.reduce((acc, row) => ({ ...acc, [row.roleId]: Number(row.total) }), {});
+  // Counts primary and extra holders alike — see adminRole.service.
+  const byRole = await adminRoles.adminCountsByRole(req.auth.companyId);
 
   const rows = result.rows.map((row) => ({ ...row.toJSON(), adminCount: byRole[row.id] || 0 }));
   return paginated(res, { rows, count: result.count }, { page, limit }, 'Role list fetched successfully');
@@ -73,6 +69,16 @@ const create = asyncHandler(async (req, res) => {
 
   const clash = await db.Role.findOne({ where: { companyId, name: data.name } });
   if (clash) throw ApiError.conflict('A role with this name already exists');
+
+  /* The same check `syncPermissions` makes: a permission may only name a system
+     menu or one of this company's own. Without it a role could be created
+     pointing at another company's private menus, and reading the role back
+     would reveal their names. */
+  const menuIds = (permissions ?? []).map((permission) => permission.menuId);
+  if (menuIds.length) {
+    const valid = await db.Menu.count({ where: { id: menuIds, companyId: { [Op.or]: [null, companyId] } } });
+    if (valid !== new Set(menuIds).size) throw ApiError.badRequest('One or more menus do not exist');
+  }
 
   const role = await db.sequelize.transaction(async (transaction) => {
     const row = await db.Role.create(
@@ -125,11 +131,12 @@ const remove = asyncHandler(async (req, res) => {
   const role = await findOrFail(req);
   if (role.isSystem) throw ApiError.badRequest('The company admin role cannot be deleted');
 
-  const adminCount = await db.Admin.count({ where: { roleId: role.id } });
+  const adminCount = (await adminRoles.adminIdsWithRole(role.companyId, role.id)).length;
   if (adminCount > 0) throw ApiError.badRequest(`Reassign the ${adminCount} admin(s) using this role first`);
 
   await db.sequelize.transaction(async (transaction) => {
     await db.RolePermission.destroy({ where: { roleId: role.id }, transaction });
+    await db.AdminRole.destroy({ where: { roleId: role.id }, transaction });
     await role.destroy({ transaction });
   });
 
@@ -216,7 +223,84 @@ const syncPermissions = asyncHandler(async (req, res) => {
   return success(res, { message: 'Permissions updated successfully', data: { roleId: role.id } });
 });
 
+/* ---------------- Admins holding a role ---------------- */
+
+/**
+ * GET /roles/:id/admins - every admin of the company (except the main admin,
+ * whose role is fixed) with whether they hold this role and how: `primary`,
+ * `extra`, or not at all. What the "Assign admins" dialog renders.
+ */
+const getAdmins = asyncHandler(async (req, res) => {
+  const role = await findOrFail(req);
+  if (role.isSystem) throw ApiError.badRequest('The company admin role belongs to the main admin only');
+
+  const admins = await db.Admin.findAll({
+    where: { companyId: role.companyId, isCompanyAdmin: false },
+    attributes: ['id', 'name', 'email', 'status', 'roleId'],
+    order: [['name', 'ASC']],
+    raw: true,
+  });
+  const withRoles = await adminRoles.attachRoles(role.companyId, admins);
+  const data = withRoles.map((admin) => ({
+    id: admin.id,
+    name: admin.name,
+    email: admin.email,
+    status: admin.status,
+    roles: admin.roles,
+    holds: admin.roleIds.includes(role.id),
+    holdsAs: admin.roleId === role.id ? 'primary' : admin.roleIds.includes(role.id) ? 'extra' : null,
+  }));
+  return success(res, { message: 'Role admins fetched successfully', data: { role: { id: role.id, name: role.name }, admins: data } });
+});
+
+/**
+ * PUT /roles/:id/admins - `{ adminIds }` is the complete list of admins who
+ * should hold this role. Newly ticked admins get it as an extra role (or as
+ * their primary role when they had none); unticked ones lose it. An admin whose
+ * only role this is cannot be unticked — every admin keeps at least one role —
+ * and when it was their primary role, their next role becomes primary.
+ */
+const syncAdmins = asyncHandler(async (req, res) => {
+  const role = await findOrFail(req);
+  if (role.isSystem) throw ApiError.badRequest('The company admin role belongs to the main admin only');
+
+  const wanted = new Set(req.body.adminIds.map(Number));
+  const admins = await db.Admin.findAll({ where: { companyId: role.companyId, isCompanyAdmin: false } });
+  const known = new Set(admins.map((admin) => admin.id));
+  const unknown = [...wanted].filter((id) => !known.has(id));
+  if (unknown.length) throw ApiError.badRequest('One or more admins do not belong to this company');
+
+  const withRoles = await adminRoles.attachRoles(role.companyId, admins.map((admin) => admin.toJSON()));
+  const plan = withRoles.map((admin) => {
+    const has = admin.roleIds.includes(role.id);
+    const want = wanted.has(admin.id);
+    if (has === want) return null;
+    const next = want ? [...admin.roleIds, role.id] : admin.roleIds.filter((id) => id !== role.id);
+    return { admin, next };
+  }).filter(Boolean);
+
+  const stranded = plan.filter((step) => !step.next.length).map((step) => step.admin.name);
+  if (stranded.length) {
+    throw ApiError.badRequest(`${stranded.join(', ')} would be left with no role — give them another role first`);
+  }
+
+  const byId = new Map(admins.map((admin) => [admin.id, admin]));
+  await db.sequelize.transaction(async (transaction) => {
+    for (const step of plan) {
+      // eslint-disable-next-line no-await-in-loop
+      await adminRoles.setRoles({ admin: byId.get(step.admin.id), roleIds: step.next, actorId: req.auth.id, transaction });
+    }
+  });
+
+  return success(res, {
+    message: 'Role assignments updated successfully',
+    data: { roleId: role.id, changed: plan.length },
+  });
+});
+
 module.exports = {
+  getAdmins,
+  syncAdmins,
   list,
   dropdown,
   getById,

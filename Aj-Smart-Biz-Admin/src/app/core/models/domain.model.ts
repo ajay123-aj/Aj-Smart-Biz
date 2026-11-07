@@ -1626,6 +1626,28 @@ export interface RolePermissionMatrix {
   permissions: PermissionRow[];
 }
 
+/** A role an admin holds. `primary` marks `admins.role_id`. */
+export interface AdminRoleRef {
+  id: number;
+  name: string;
+  status?: string;
+  primary?: boolean;
+}
+
+/** GET /admin/roles/:id/admins - who holds a role, for the Assign admins dialog. */
+export interface RoleAdminsView {
+  role: { id: number; name: string };
+  admins: {
+    id: number;
+    name: string;
+    email: string;
+    status: string;
+    roles: AdminRoleRef[];
+    holds: boolean;
+    holdsAs: 'primary' | 'extra' | null;
+  }[];
+}
+
 export interface CompanyAdmin extends AuditFields {
   companyId: number;
   branchId?: number | null;
@@ -1638,6 +1660,9 @@ export interface CompanyAdmin extends AuditFields {
   mustChangePassword: boolean;
   lastLoginAt?: string | null;
   role?: Option | null;
+  /** Every role held, primary first. Access is the union of the active ones. */
+  roleIds?: number[];
+  roles?: AdminRoleRef[];
   branch?: Option | null;
   /** Present only on the create response, shown once. */
   generatedPassword?: string | null;
@@ -1957,7 +1982,28 @@ export interface Transaction {
 }
 
 /* ------------------------------- dashboard ----------------------------- */
+/** Upload storage used vs allowed. `GET /admin/dashboard` → `storage`. */
+export interface CompanyStorage {
+  usedBytes: number;
+  usedMb: number;
+  usedLabel: string;
+  limitMb: number | null;
+  limitLabel: string;
+  remainingBytes: number | null;
+  percentUsed: number;
+  atLimit: boolean;
+  unlimited: boolean;
+  /** `company` — a custom limit the platform set; `plan`; or `none`. */
+  source: 'company' | 'plan' | 'none';
+  companyStorageLimitMb: number | null;
+  planStorageMb: number | null;
+  planName: string | null;
+  fileCount: number;
+}
+
 export interface AdminDashboard {
+  /** Null only if it could not be read. */
+  storage?: CompanyStorage | null;
   admins: { total: number; active: number; inactive: number };
   branches: { total: number; active: number };
   roles: { total: number };

@@ -1,15 +1,18 @@
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo';
 import EnquiryForm from '@/components/EnquiryForm';
 import BusinessTypesSection from '@/components/BusinessTypesSection';
 import Glyph from '@/components/Glyph';
 import { getSite } from '@/lib/api';
 import styles from './page.module.css';
 
-export const metadata: Metadata = {
-  title: 'Book a free demo',
-  description:
+export async function generateMetadata(): Promise<Metadata> {
+  return pageMetadata(
+    '/demo',
+    'Book a free demo',
     'See the website we would build for your business, free. Tell us your trade and we will call you back the same working day.',
-};
+  );
+}
 
 /**
  * The demo request.

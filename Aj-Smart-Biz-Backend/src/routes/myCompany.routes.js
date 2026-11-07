@@ -13,6 +13,7 @@ const catalogueRoutes = require('./catalogue.routes');
 const blogRoutes = require('./blog.routes');
 const orderRoutes = require('./order.routes');
 const warehouseRoutes = require('./warehouse.routes');
+const invoiceRoutes = require('./invoice.routes');
 const leadRoutes = require('./lead.routes');
 const serviceLeadController = require('../controllers/serviceLead.controller');
 const functionalitySchema = require('../validators/functionality.validator');
@@ -317,6 +318,13 @@ router.use(
   (req, res, next) => (req.method === 'GET' ? next() : requirePermission('warehouse', 'canEdit')(req, res, next)),
   warehouseRoutes.warehouses
 );
+/**
+ * Counter invoices — billing walk-in customers, with discounts, deducting stock
+ * on issue. Its own menu, shown only when the plan carries Invoice management;
+ * see `routes/invoice.routes` for the per-action permissions.
+ */
+router.use('/invoices', requirePermission('invoices', 'canView'), invoiceRoutes);
+
 router.use(
   '/stock',
   requirePermission('warehouse', 'canView'),

@@ -1,147 +1,377 @@
-/*
- * The footer is a panel, like every other band on this site — inset from the
- * viewport and rounded, never a full-bleed rectangle.
+/* ------------------------------------------------------------------ *
+ * The dark footer.
  *
- * It is the one place that rule is tempting to break, because a footer
- * traditionally closes the window off. But a band touching the viewport edges
- * casts no shadow, with no shadow it is not floating, and if it is not floating
- * it is not made of the same material as everything above it. So the page
- * simply ends, with the aurora showing past the last panel.
- */
+ * Deep navy, lit from the top by the brand gradient: a glowing hairline along
+ * the top edge and a soft violet bloom behind the brand block, so the page ends
+ * on the same colours it opened with. Text sits at three steps of white —
+ * headings, links, notes — all of which clear 4.5:1 on the ground.
+ * ------------------------------------------------------------------ */
+
 .footer {
-  margin: 0 16px 16px;
-  padding-block: 56px 20px;
-  border-radius: var(--radius-lg);
-  background: var(--glass);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--hairline);
-  box-shadow: var(--shadow), var(--glass-sheen);
+  --f-ground: #0b0f2a;
+  --f-ground-2: #070a1e;
+  --f-text: #ffffff;
+  --f-muted: #b8bfdc;
+  --f-faint: #8b93b8;
+  --f-line: rgba(255, 255, 255, 0.09);
+  --f-chip: rgba(255, 255, 255, 0.06);
+
+  position: relative;
+  margin-top: 40px;
+  background: linear-gradient(180deg, rgba(7, 10, 30, 0.6) 0%, var(--f-ground-2) 100%);
+  color: var(--f-muted);
+  overflow: hidden;
+  isolation: isolate;
 }
 
-.inner {
+/* The glowing top edge. */
+.footer::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #6366f1 25%, #a855f7 50%, #ec4899 75%, transparent);
+  opacity: 0.9;
+}
+
+/* Soft colour blooms behind the content. */
+.glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38rem 22rem at 8% 0%, rgba(99, 102, 241, 0.28), transparent 70%),
+    radial-gradient(30rem 20rem at 92% 10%, rgba(168, 85, 247, 0.18), transparent 70%),
+    radial-gradient(36rem 18rem at 50% 110%, rgba(236, 72, 153, 0.12), transparent 70%);
+}
+
+/* ------------------------------- top ------------------------------- */
+
+.top {
   display: grid;
-  grid-template-columns: 1.6fr 1fr 1fr;
-  gap: 44px;
-  align-items: start;
+  grid-template-columns: 1.5fr 0.8fr 1.1fr;
+  gap: 56px;
+  padding-block: 76px 48px;
 }
-
-/* -------------------------------- about -------------------------------- */
 
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
+  border-radius: 12px;
 }
 
 .mark {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  background: var(--accent-ramp);
-  color: var(--on-accent);
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #2563eb, #4f46e5 50%, #7c3aed);
+  color: #ffffff;
   font-weight: 800;
-  font-size: 0.86rem;
+  font-size: 0.92rem;
+  box-shadow: 0 10px 28px rgba(99, 102, 241, 0.45);
 }
 
 .brandText {
-  font-weight: 700;
-  font-size: 1.02rem;
+  color: var(--f-text);
+  font-weight: 800;
+  font-size: 1.2rem;
+  letter-spacing: -0.015em;
 }
 
 .tagline {
-  margin-top: 16px;
-  max-width: 34ch;
-  color: var(--text-muted);
-  font-size: 0.95rem;
+  margin-top: 18px;
+  max-width: 42ch;
+  color: var(--f-muted);
+  font-size: 1rem;
+  line-height: 1.7;
 }
 
-.address {
-  margin-top: 10px;
-  color: var(--text-faint);
-  font-size: 0.88rem;
-}
-
-/* ------------------------------- columns ------------------------------- */
-
-.column {
+.actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.demo {
+  background: #ffffff;
+  color: #1e1b4b;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
+}
+
+.demo:hover {
+  background: #eef0ff;
+  box-shadow: 0 14px 34px rgba(99, 102, 241, 0.35);
+}
+
+.quick {
+  display: flex;
   gap: 10px;
 }
 
+.quickBtn {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--f-chip);
+  border: 1px solid var(--f-line);
+  color: var(--f-text);
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.quickBtn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.quickBtn:hover {
+  transform: translateY(-3px);
+}
+
+.quickBtn[data-kind='whatsapp']:hover {
+  background: #128c4a;
+  border-color: #128c4a;
+}
+
+.quickBtn[data-kind='phone']:hover {
+  background: #4f46e5;
+  border-color: #4f46e5;
+}
+
+.quickBtn[data-kind='mail']:hover {
+  background: #db2777;
+  border-color: #db2777;
+}
+
+/* ------------------------------ columns ------------------------------ */
+
+.column {
+  min-width: 0;
+}
+
 .columnTitle {
-  margin-bottom: 4px;
-  font-size: 0.74rem;
-  font-weight: 600;
-  letter-spacing: 0.24em;
+  margin-bottom: 20px;
+  color: var(--f-text);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--accent-text);
+}
+
+.links,
+.contacts {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .link {
-  font-size: 0.93rem;
-  color: var(--text-muted);
-  transition: color 0.18s ease;
+  position: relative;
+  color: var(--f-muted);
+  font-size: 0.97rem;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+
+/* An underline that draws in from the left. */
+.link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 1.5px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #818cf8, #c084fc);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
 }
 
 .link:hover {
-  color: var(--text);
+  color: var(--f-text);
 }
 
-.hours {
-  margin-top: 6px;
-  max-width: 24ch;
-  color: var(--text-faint);
-  font-size: 0.85rem;
+.link:hover::after {
+  transform: scaleX(1);
+}
+
+.contacts li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 0.95rem;
   line-height: 1.5;
+  word-break: break-word;
 }
 
-/* --------------------------------- base --------------------------------- */
+.contactIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin-top: -5px;
+  border-radius: 10px;
+  background: var(--f-chip);
+  border: 1px solid var(--f-line);
+  color: #a5b4fc;
+}
+
+.contactIcon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ------------------------------ wordmark ------------------------------ */
+
+.wordmark {
+  padding-inline: 16px;
+  margin-bottom: -0.18em;
+  font-size: clamp(3.5rem, 13vw, 11rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.01) 85%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  user-select: none;
+}
+
+/* -------------------------------- base -------------------------------- */
 
 .base {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  gap: 8px 24px;
-  margin-top: 44px;
-  padding-top: 20px;
-  /* A hairline in the glass border's own colour, so the rule reads as part of
-     the sheet rather than as a line drawn on it. */
-  border-top: 1px solid var(--hairline);
-  color: var(--text-faint);
-  font-size: 0.84rem;
+  gap: 10px 28px;
+  padding-block: 22px 28px;
+  border-top: 1px solid var(--f-line);
+  color: var(--f-faint);
+  font-size: 0.88rem;
 }
 
 .baseNote {
-  color: var(--text-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
-@media (max-width: 880px) {
-  .inner {
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.18);
+}
+
+.toTop {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--f-chip);
+  border: 1px solid var(--f-line);
+  color: var(--f-muted);
+  font-weight: 600;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.toTop:hover {
+  color: var(--f-text);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.toTopIcon {
+  width: 15px;
+  height: 15px;
+  transform: rotate(-90deg);
+}
+
+.footer :focus-visible {
+  outline-color: #a5b4fc;
+}
+
+/* ------------------------------ responsive ------------------------------ */
+
+@media (max-width: 900px) {
+  .top {
     grid-template-columns: 1fr 1fr;
-    gap: 36px;
+    gap: 40px;
   }
 
-  /* The about block takes the full width above the two link columns rather
-     than squeezing into half of it — the tagline needs its measure. */
   .about {
     grid-column: 1 / -1;
   }
 }
 
-@media (max-width: 520px) {
-  .footer {
-    margin-inline: 10px;
-    padding-block: 40px 16px;
-    border-radius: var(--radius);
+/* The floating WhatsApp button (bottom-right, ~56px tall) would sit on top
+   of "Back to top" once the page is scrolled to the end. Below the width
+   where the container's right margin clears it, leave room underneath. */
+@media (max-width: 1599px) {
+  .base {
+    padding-bottom: 92px;
+  }
+}
+
+@media (max-width: 640px) {
+  .links {
+    gap: 2px;
   }
 
-  .inner {
+  /* 40px-tall tap targets for the footer links on a phone. */
+  .links .link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+  }
+
+  .links .link::after {
+    bottom: 6px;
+  }
+
+  .toTop {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 560px) {
+  .top {
     grid-template-columns: 1fr;
-    gap: 30px;
+    padding-block: 56px 36px;
+  }
+
+  .actions :global(.btn) {
+    width: 100%;
+  }
+
+  .base {
+    flex-direction: column;
+    align-items: flex-start;
+    /* Room for the floating WhatsApp button. */
+    padding-bottom: 92px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .link::after,
+  .quickBtn {
+    transition: none;
   }
 }

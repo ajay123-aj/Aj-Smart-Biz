@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>System Architecture — Aj Smart Biz</title>
+<link rel="stylesheet" href="assets/doc.css">
+<style>
+svg text { font-family: 'Segoe UI', Arial, sans-serif; }
+.bx { fill: #fff; stroke: #2563eb; stroke-width: 1.4; }
+.bx2 { fill: #eef3fe; stroke: #2563eb; stroke-width: 1.4; }
+.bx3 { fill: #f5f7fa; stroke: #9aa4b5; stroke-width: 1.2; stroke-dasharray: 4 3; }
+.db { fill: #fdf3e2; stroke: #9a5b00; stroke-width: 1.4; }
+.t { font-size: 12px; fill: #1b2130; font-weight: 600; }
+.s { font-size: 10px; fill: #4a5468; }
+.ar { stroke: #4a5468; stroke-width: 1.3; fill: none; marker-end: url(#a); }
+.lb { font-size: 9.5px; fill: #1d3f9e; }
+</style></head><body>
+
+<svg width="0" height="0" style="position:absolute"><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4a5468"/></marker></defs></svg>
+
+<section class="cover">
+  <div class="band">
+    <div class="kicker">Aj Smart Biz · Document 04</div>
+    <h1>System Architecture &amp; Design</h1>
+    <div class="sub">High-level and low-level design: components, multi-tenancy, security, data flows, state machines and key design decisions.</div>
+  </div>
+  <table class="meta">
+    <tr><td>Audience</td><td>Architects, developers, DevOps, technical reviewers</td></tr>
+    <tr><td>Version / date</td><td>1.0 · 7 November 2026</td></tr>
+    <tr><td>Related</td><td>05 Database Design · 06 API Reference · 07 Deployment · 08 Security</td></tr>
+  </table>
+</section>
+
+<section class="toc"><h2>Contents</h2><ol>
+<li>Architecture overview</li><li>Technology stack</li><li>Component design — Backend API</li><li>Component design — Angular consoles</li>
+<li>Component design — Next.js websites</li><li>Multi-tenancy</li><li>Authentication &amp; authorisation</li><li>Feature entitlement</li>
+<li>Key flows (sequence)</li><li>State machines</li><li>Cross-cutting concerns</li><li>Architecture decisions (ADR summary)</li></ol></section>
+
+<h1>1. Architecture overview</h1>
+<p>Aj Smart Biz is a <strong>shared-database, shared-schema multi-tenant</strong> system. One Express API owns all data and business rules. Four kinds of client consume it, each through its own route module with its own guard.</p>
+
+<figure>
+<svg viewBox="0 0 720 380" width="680">
+  <!-- users -->
+  <rect class="bx3" x="10" y="10" width="700" height="58" rx="8"/>
+  <text class="t" x="24" y="30">People</text>
+  <text class="s" x="24" y="50">Super admins · Company admins &amp; staff · Website visitors / customers · Prospects</text>
+  <!-- clients -->
+  <rect class="bx" x="10" y="100" width="160" height="72" rx="8"/><text class="t" x="22" y="122">Super Admin console</text><text class="s" x="22" y="140">Angular 22 · :4200</text><text class="s" x="22" y="156">nginx container</text>
+  <rect class="bx" x="190" y="100" width="160" height="72" rx="8"/><text class="t" x="202" y="122">Company Admin</text><text class="s" x="202" y="140">Angular 22 · :4300</text><text class="s" x="202" y="156">nginx container</text>
+  <rect class="bx" x="370" y="100" width="160" height="72" rx="8"/><text class="t" x="382" y="122">Tenant websites</text><text class="s" x="382" y="140">Next.js 15 · 3 designs</text><text class="s" x="382" y="156">:4400 / :4500 / :4600</text>
+  <rect class="bx" x="550" y="100" width="160" height="72" rx="8"/><text class="t" x="562" y="122">Product website</text><text class="s" x="562" y="140">Next.js 15 · :4700</text><text class="s" x="562" y="156">sells the platform</text>
+  <!-- api -->
+  <rect class="bx2" x="120" y="220" width="480" height="80" rx="10"/>
+  <text class="t" x="138" y="242">Aj-Smart-Biz-Backend · Express API · :4000 · /api/v1</text>
+  <text class="s" x="138" y="262">/super-admin   /admin   /theme   /website   shared: /auth /masters /uploads /health</text>
+  <text class="s" x="138" y="280">services: subscription · quota · functionality · order · stock · invoice · booking · storage · AI</text>
+  <!-- db & files -->
+  <rect class="db" x="150" y="330" width="170" height="42" rx="8"/><text class="t" x="164" y="350">MySQL (52 tables)</text><text class="s" x="164" y="365">SQLite for local dev</text>
+  <rect class="db" x="400" y="330" width="170" height="42" rx="8"/><text class="t" x="414" y="350">uploads/ volume</text><text class="s" x="414" y="365">images, served at /uploads</text>
+  <rect class="bx3" x="620" y="232" width="90" height="56" rx="8"/><text class="t" x="630" y="254">Anthropic</text><text class="s" x="630" y="270">AI content</text>
+  <!-- arrows -->
+  <path class="ar" d="M90 68 V100"/><path class="ar" d="M270 68 V100"/><path class="ar" d="M450 68 V100"/><path class="ar" d="M630 68 V100"/>
+  <path class="ar" d="M90 172 L230 220"/><path class="ar" d="M270 172 L310 220"/><path class="ar" d="M450 172 L420 220"/><path class="ar" d="M630 172 L520 220"/>
+  <text class="lb" x="96" y="200">/super-admin</text><text class="lb" x="262" y="200">/admin</text><text class="lb" x="440" y="200">/theme</text><text class="lb" x="590" y="200">/website</text>
+  <path class="ar" d="M235 300 V330"/><path class="ar" d="M485 300 V330"/><path class="ar" d="M600 260 H620"/>
+</svg>
+<figcaption>Figure 1 — System context and containers</figcaption>
+</figure>
+
+<div class="callout"><strong>Rule: the guard belongs to the module, not to the route.</strong>
+Each consumer has one composed router (<code>src/modules/*</code>). Its scope guard is applied once when it is mounted, so a route added inside a module cannot accidentally be left unprotected.</div>
+
+<h1>2. Technology stack</h1>
+<table><thead><tr><th>Layer</th><th>Technology</th><th>Notes</th></tr></thead><tbody>
+<tr><td>API</td><td>Node.js 24, Express 4.19, CommonJS</td><td><code>'use strict'</code> in every file; no TypeScript.</td></tr>
+<tr><td>ORM / DB</td><td>Sequelize 6.37, MySQL (mysql2) · SQLite (dev)</td><td><code>underscored</code>, <code>freezeTableName</code>, <code>paranoid</code> globally; sync with alter — no migrations.</td></tr>
+<tr><td>Validation</td><td>Joi 17</td><td>Schemas double as Swagger request bodies (joi-to-swagger).</td></tr>
+<tr><td>Auth</td><td>jsonwebtoken, bcryptjs</td><td>Access + refresh tokens; scopes super_admin / admin / customer.</td></tr>
+<tr><td>Hardening</td><td>helmet, cors, express-rate-limit, compression, morgan</td><td></td></tr>
+<tr><td>Uploads</td><td>multer 2 (disk)</td><td>Storage ledger <code>company_files</code>.</td></tr>
+<tr><td>API docs</td><td>swagger-jsdoc, swagger-ui-express</td><td>Auto-scanned routes + <code>@openapi</code> prose at <code>/api/v1/docs</code>.</td></tr>
+<tr><td>AI</td><td>@anthropic-ai/sdk</td><td>Background job drafting website content.</td></tr>
+<tr><td>Consoles</td><td>Angular 22 (standalone, signals, zoneless default), RxJS 7.8, TypeScript 6</td><td>No UI/chart/state library; own design system in <code>styles.scss</code>.</td></tr>
+<tr><td>Websites</td><td>Next.js 15 App Router, React 19, TypeScript 5.8</td><td>Plain CSS + CSS Modules; standalone output.</td></tr>
+<tr><td>Delivery</td><td>Docker (node:24-alpine, nginx:1.29-alpine), GitHub Actions, Docker Hub, nginx, certbot, Cloudflare DNS</td><td>See Document 07.</td></tr>
+</tbody></table>
+
+<h1>3. Component design — Backend API</h1>
+<figure>
+<svg viewBox="0 0 720 210" width="680">
+  <rect class="bx2" x="10" y="20" width="100" height="50" rx="7"/><text class="t" x="22" y="42">Request</text><text class="s" x="22" y="58">/api/v1/…</text>
+  <rect class="bx" x="130" y="20" width="110" height="50" rx="7"/><text class="t" x="142" y="42">app.js</text><text class="s" x="142" y="58">helmet·cors·limits</text>
+  <rect class="bx" x="260" y="20" width="110" height="50" rx="7"/><text class="t" x="272" y="42">modules/*</text><text class="s" x="272" y="58">scope guard</text>
+  <rect class="bx" x="390" y="20" width="110" height="50" rx="7"/><text class="t" x="402" y="42">routes/*</text><text class="s" x="402" y="58">permission+validate</text>
+  <rect class="bx" x="520" y="20" width="110" height="50" rx="7"/><text class="t" x="532" y="42">controllers/*</text><text class="s" x="532" y="58">asyncHandler</text>
+  <rect class="bx" x="520" y="110" width="110" height="50" rx="7"/><text class="t" x="532" y="132">services/*</text><text class="s" x="532" y="148">rules·transactions</text>
+  <rect class="bx" x="370" y="110" width="120" height="50" rx="7"/><text class="t" x="382" y="132">models/index.js</text><text class="s" x="382" y="148">52 models + assoc.</text>
+  <rect class="db" x="230" y="110" width="110" height="50" rx="7"/><text class="t" x="244" y="132">MySQL</text><text class="s" x="244" y="148">Sequelize</text>
+  <rect class="bx3" x="10" y="110" width="190" height="80" rx="7"/><text class="t" x="22" y="130">Supporting</text><text class="s" x="22" y="148">constants/ (enums, catalogues)</text><text class="s" x="22" y="163">utils/ (ApiError, response, query)</text><text class="s" x="22" y="178">validators/ · seeders/ · docs/</text>
+  <path class="ar" d="M110 45 H130"/><path class="ar" d="M240 45 H260"/><path class="ar" d="M370 45 H390"/><path class="ar" d="M500 45 H520"/><path class="ar" d="M575 70 V110"/><path class="ar" d="M520 135 H490"/><path class="ar" d="M370 135 H340"/>
+  <rect class="bx" x="650" y="20" width="62" height="50" rx="7"/><text class="t" x="656" y="42">error</text><text class="s" x="656" y="58">Handler</text>
+  <path class="ar" d="M630 45 H650"/>
+</svg>
+<figcaption>Figure 2 — Request pipeline inside the API</figcaption>
+</figure>
+<table><thead><tr><th>Folder</th><th>Responsibility</th></tr></thead><tbody>
+<tr><td><code>src/server.js</code></td><td>Boot: load models → create DB if missing → authenticate → sync (alter/force/none, with MySQL index clean-up and SQLite repair) → bootstrap seeders → subscription sweep (boot + hourly) → listen → storage reconcile; graceful shutdown.</td></tr>
+<tr><td><code>src/app.js</code></td><td>Middleware chain; static <code>/uploads</code> with script-blocking CSP; login rate limit; docs and API routers; 404 and error handler.</td></tr>
+<tr><td><code>src/modules/</code></td><td>One router per consumer: <code>shared</code>, <code>theme</code>, <code>website</code>, <code>admin</code>, <code>superadmin</code>.</td></tr>
+<tr><td><code>src/routes/</code></td><td>Resource routers reused by modules (e.g. branches under both <code>/admin/company</code> and <code>/super-admin/companies/:companyId</code>).</td></tr>
+<tr><td><code>src/controllers/</code></td><td>HTTP handlers; factories <code>crud.factory.js</code> (masters) and <code>cardResource.factory.js</code> (ordered tenant cards).</td></tr>
+<tr><td><code>src/services/</code></td><td>Business logic: subscription (lifecycle, proration, sweeper), quota, functionality, serviceState, theme merge, order, stock, invoice, booking, analytics, storage, company (provisioning), companyDuplicate, aiContent.</td></tr>
+<tr><td><code>src/constants/index.js</code></td><td>Single source of every enum, catalogue, transition map, default and limit.</td></tr>
+<tr><td><code>src/seeders/</code></td><td>Idempotent boot bootstrap: root super admin, system menus, Company Admin permissions, reference data, backfills.</td></tr>
+</tbody></table>
+
+<h1>4. Component design — Angular consoles</h1>
+<table><thead><tr><th>Layer</th><th>Contents</th></tr></thead><tbody>
+<tr><td><code>core/services</code></td><td><code>ApiService</code> (envelope unwrapping, paging), <code>AuthService</code> (signals), <code>CrudFactory</code>, <code>UploadService</code>, domain services, Toast/Confirm/Theme/ServerStatus/Branding.</td></tr>
+<tr><td><code>core/guards</code></td><td><code>authGuard</code>, <code>guestGuard</code>; Admin adds <code>permissionGuard(slug, action)</code> and <code>passwordChangeGuard</code>.</td></tr>
+<tr><td><code>core/interceptors</code></td><td>Bearer token, unreachable-server detection (0/502/503/504), 401 sign-out, 403/5xx toasts, <code>messageOf()</code>.</td></tr>
+<tr><td><code>layout/shell</code></td><td>Sidebar + top bar + outlet. Super Admin: hard-coded groups. Admin: menu tree from <code>/auth/me</code>.</td></tr>
+<tr><td><code>shared/</code></td><td><code>ListStore&lt;T&gt;</code>, <code>CrudPage&lt;T&gt;</code>, UI kit (modal, pager, table-state, field-error, image-upload, plan-timer, limit-notice…), <code>*appCan</code>.</td></tr>
+<tr><td><code>features/</code></td><td>One lazy-loaded folder per business area.</td></tr>
+</tbody></table>
+<p>Production containers serve the built SPA from nginx, with <code>/api/v1</code> and <code>/uploads</code> proxied to the API container (resolver at request time).</p>
+
+<h1>5. Component design — Next.js websites</h1>
+<div class="grid2">
+<div class="card"><h4>Tenant themes</h4><ul>
+<li><code>middleware.ts</code> resolves the domain (<code>?domain=</code> → forwarded host → <code>TENANT_DOMAIN</code> → cookie) into header <code>x-tenant-domain</code>.</li>
+<li><code>getCompanyDetails()</code> calls <code>/theme/company-details?domain=</code> (no-store), memoised per render.</li>
+<li>Server Components by default; <code>'use client'</code> only for interactivity; <code>siteCompany()</code> strips the catalogue from client props.</li>
+<li>Server Actions in <code>app/actions/</code> for orders, enquiries, bookings, reviews and account; customer token in httpOnly cookie.</li>
+<li><code>/uploads/[...path]</code> route proxies images; <code>/api/track</code> proxies the beacon.</li></ul></div>
+<div class="card"><h4>Product website</h4><ul>
+<li><code>lib/api.ts</code> is the only file that talks to the API.</li>
+<li><code>getSite()</code> = <code>/website/bootstrap</code>, revalidated every 300 s, retried with back-off, last good response kept in memory and on disk.</li>
+<li>Throws only if the API has never answered → <code>ApiDownNotice</code>.</li>
+<li>One server action: <code>submit-enquiry.ts</code>.</li></ul></div>
+</div>
+
+<h1>6. Multi-tenancy</h1>
+<h2>6.1 Isolation model</h2>
+<ul>
+<li>Every tenant-owned row carries <code>companyId</code>; tenant tables are prefixed <code>company_</code>.</li>
+<li>In <code>/admin</code> the company is read from the token (<code>req.auth.companyId</code>), never from the URL or body.</li>
+<li>The same routers mounted under <code>/super-admin/companies/:companyId/…</code> honour the URL parameter — the super admin may address any tenant.</li>
+<li>Look-ups are scoped by company; a foreign id returns 404, revealing nothing.</li>
+</ul>
+<h2>6.2 Tenant resolution by domain</h2>
+<figure>
+<svg viewBox="0 0 720 150" width="680">
+  <rect class="bx2" x="10" y="45" width="120" height="56" rx="7"/><text class="t" x="22" y="68">Browser</text><text class="s" x="22" y="86">acme.com/products</text>
+  <rect class="bx" x="160" y="45" width="110" height="56" rx="7"/><text class="t" x="172" y="68">nginx vhost</text><text class="s" x="172" y="86">X-Forwarded-Host</text>
+  <rect class="bx" x="300" y="45" width="130" height="56" rx="7"/><text class="t" x="312" y="68">Theme middleware</text><text class="s" x="312" y="86">x-tenant-domain</text>
+  <rect class="bx" x="460" y="45" width="120" height="56" rx="7"/><text class="t" x="472" y="68">/theme/company</text><text class="s" x="472" y="86">-details?domain=</text>
+  <rect class="db" x="610" y="20" width="100" height="44" rx="7"/><text class="t" x="620" y="40">company_domain</text><text class="s" x="620" y="55">host → company/branch</text>
+  <rect class="db" x="610" y="84" width="100" height="44" rx="7"/><text class="t" x="620" y="104">companies.code</text><text class="s" x="620" y="119">first-label fallback</text>
+  <path class="ar" d="M130 73 H160"/><path class="ar" d="M270 73 H300"/><path class="ar" d="M430 73 H460"/><path class="ar" d="M580 65 L610 45"/><path class="ar" d="M580 82 L610 104"/>
+</svg>
+<figcaption>Figure 3 — How a website request finds its tenant. Unknown or inactive hosts receive platform defaults (<code>resolved:false</code>), so the endpoint cannot be used to enumerate tenants.</figcaption>
+</figure>
+<h2>6.3 Branch awareness</h2>
+<p>A domain pinned to a branch (<code>sub_company_id</code>) serves that branch's logo, favicon, theme colours, slides, About, figures, team, gallery, features and Contact settings, falling back to the company-wide row where the branch has none. Theme colours merge per key: <em>branch → company → preset theme</em>.</p>
+
+<h1>7. Authentication &amp; authorisation</h1>
+<table><thead><tr><th>Scope</th><th>Issued by</th><th>Token carries</th><th>Guards</th></tr></thead><tbody>
+<tr><td><code>super_admin</code></td><td><code>POST /auth/super-admin/login</code></td><td>id, scope</td><td><code>authenticate</code> + <code>superAdminOnly</code> on /super-admin</td></tr>
+<tr><td><code>admin</code></td><td><code>POST /auth/admin/login</code></td><td>id, scope, companyId</td><td><code>authenticate</code> + <code>adminOnly</code>, then <code>requirePermission(slug, action)</code></td></tr>
+<tr><td><code>customer</code></td><td><code>POST /theme/auth/verify</code> (OTP)</td><td>id, scope, companyId</td><td><code>authenticate</code> + <code>customerOnly</code> on /theme/me</td></tr>
+</tbody></table>
+<ul>
+<li><code>authenticate</code> reloads the principal from the database on every request and rejects inactive/deleted users and inactive companies — a disabled account is locked out immediately, not at token expiry.</li>
+<li>RBAC: <code>role_permissions</code> (role × menu × canView/canCreate/canEdit/canDelete/canExport). The main admin (<code>isCompanyAdmin</code>) and super admins bypass it.</li>
+<li><code>/auth/me</code> returns the permission map and menu tree; menus are dropped when the plan does not grant their functionality (<code>MENU_FUNCTIONALITY</code>), and children in <code>MENU_INHERITS_PARENT</code> follow the parent's permission.</li>
+<li>The Admin UI mirrors the API: <code>permissionGuard</code> on routes, <code>*appCan</code> on buttons — but the API is the enforcement point.</li>
+</ul>
+
+<h1>8. Feature entitlement</h1>
+<figure>
+<svg viewBox="0 0 720 130" width="680">
+  <rect class="bx" x="10" y="20" width="160" height="60" rx="7"/><text class="t" x="22" y="42">granted</text><text class="s" x="22" y="60">plan snapshot .functionalities</text>
+  <rect class="bx" x="200" y="20" width="160" height="60" rx="7"/><text class="t" x="212" y="42">enabled</text><text class="s" x="212" y="60">company_functionalities.status</text>
+  <rect class="bx" x="390" y="20" width="160" height="60" rx="7"/><text class="t" x="402" y="42">served</text><text class="s" x="402" y="60">plan not expired/suspended</text>
+  <rect class="bx2" x="580" y="20" width="130" height="60" rx="7"/><text class="t" x="592" y="42">active</text><text class="s" x="592" y="60">all three true</text>
+  <text class="t" x="178" y="55">∧</text><text class="t" x="368" y="55">∧</text><text class="t" x="560" y="55">=</text>
+  <text class="s" x="10" y="110">Writes check granted (assertGranted) so content can be prepared while switched off · Public payload serves only active features (others are null)</text>
+</svg>
+<figcaption>Figure 4 — Entitlement is decided in one place: <code>services/functionality.service.js</code></figcaption>
+</figure>
+
+<h1>9. Key flows</h1>
+<h2>9.1 Website page render</h2>
+<ol><li>Request reaches the design's container via nginx; middleware sets <code>x-tenant-domain</code>.</li>
+<li>Layout and page call <code>getCompanyDetails()</code> (one API call per render thanks to fetch memoisation).</li>
+<li>Guard chain: API unreachable → ServiceUnavailable; unresolved → CompanyNotFound; <code>service.active=false</code> → PlanNotice; feature absent → 404.</li>
+<li>Sections render from the payload; brand colours become CSS variables on <code>&lt;body&gt;</code>.</li></ol>
+<h2>9.2 Place an order</h2>
+<ol><li>Client cart → Server Action <code>submitOrder</code> → <code>POST /theme/orders</code> with domain, product ids, quantities, contact, optional address id and Bearer token.</li>
+<li><code>order.service</code> checks entitlement (products + orders active, route usable), prices every line from the catalogue, snapshots lines and address, assigns <code>ORD…</code> number, stores <em>pending</em>.</li>
+<li>Response returns number, total and the WhatsApp text / payment link; the browser opens the hand-off.</li></ol>
+<h2>9.3 Provision a company</h2>
+<p>One transaction in <code>company.service.createCompany</code>: company → head-office branch (<code>CODE-HO</code>) → optional domain → system role + full permissions → three default slides → main admin (generated password returned once) → optional subscription activation + transaction.</p>
+<h2>9.4 Subscription sweeper</h2>
+<p><code>runDueSubscriptions()</code> runs at boot, hourly, and on demand: activates due <em>pending</em> terms, renews <em>autoRenew</em> terms at end, expires terms past <code>endDate + graceDays</code>, writing a <code>subscription_events</code> row for each move.</p>
+
+<h1>10. State machines</h1>
+<div class="grid2">
+<div class="card"><h4>Subscription (SUBSCRIPTION_TRANSITIONS)</h4>
+<pre>pending   → active | cancelled
+active    → suspended | expired | cancelled | superseded*
+suspended → active | expired | cancelled
+expired, cancelled, superseded: final
+* superseded only through a plan change</pre></div>
+<div class="card"><h4>Order (ORDER_TRANSITIONS)</h4>
+<pre>pending → confirmed → packed → dispatched → delivered
+any non-terminal → cancelled
+confirmed: reserve stock · dispatched: issue stock
+cancelled: release or return stock
+payment: unpaid → paid → refunded (paid → unpaid allowed)</pre></div>
+<div class="card"><h4>Booking (BOOKING_TRANSITIONS)</h4>
+<pre>requested → accepted | declined | cancelled
+accepted  → completed | cancelled
+requested and accepted hold the slot</pre></div>
+<div class="card"><h4>Invoice</h4>
+<pre>draft → issued → cancelled
+draft: editable, deletable
+issued: stock deducted, payments unpaid|partial|paid
+cancelled: stock returned</pre></div>
+</div>
+
+<h1>11. Cross-cutting concerns</h1>
+<table><thead><tr><th>Concern</th><th>Approach</th></tr></thead><tbody>
+<tr><td>Response envelope</td><td><code>{ success, message, data, meta?, errors?: [{field, message}] }</code> via <code>utils/response.js</code>.</td></tr>
+<tr><td>Errors</td><td><code>ApiError.badRequest/unauthorized/forbidden/notFound/conflict/internal</code>; Sequelize errors mapped (unique → 409, validation → 400, FK → 400).</td></tr>
+<tr><td>Pagination</td><td><code>?page&amp;limit&amp;search&amp;status&amp;sortBy&amp;sortOrder</code>; limit ≤ 200; sort allow-list.</td></tr>
+<tr><td>Transactions</td><td>Multi-step writes (provisioning, plan change, order status + stock, invoice issue) run in one Sequelize transaction.</td></tr>
+<tr><td>Audit</td><td><code>createdBy/updatedBy</code>, subscription events, stock ledger with <code>balanceAfter</code>.</td></tr>
+<tr><td>Storage</td><td>Upload ledger; limit = company override → plan storage → unlimited; enforced on upload.</td></tr>
+<tr><td>Rate limiting</td><td>Login 30/15 min; theme reads 120/5 min; orders 15/h; service leads 12/h; testimonials 5/h; customer auth 10/15 min; website enquiries 10/15 min.</td></tr>
+<tr><td>Time</td><td>MySQL timezone +05:30; companies carry their own timezone; analytics series gap-filled server-side.</td></tr>
+<tr><td>Logging</td><td>morgan access log; <code>utils/logger</code> levels; debug off in production.</td></tr>
+</tbody></table>
+
+<h1>12. Architecture decisions (ADR summary)</h1>
+<table><thead><tr><th>#</th><th>Decision</th><th>Reason</th></tr></thead><tbody>
+<tr><td>1</td><td>Shared schema with <code>companyId</code>, not a database per tenant</td><td>Small tenants, many of them; one sync, one backup, one deploy.</td></tr>
+<tr><td>2</td><td>One deployment per website design, tenant resolved by host</td><td>Onboarding without builds; designs upgrade for all tenants at once.</td></tr>
+<tr><td>3</td><td>Company from token, never from client</td><td>Makes cross-tenant access impossible by construction.</td></tr>
+<tr><td>4</td><td>Snapshots for plans, order lines, addresses</td><td>History must not change when sources are edited.</td></tr>
+<tr><td>5</td><td>Soft delete everywhere (except ledgers/switches)</td><td>Recoverability; uniqueness checked in services instead of DB indexes.</td></tr>
+<tr><td>6</td><td>Stock = ledger + running total in one transaction</td><td>Truth and speed; drift traceable via <code>balanceAfter</code>.</td></tr>
+<tr><td>7</td><td>Sequelize alter-sync instead of migrations</td><td>Speed of iteration; trade-off — production schema changes need care (see Document 07).</td></tr>
+<tr><td>8</td><td>No UI/chart libraries in consoles</td><td>Small bundles, one design system, hand-written SVG charts starting at zero.</td></tr>
+<tr><td>9</td><td>Constants file as the single catalogue</td><td>Adding a feature or enum is one entry; validators, Swagger and UIs read it.</td></tr>
+</tbody></table>
+</body></html>

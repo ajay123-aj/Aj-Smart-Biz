@@ -1,7 +1,7 @@
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
-  gap: 22px;
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+  gap: 24px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -10,18 +10,28 @@
 .more {
   display: flex;
   justify-content: center;
-  margin-top: 30px;
+  margin-top: 40px;
 }
 
 .count {
-  padding: 1px 7px;
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 22px;
+  padding-inline: 7px;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--surface-2);
   color: var(--text-muted);
-  font-size: 0.74rem;
+  font-size: 0.76rem;
 }
 
 .icon {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
+}
+
+@media (max-width: 400px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }

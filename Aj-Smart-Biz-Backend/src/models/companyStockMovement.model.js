@@ -69,6 +69,8 @@ module.exports = (sequelize) =>
 
       /** The order this went out against, where it went out against one. */
       orderId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
+      /** The invoice that billed this stock out, or returned it on cancel. */
+      invoiceId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
       /**
        * The other half of a transfer — the warehouse this came from, or went to.
        * A transfer is two movements, and this is what pairs them.
@@ -107,6 +109,7 @@ module.exports = (sequelize) =>
         { fields: ['warehouse_id'] },
         { fields: ['product_id'] },
         { fields: ['order_id'] },
+        { fields: ['invoice_id'] },
         { fields: ['type'] },
         { fields: ['reason'] },
         /* Every report is "this warehouse, this window" or "this tenant, this

@@ -23,7 +23,22 @@ const roleRoutes = require('../../routes/role.routes');
 const menuRoutes = require('../../routes/menu.routes');
 const adminRoutes = require('../../routes/admin.routes');
 
-/** What the workspace opens on: counts, quota and the plan's state. */
+/**
+ * What the workspace opens on: counts, quota and the plan's state.
+ *
+ * @openapi
+ * /admin/dashboard:
+ *   get:
+ *     tags: [Admin]
+ *     summary: The company dashboard
+ *     description: |
+ *       Counts (admins, branches, roles), the blocks for each live feature,
+ *       the running subscription with its limits, and `storage`: upload
+ *       storage used against the company's limit — `usedBytes`, `usedLabel`,
+ *       `limitMb`, `limitLabel`, `percentUsed`, `atLimit`, `unlimited`,
+ *       `source` (`company` when the platform set a custom limit, `plan`, or
+ *       `none`) and `fileCount`. `storage` is null only if it could not be read.
+ */
 router.get('/dashboard', dashboard.adminDashboard);
 
 /** The company itself, its branches, its website content and its plan. */

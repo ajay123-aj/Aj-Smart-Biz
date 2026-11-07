@@ -20,7 +20,8 @@
  * enforces per verb.
  */
 const router = require('express').Router();
-const { authenticate } = require('../../middlewares/auth');
+const { authenticate, requireScope } = require('../../middlewares/auth');
+const { AUTH_SCOPE } = require('../../constants');
 const authRoutes = require('../../routes/auth.routes');
 const masterRoutes = require('../../routes/master.routes');
 const uploadRoutes = require('../../routes/upload.routes');
@@ -41,7 +42,14 @@ router.use('/auth', authRoutes);
 /** Reference data both consoles render: states, themes, plans, business types. */
 router.use('/masters', authenticate, masterRoutes);
 
-/** File uploads, for both consoles. */
-router.use('/uploads', authenticate, uploadRoutes);
+/**
+ * File uploads, for both consoles — staff only.
+ *
+ * A website customer's token also passes `authenticate`, and used to reach
+ * these routes: a shop's customer could upload into the company's storage or
+ * delete its product images by path. The tenant websites never upload through
+ * the API (they only read public files), so customers are refused here.
+ */
+router.use('/uploads', authenticate, requireScope(AUTH_SCOPE.ADMIN, AUTH_SCOPE.SUPER_ADMIN), uploadRoutes);
 
 module.exports = router;

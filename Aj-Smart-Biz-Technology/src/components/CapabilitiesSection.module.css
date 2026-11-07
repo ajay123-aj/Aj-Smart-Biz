@@ -1,69 +1,346 @@
+/* ------------------------------- compact ------------------------------- */
+
+/* A bento grid: 3 columns, cards 1 and 4 run double-wide, a 5th spans the row. */
+.compact {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.compact > .groupCard:nth-child(4n + 1),
+.compact > .groupCard:nth-child(4n + 4) {
+  grid-column: span 2;
+}
+
+.compact > .groupCard:nth-child(5):last-child {
+  grid-column: 1 / -1;
+}
+
+/* Wide cards put the drawing beside the words. */
+.compact > .groupCard:nth-child(4n + 1),
+.compact > .groupCard:nth-child(4n + 4),
+.compact > .groupCard:nth-child(5):last-child {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  grid-template-rows: auto 1fr;
+  column-gap: 28px;
+}
+
+.compact > .groupCard:nth-child(4n + 1) > :first-child,
+.compact > .groupCard:nth-child(4n + 4) > :first-child,
+.compact > .groupCard:nth-child(5):last-child > :first-child {
+  grid-row: 1 / span 2;
+  height: 100%;
+  min-height: 220px;
+  margin-bottom: 0;
+}
+
+@media (max-width: 960px) {
+  .compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Doubled selectors so this outranks the wide-card rules above. */
+  .compact > .groupCard.groupCard:nth-child(n):nth-child(n) {
+    grid-column: auto;
+    display: flex;
+  }
+
+  .compact > .groupCard.groupCard:nth-child(n):nth-child(n) > :first-child {
+    height: 168px;
+    min-height: 0;
+    margin-bottom: 22px;
+  }
+}
+
+@media (max-width: 600px) {
+  .compact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* One card per group, its colour along the top and in every icon and tick. */
+.groupCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg);
+  padding: 14px 14px 24px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  scroll-margin-top: calc(var(--header-height) + 20px);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.groupCard::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--tone);
+}
+
+.groupCard:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.groupCard :global(.icon-tile) {
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.groupCardBody {
+  padding: 0 10px;
+}
+
+.groupCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.groupCount {
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--tone);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.groupCardTitle {
+  margin-top: 18px;
+  font-size: 1.25rem;
+}
+
+.groupCardSummary {
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 0.93rem;
+  line-height: 1.55;
+}
+
+.toolList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(170px, 100%), 1fr));
+  gap: 9px 14px;
+  margin: 18px 10px 0;
+  padding: 16px 0 0;
+  list-style: none;
+  border-top: 1px solid var(--hairline);
+}
+
+.toolList li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 0.92rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.toolTick {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 3px;
+  border-radius: 50%;
+  background: var(--tone-soft);
+  color: var(--tone);
+  stroke-width: 2.8;
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+}
+
+/* ------------------------------ detailed ------------------------------ */
+
+.jump {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: -20px 0 56px;
+}
+
+.jumpLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--tone-soft);
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 700;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.jumpLink:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.jumpLink svg {
+  width: 17px;
+  height: 17px;
+  color: var(--tone);
+}
+
+.jumpCount {
+  min-width: 22px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--tone);
+  font-size: 0.76rem;
+  text-align: center;
+}
+
+.groups {
+  display: grid;
+  gap: 28px;
+}
+
+.group {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  gap: 40px;
+  padding: 32px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, var(--tone-soft) 0, var(--surface) 340px);
+  border: 1px solid var(--hairline);
+  scroll-margin-top: calc(var(--header-height) + 20px);
+}
+
+.groupHead {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  align-self: start;
+  position: sticky;
+  top: calc(var(--header-height) + 28px);
+}
+
+.groupHead > div,
+.card > div {
+  min-width: 0;
+}
+
+.groupHead :global(.icon-tile) {
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.groupTitle {
+  font-size: 1.4rem;
+}
+
+.groupSummary {
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .card {
-  padding: 24px 22px 22px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-sm);
 }
 
-/*
- * A round tile rather than the rounded square the steps use.
- *
- * There are seventeen of these on the Services page, and seventeen squircles in
- * a grid start to read as a control panel. A circle is quieter at that count.
- */
 .icon {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
-  margin-bottom: 17px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--hairline);
-  color: var(--accent-text);
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--tone-soft);
+  color: var(--tone);
 }
 
 .icon svg {
-  width: 21px;
-  height: 21px;
+  width: 19px;
+  height: 19px;
 }
 
 .title {
-  font-size: 1.02rem;
-  letter-spacing: -0.012em;
+  font-size: 1rem;
+  line-height: 1.35;
 }
 
 .summary {
-  margin-top: 9px;
+  margin-top: 4px;
   color: var(--text-muted);
   font-size: 0.9rem;
-  line-height: 1.58;
+  line-height: 1.55;
 }
 
-/*
- * The long description, on the Services page only.
- *
- * Separated by a hairline rather than by space alone: it is a different
- * register — the summary is a claim, this is the detail — and a rule is the
- * cheapest way to say so without adding a second heading.
- */
 .description {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--hairline);
-  color: var(--text-faint);
-  font-size: 0.86rem;
-  line-height: 1.6;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--hairline);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.65;
 }
 
-.more {
-  margin-top: 22px;
-  color: var(--text-faint);
-  font-size: 0.92rem;
+@media (max-width: 960px) {
+  .group {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    padding: 24px;
+    background: linear-gradient(180deg, var(--tone-soft) 0, var(--surface) 200px);
+  }
+
+  .groupHead {
+    position: static;
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .jump {
+    justify-content: flex-start;
+    margin-top: -8px;
+    margin-bottom: 36px;
+  }
+
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .group {
+    padding: 18px;
+  }
+
+  .card {
+    padding: 16px;
+  }
 }

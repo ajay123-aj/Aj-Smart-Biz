@@ -1,6 +1,8 @@
 import Glyph from './Glyph';
 import { getSite } from '@/lib/api';
+import { TONES } from '@/lib/capabilityGroups';
 import styles from './PromisesSection.module.css';
+
 
 /**
  * The six jobs that stop being the customer's.
@@ -17,19 +19,19 @@ export default async function PromisesSection() {
   if (!items.length) return null;
 
   return (
-    <section className="section section--panel">
-      <div className="container">
-        <header className="section-head">
+    <section className="section">
+      <div className={`container ${styles.layout}`}>
+        <header className={`section-head ${styles.head}`}>
           <span className="eyebrow">{promises?.eyebrow}</span>
           <h2 className="section-title">{promises?.title}</h2>
           <p className="section-lede">{promises?.lede}</p>
         </header>
 
         <ul className={styles.grid}>
-          {items.map((item) => (
-            <li key={item.title} className={styles.item}>
+          {items.map((item, index) => (
+            <li key={item.title} className={styles.item} data-tone={TONES[index % TONES.length]}>
               {item.icon ? (
-                <span className={styles.icon} aria-hidden="true">
+                <span className={`icon-tile ${styles.icon}`} aria-hidden="true">
                   <Glyph name={item.icon} />
                 </span>
               ) : null}

@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Business Requirements — Aj Smart Biz</title>
+<link rel="stylesheet" href="assets/doc.css"></head><body>
+
+<section class="cover">
+  <div class="band">
+    <div class="kicker">Aj Smart Biz · Document 02</div>
+    <h1>Business Requirements Document (BRD)</h1>
+    <div class="sub">Objectives, stakeholders, scope, business rules and business processes the platform must satisfy.</div>
+  </div>
+  <table class="meta">
+    <tr><td>Audience</td><td>Business owners, product managers, business analysts, QA</td></tr>
+    <tr><td>Version / date</td><td>1.0 · 7 November 2026</td></tr>
+    <tr><td>Related</td><td>03 Functional Specification · 04 System Architecture · 05 Database Design</td></tr>
+  </table>
+</section>
+
+<section class="toc"><h2>Contents</h2><ol>
+<li>Business objectives</li><li>Stakeholders</li><li>Scope</li><li>Business requirements by area</li>
+<li>Business rules catalogue</li><li>Key business processes</li><li>Non-functional requirements</li><li>Assumptions, constraints and dependencies</li><li>Glossary</li></ol></section>
+
+<h1>1. Business objectives</h1>
+<table><thead><tr><th>#</th><th>Objective</th><th>How the platform meets it</th></tr></thead><tbody>
+<tr><td>BO-1</td><td>Sell a recurring subscription to many small businesses from one codebase.</td><td>Multi-tenant API; plans and subscriptions with lifecycle; one website deployment per design serves all tenants.</td></tr>
+<tr><td>BO-2</td><td>Onboard a new business in minutes.</td><td>One-form provisioning (company, head office, admin, plan, payment); duplicate-company; AI content creator.</td></tr>
+<tr><td>BO-3</td><td>Tier the offer by value delivered.</td><td>19 functionalities granted per plan, plus branch/admin/storage quotas.</td></tr>
+<tr><td>BO-4</td><td>Grow revenue from existing tenants.</td><td>In-console upgrade requests, prorated plan changes, pre-renewals, auto-renew.</td></tr>
+<tr><td>BO-5</td><td>Give tenants tools that make the subscription sticky.</td><td>Orders, bookings, stock, invoices, customers and leads — daily operational use, not just a website.</td></tr>
+<tr><td>BO-6</td><td>Protect tenant data and the platform's revenue.</td><td>Token-scoped tenant isolation, RBAC, soft delete, frozen history, holding page on lapsed plans.</td></tr>
+</tbody></table>
+
+<h1>2. Stakeholders</h1>
+<table><thead><tr><th>Stakeholder</th><th>Interest</th><th>Responsibilities in the system</th></tr></thead><tbody>
+<tr><td>Platform owner (root super admin)</td><td>Revenue, growth, control</td><td>Plans, pricing, tenant lifecycle, staff accounts, marketing site.</td></tr>
+<tr><td>Platform staff (super admin, role staff)</td><td>Operations and support</td><td>Provision companies, record payments, approve plan requests.</td></tr>
+<tr><td>Company main admin</td><td>Running the business online</td><td>Website content, branches, domains, roles, staff, plan requests.</td></tr>
+<tr><td>Company staff</td><td>Daily operations</td><td>Orders, bookings, stock, invoices, leads — per role.</td></tr>
+<tr><td>End customers</td><td>Buying and booking easily</td><td>Browse, order, book, sign in, view history.</td></tr>
+<tr><td>Prospects</td><td>Evaluating the product</td><td>Browse product site, request demo.</td></tr>
+</tbody></table>
+
+<h1>3. Scope</h1>
+<div class="grid2">
+<div class="card"><h4>In scope</h4><ul>
+<li>Tenant provisioning, billing records, plan lifecycle</li>
+<li>Role-based access for company staff</li>
+<li>Public tenant websites in three designs</li>
+<li>Catalogue, cart, order desk, stock, POS invoicing</li>
+<li>Services, enquiries and slot booking</li>
+<li>Customer accounts (phone + OTP)</li>
+<li>Visitor tracking, leads, analytics</li>
+<li>Product marketing website and its CMS</li></ul></div>
+<div class="card"><h4>Out of scope (today)</h4><ul>
+<li>Online payment gateway capture (UPI/link hand-off only)</li>
+<li>SMS delivery of OTPs (development code until a gateway is connected)</li>
+<li>Email notifications</li>
+<li>Accounting ledgers / GST return filing</li>
+<li>Native mobile apps</li>
+<li>Per-tenant custom code or builds</li></ul></div>
+</div>
+
+<h1>4. Business requirements by area</h1>
+<p>Priority: <span class="tag bad">Must</span> <span class="tag warn">Should</span> <span class="tag">Could</span>. Status reflects what is implemented in the code.</p>
+
+<h2>4.1 Platform &amp; tenants</h2>
+<table><thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th>Status</th></tr></thead><tbody>
+<tr><td>BR-T1</td><td>The operator can create a company with profile, branding, address, main admin and starting plan in one step.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-T2</td><td>Every company gets a head-office branch, a system “Company Admin” role with full rights, and three default slides automatically.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-T3</td><td>A generated main-admin password is shown once and must be changed at first sign-in.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-T4</td><td>A company can be deactivated, soft-deleted and restored with all its dependents.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-T5</td><td>A company's set-up can be duplicated into a new company (website, services, products, blog, testimonials, branches, roles).</td><td><span class="tag warn">Should</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-T6</td><td>The operator can generate starter website copy for a tenant with AI, never overwriting existing content.</td><td><span class="tag">Could</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-T7</td><td>Master data (states, business types, themes) is maintained centrally.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+</tbody></table>
+
+<h2>4.2 Plans, subscriptions and billing</h2>
+<table><thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th>Status</th></tr></thead><tbody>
+<tr><td>BR-P1</td><td>Plans define price, cycle, trial, quotas (branches, admins, users, storage) and granted functionalities.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-P2</td><td>A subscription freezes the plan's terms at activation (snapshot); later plan edits do not affect running terms.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-P3</td><td>Supported moves: assign, pre-renew, renew now, upgrade/downgrade with proration, suspend/resume, extend, cancel/expire, reactivate.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-P4</td><td>Every status change is recorded with actor, reason and before/after.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-P5</td><td>Terms start, expire (after grace days) and auto-renew without manual action.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done (hourly sweeper)</span></td></tr>
+<tr><td>BR-P6</td><td>Payments are recorded as transactions with an invoice number and payment mode.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-P7</td><td>Tenants can request a plan change; only the operator can approve it.</td><td><span class="tag warn">Should</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-P8</td><td>Creating branches/admins is refused with a readable reason when the quota is used or the plan is expired, suspended or missing.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-P9</td><td>A lapsed plan replaces the public website with a holding page.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+</tbody></table>
+
+<h2>4.3 Access control</h2>
+<table><thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th>Status</th></tr></thead><tbody>
+<tr><td>BR-A1</td><td>A company admin can never read or change another company's data.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done (company from token)</span></td></tr>
+<tr><td>BR-A2</td><td>Companies define roles and grant view/create/edit/delete/export per menu.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-A3</td><td>The sidebar shows only menus the role may view and the plan pays for.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-A4</td><td>The main admin and the root super admin cannot be deleted or disabled.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+</tbody></table>
+
+<h2>4.4 Website &amp; content</h2>
+<table><thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th>Status</th></tr></thead><tbody>
+<tr><td>BR-W1</td><td>The website identifies the company from its domain; branch domains can show branch-specific branding and content with fallback to company content.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-W2</td><td>A section is shown only if granted by the plan, switched on by the company, the plan is being served, and content exists.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-W3</td><td>The platform never publishes invented claims about a tenant (no default services, no fake figures).</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-W4</td><td>The website menu is built by the API and renameable per page by the tenant.</td><td><span class="tag warn">Should</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-W5</td><td>Tenants choose website colours per company or branch over a preset theme.</td><td><span class="tag warn">Should</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-W6</td><td>Visitor reviews are held for moderation before publication.</td><td><span class="tag warn">Should</span></td><td><span class="tag ok">Done</span></td></tr>
+</tbody></table>
+
+<h2>4.5 Commerce &amp; operations</h2>
+<table><thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th>Status</th></tr></thead><tbody>
+<tr><td>BR-C1</td><td>Every order placed on the website is recorded; prices are computed on the server.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-C2</td><td>Orders go to WhatsApp, to a payment link/UPI, or ordering is paused — tenant's choice.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-C3</td><td>Order status moves forward only; payment status is a separate axis.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-C4</td><td>Stock is a ledger: every change is a movement; corrections are new movements.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-C5</td><td>Confirming an order reserves stock; dispatching issues it; cancelling returns it.</td><td><span class="tag bad">Must</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-C6</td><td>Counter invoices with GST rates, discounts, round-off, partial payments; issuing deducts stock.</td><td><span class="tag warn">Should</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-C7</td><td>Services can be enquired about or booked into time slots with capacity.</td><td><span class="tag warn">Should</span></td><td><span class="tag ok">Done</span></td></tr>
+<tr><td>BR-C8</td><td>Customers sign in with phone + OTP, keep addresses and see their history.</td><td><span class="tag warn">Should</span></td><td><span class="tag warn">Done (dev OTP)</span></td></tr>
+<tr><td>BR-C9</td><td>Visitor and campaign analytics for tenants and for the platform's marketing.</td><td><span class="tag warn">Should</span></td><td><span class="tag ok">Done</span></td></tr>
+</tbody></table>
+
+<h1>5. Business rules catalogue</h1>
+<table><thead><tr><th>Rule</th><th>Statement</th></tr></thead><tbody>
+<tr><td>R-01 Entitlement</td><td><code>active = granted (plan snapshot) AND enabled (tenant switch) AND served (plan not expired/suspended)</code>. Decided only in <code>functionality.service.js</code>.</td></tr>
+<tr><td>R-02 Subscription states</td><td>pending → active → expired/cancelled/superseded; active ↔ suspended; pending → cancelled. <em>superseded</em> only via plan change. All other moves refused.</td></tr>
+<tr><td>R-03 Proration</td><td><code>credit = term total × remaining days ÷ term days</code>; previewed before commit.</td></tr>
+<tr><td>R-04 Quota refusal reasons</td><td><code>limit_reached</code>, <code>expired</code>, <code>suspended</code>, <code>no_plan</code>; plan-wide reasons outrank per-metric ones.</td></tr>
+<tr><td>R-05 Limits source</td><td>Limits and grants read from the subscription snapshot, never the live plan row.</td></tr>
+<tr><td>R-06 One open request</td><td>At most one pending plan request per company.</td></tr>
+<tr><td>R-07 Order lifecycle</td><td>pending → confirmed → packed → dispatched → delivered; any non-terminal → cancelled. Never backward. No manual order creation, no deletion; lines are read-only.</td></tr>
+<tr><td>R-08 Unpriced lines</td><td>Lines priced in words are counted in <code>unpricedItems</code>; totals are never treated as complete when such lines exist.</td></tr>
+<tr><td>R-09 Stock direction</td><td>Direction comes from the reason (purchase in, damage out, count = adjust). <code>sale</code> and <code>transfer</code> are system-written only.</td></tr>
+<tr><td>R-10 Available stock</td><td><code>available = quantity − reserved</code>. Tracked products derive in/out of stock from the shelf.</td></tr>
+<tr><td>R-11 Offer</td><td>Discount % is computed from price and offer price; an offer price ≥ price is refused. <code>isOnOffer</code> is the single decision.</td></tr>
+<tr><td>R-12 Category tree</td><td>Maximum three levels; no move under its own descendant; deleting promotes children and un-categorises products.</td></tr>
+<tr><td>R-13 Enquiry routing</td><td>Target is both (default), admin only, or WhatsApp only; without an inquiry number WhatsApp degrades to admin.</td></tr>
+<tr><td>R-14 WhatsApp numbers</td><td>Typed inquiry/contact/support/orders; empty type falls back to <code>contact</code>; country prefixes normalised.</td></tr>
+<tr><td>R-15 Customer identity</td><td>Phone is the identity, unique per company; normalised; not editable by staff; barred customers keep their orders.</td></tr>
+<tr><td>R-16 OTP</td><td>6 digits, 10-minute validity, 5 attempts; development code until an SMS gateway exists.</td></tr>
+<tr><td>R-17 Address on order</td><td>Copied as text at order time, never referenced.</td></tr>
+<tr><td>R-18 Branch fallback</td><td>Branch content overrides company content; a branch with none inherits; a company domain never shows branch content.</td></tr>
+<tr><td>R-19 Soft delete</td><td>Everything is paranoid except switch rows, ledgers, stock levels and visit logs.</td></tr>
+<tr><td>R-20 Invoices</td><td>draft → issued → cancelled; only drafts are edited or deleted; issuing deducts stock, cancelling returns it.</td></tr>
+</tbody></table>
+
+<h1>6. Key business processes</h1>
+<h2>6.1 Onboard a new business</h2>
+<ol><li>Prospect books a demo on the product website → enquiry appears in <em>Our website → Enquiries</em>.</li>
+<li>Operator creates the plan (if needed) in Plan Management.</li>
+<li>Operator creates the company: profile, branding, main admin, plan and payment. Optionally duplicates a template company or runs the AI content creator.</li>
+<li>Operator adds the tenant's domain; DevOps adds the nginx vhost pointing to the chosen design.</li>
+<li>Main admin signs in at the company workspace, sets a new password, switches on features and fills content.</li>
+<li>The website goes live as soon as the domain resolves.</li></ol>
+
+<h2>6.2 Renew or change plan</h2>
+<ol><li>Tenant sees days remaining on My Plan; operator sees “Expiring in 7/30 days” on Company Plans.</li>
+<li>Operator pre-renews (queued as pending) or tenant raises a plan request.</li>
+<li>Operator previews proration, approves; the old term becomes <em>superseded</em>, a transaction is recorded.</li>
+<li>The sweeper activates queued terms on their start date.</li></ol>
+
+<h2>6.3 Order to delivery</h2>
+<ol><li>Visitor adds items to the cart and submits name, phone and address (or picks a saved address).</li>
+<li>API prices the order from the catalogue, records it as <em>pending</em>, and returns the WhatsApp message or payment link.</li>
+<li>Staff confirm (stock reserved), pack, dispatch (stock issued, ledger entry), deliver. Payment is marked separately.</li>
+<li>Cancelling returns or releases stock. Analytics exclude cancelled orders from revenue.</li></ol>
+
+<h2>6.4 Service booking</h2>
+<ol><li>Visitor opens a bookable service, picks a date; available slots are computed from hours, slot length, capacity and existing bookings.</li>
+<li>Booking is recorded as a service lead (<em>requested</em>). Staff accept or decline; completed bookings feed revenue.</li></ol>
+
+<h2>6.5 Counter sale (POS)</h2>
+<ol><li>Staff open a new invoice, pick products, discounts and tax; save as draft or issue.</li>
+<li>Issuing assigns the invoice number and deducts stock from the selected warehouse; payments may be partial.</li></ol>
+
+<h1>7. Non-functional requirements</h1>
+<table><thead><tr><th>Area</th><th>Requirement</th></tr></thead><tbody>
+<tr><td>Security</td><td>JWT with scope; principal reloaded on every request; bcrypt passwords; helmet; rate limits on login and public writes; uploads served with a script-blocking CSP.</td></tr>
+<tr><td>Isolation</td><td>Tenant derived from token, never from client input; unknown domains return platform defaults (no enumeration).</td></tr>
+<tr><td>Auditability</td><td>Subscription events, stock ledger, created/updated by, soft delete.</td></tr>
+<tr><td>Performance</td><td>Stock level table avoids summing the ledger; catalogue stripped from client payloads; product site caches API data 300 s with snapshot fallback.</td></tr>
+<tr><td>Availability</td><td>Docker health checks, automatic rollback on failed deploy, “server unreachable” screens in every client.</td></tr>
+<tr><td>Usability</td><td>Every refusal carries a human-readable reason that the UI shows verbatim.</td></tr>
+<tr><td>SEO</td><td>Server-rendered websites, sitemap/robots on the product site, <code>noindex</code> on holding pages.</td></tr>
+<tr><td>Localisation</td><td>Currency and timezone per company; Indian states and GST codes seeded.</td></tr>
+</tbody></table>
+
+<h1>8. Assumptions, constraints and dependencies</h1>
+<ul>
+<li><strong>Database:</strong> MySQL (default) — SQLite supported for local work. Schema is created by Sequelize sync; there are no migration files.</li>
+<li><strong>Hosting:</strong> one Linux server running Docker containers behind nginx, with Cloudflare DNS and certbot TLS.</li>
+<li><strong>Messaging:</strong> WhatsApp is reached through <code>wa.me</code> links; no WhatsApp Business API integration.</li>
+<li><strong>AI:</strong> the AI content creator depends on an Anthropic API key configured for the backend.</li>
+<li><strong>Payments:</strong> recorded manually by the operator (platform billing) or handed off to UPI/payment links (tenant orders).</li>
+</ul>
+
+<h1>9. Glossary</h1>
+<table><tbody>
+<tr><td><strong>Tenant / Company</strong></td><td>A business subscribed to the platform.</td></tr>
+<tr><td><strong>Branch</strong></td><td>A place a company trades from; the head office is created automatically.</td></tr>
+<tr><td><strong>Functionality</strong></td><td>A sellable feature key (e.g. <code>products</code>, <code>orders</code>).</td></tr>
+<tr><td><strong>Plan snapshot</strong></td><td>Copy of the plan's terms frozen onto a subscription.</td></tr>
+<tr><td><strong>Main admin</strong></td><td>The admin created with the company; bypasses permissions.</td></tr>
+<tr><td><strong>Menu slug</strong></td><td>Kebab-case key of a console menu, used for permissions.</td></tr>
+<tr><td><strong>Lead</strong></td><td>One tracked device visiting a website.</td></tr>
+<tr><td><strong>Service lead</strong></td><td>One enquiry or booking submitted on a service.</td></tr>
+<tr><td><strong>Holding page</strong></td><td>Branded “back shortly” page shown when a plan lapses.</td></tr>
+<tr><td><strong>Theme (design)</strong></td><td>One of the website front-ends: default, midnight, atelier.</td></tr>
+</tbody></table>
+</body></html>

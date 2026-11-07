@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>User Manual — Aj Smart Biz</title>
+<link rel="stylesheet" href="assets/doc.css"></head><body>
+
+<section class="cover">
+  <div class="band">
+    <div class="kicker">Aj Smart Biz · Document 09</div>
+    <h1>User Manual</h1>
+    <div class="sub">Step-by-step guides for platform operators, company admins and their staff.</div>
+  </div>
+  <table class="meta">
+    <tr><td>Audience</td><td>Super admins, company admins, company staff, support team</td></tr>
+    <tr><td>Version / date</td><td>1.0 · 7 November 2026</td></tr>
+  </table>
+</section>
+
+<section class="toc"><h2>Contents</h2><ol>
+<li>Getting started</li><li>Part A — Super Admin guide</li><li>Part B — Company Admin guide</li><li>Part C — Staff daily operations</li>
+<li>Part D — What website visitors see</li><li>Troubleshooting and FAQ</li></ol></section>
+
+<h1>1. Getting started</h1>
+<table><thead><tr><th>You are</th><th>Open</th><th>Sign in with</th></tr></thead><tbody>
+<tr><td>Platform owner / staff</td><td>Super Admin console (smart-biz-super-admin…, :4200 locally)</td><td>Email + password given by the platform owner</td></tr>
+<tr><td>Company admin / staff</td><td>Company workspace (smart-biz-admin… or your own domain, :4300 locally)</td><td>Email + password from your main admin or the platform</td></tr>
+</tbody></table>
+<p>Both consoles have a light/dark switch, a profile page for changing your password, and show a “Cannot reach the server” screen with a <em>Retry</em> button if the API is down.</p>
+
+<h1 class="page">Part A — Super Admin guide</h1>
+<h2>A1. Create a plan</h2>
+<ol><li>Go to <strong>Plan Management → Add plan</strong>.</li>
+<li>Enter name, code, price (and discount price), currency, billing cycle, duration and trial days.</li>
+<li>Set quotas: max branches, max admins, users, storage MB.</li>
+<li>Tick the <strong>functionalities</strong> the plan grants (website sections, products, orders, warehouse, invoices…).</li>
+<li>Choose <em>Public</em> (shown on the product website), <em>Show in admin</em> (tenants may request it) and <em>Popular</em>. Save.</li></ol>
+<div class="callout"><strong>Editing a plan is safe</strong>Running subscriptions keep the terms they were sold (snapshot). Changes apply to new terms only.</div>
+
+<h2>A2. Onboard a company</h2>
+<ol><li><strong>Company Management → New company</strong>.</li>
+<li>Fill the profile (name, business type, contact, address, GST/PAN), login branding (logo, favicon, description).</li>
+<li>Main admin: name, email, phone; leave the password empty to generate one.</li>
+<li>Choose the starting plan and record the payment (mode, reference).</li>
+<li>Optional: <em>Duplicate from</em> an existing company (website, services, products, blog, testimonials, branches, roles).</li>
+<li>Save. <strong>Copy the generated admin password now</strong> — it is shown only once.</li>
+<li>Open the company → <strong>Domains</strong> and add its website host. Ask DevOps to add the nginx vhost (Document 07).</li>
+<li>Optional: <strong>AI content creator</strong> on the company form drafts slides, About, Contact, benefits, services, products and blog posts. It never overwrites existing content.</li></ol>
+
+<h2>A3. Manage renewals — Company Plans</h2>
+<table><thead><tr><th>Action</th><th>When to use</th></tr></thead><tbody>
+<tr><td>Assign</td><td>First plan; a future start date queues it as pending.</td></tr>
+<tr><td>Pre-renew</td><td>Book the next term to start when the current ends.</td></tr>
+<tr><td>Renew now</td><td>Close today and start a new term.</td></tr>
+<tr><td>Upgrade / downgrade</td><td>Mid-term change; the dialog shows the credit for unused days before you confirm.</td></tr>
+<tr><td>Suspend / resume</td><td>Stop access temporarily without losing dates or money.</td></tr>
+<tr><td>Extend</td><td>Push the end date out at no charge.</td></tr>
+<tr><td>Cancel / expire</td><td>End the term (final).</td></tr>
+<tr><td>Reactivate</td><td>Open a fresh term for a finished subscription.</td></tr>
+<tr><td>Run expiry check</td><td>Apply due starts/expiries immediately instead of waiting for the hourly run.</td></tr>
+</tbody></table>
+<p><strong>Plan requests</strong> from tenants appear at the top of Company Plans. <em>Approve</em> applies, bills and closes the old term; <em>Reject</em> with a note. The tenant sees the decision on My Plan.</p>
+
+<h2>A4. Other platform tasks</h2>
+<ul>
+<li><strong>Dashboard</strong> — income this month and growth, companies by plan, recent transactions.</li>
+<li><strong>Customers / Lead Management</strong> — read-only, all tenants.</li>
+<li><strong>Super Admins</strong> — add staff (role <em>staff</em>), reset passwords. The root account cannot be removed.</li>
+<li><strong>Masters</strong> — states (with GST code), business types, theme presets.</li>
+<li><strong>Our website</strong> — edit the product site's content, FAQ and template showcase; follow up enquiries (new → contacted → converted/closed); campaign analysis by UTM.</li>
+</ul>
+
+<h1 class="page">Part B — Company Admin guide</h1>
+<h2>B1. First sign-in</h2>
+<ol><li>Sign in with the email and password from the platform.</li>
+<li>You are taken to <strong>Profile</strong> to set your own password — required before anything else.</li>
+<li>Check <strong>Dashboard</strong> and <strong>My Plan</strong> for your plan, days left and limits.</li></ol>
+
+<h2>B2. Set up your website</h2>
+<ol>
+<li><strong>Company Details → Company profile</strong>: logo, favicon (.ico), description, contact and address.</li>
+<li><strong>Theme</strong>: pick primary, secondary and accent colours (for the whole company or one branch).</li>
+<li><strong>Functionality</strong>: switch on the features your plan includes. A locked switch tells you why (not in plan, expired…). Add WhatsApp numbers by type (inquiry, contact, support, orders) — one <em>contact</em> number is enough to make every button work.</li>
+<li><strong>Slider</strong>: replace the three default slides with your own (desktop and phone images, button text and link).</li>
+<li>Fill each section you switched on: <strong>About us, Figures, Team, Gallery, Features/Benefits, Testimonials, Contact page, Social, Blog</strong>. A section stays off the website until it has content — the banner says “Nothing published yet”.</li>
+<li>Rename pages in the menu with the <em>Menu name</em> field on About, Contact and Services.</li>
+</ol>
+<div class="callout"><strong>Branch websites</strong>Use the <em>Editing for</em> / <em>Shows on</em> selector to give a branch its own About, team, slides or colours. A branch with nothing of its own shows the company-wide content.</div>
+
+<h2>B3. Catalogue, services and orders</h2>
+<ol>
+<li><strong>Categories</strong>: build up to three levels (e.g. Furniture → Tables → Dining tables).</li>
+<li><strong>Products</strong>: name, up to 8 photos (first is the card image), price, optional offer price (discount is calculated), or a free-text price label (“On request”), specifications, stock status, <em>Orderable</em>.</li>
+<li><strong>Cart &amp; orders</strong>: choose where orders go — WhatsApp, Payment (UPI id or link) or None; basket on/off; required fields; minimum order.</li>
+<li><strong>Service categories / Services</strong>: cards with photo or icon, “what's included”, price line, duration; make a service <em>bookable</em> with opening hours, slot length and capacity; choose where enquiries go (WhatsApp and Service Leads, Service Leads only, WhatsApp only).</li>
+</ol>
+
+<h2>B4. Team access</h2>
+<ol><li><strong>Role Management → Add role</strong> (e.g. “Counter staff”).</li>
+<li><strong>Menu Permission</strong>: choose the role, tick View/Create/Edit/Delete/Export per menu, save.</li>
+<li><strong>Admin Management → Add admin</strong> with that role and branch. If the button is disabled, the bar above explains the plan limit and offers <em>Upgrade your plan</em>.</li></ol>
+
+<h2>B5. Change plan</h2>
+<p><strong>My Plan</strong> lists plans marked Upgrade or Downgrade. Choose one and send a request with a note. Only one request can be open; you can cancel it. The platform's decision appears on the same screen.</p>
+
+<h1 class="page">Part C — Staff daily operations</h1>
+<h2>C1. Orders</h2>
+<ol><li><strong>Orders</strong> lists new orders as <em>Pending</em>.</li>
+<li>Move each forward: <strong>Confirm</strong> (stock is reserved) → <strong>Packed</strong> → <strong>Dispatched</strong> (stock leaves the warehouse) → <strong>Delivered</strong>.</li>
+<li>Mark <strong>payment</strong> separately (unpaid / paid / refunded).</li>
+<li>Mistake? <strong>Cancel</strong> (stock goes back) — orders never move backwards and cannot be deleted.</li>
+<li>Totals reading “plus N items to be quoted” include products priced in words.</li>
+<li>The <em>Analytics</em> tab shows sales for 7/30/90/365 days (cancelled orders excluded).</li></ol>
+
+<h2>C2. Warehouse</h2>
+<ul><li><strong>Warehouses</strong>: one is the default; others can serve a branch.</li>
+<li><strong>Movements</strong>: record receipts (purchase), returns, damage, and stock counts (enter <em>how many there are now</em>).</li>
+<li><strong>Transfer</strong> stock between warehouses.</li>
+<li>Stock is never edited directly — corrections are new movements, so the history stays complete.</li>
+<li>Products with stock tracking show in/out of stock on the website automatically.</li></ul>
+
+<h2>C3. Invoices (counter billing)</h2>
+<ol><li><strong>Invoices → New</strong>: add products, quantities, line discounts and tax rate (0/5/12/18/28 %), bill discount.</li>
+<li><strong>Save draft</strong> to finish later, or <strong>Issue</strong> — stock is deducted and an invoice number assigned.</li>
+<li>Record payment (cash, UPI, card, bank, credit) — partial payments are allowed.</li>
+<li>Print the bill from the invoice page. Cancelling an issued invoice returns stock.</li></ol>
+
+<h2>C4. Service leads and bookings</h2>
+<ul><li>Each enquiry/booking shows who, which service, and whether they were also sent to WhatsApp — check before calling.</li>
+<li>Move the <em>stage</em> (new → contacted → qualified → converted / lost) and add notes.</li>
+<li>Accept or decline booking requests; use the <em>Diary</em> to see a day's bookings.</li></ul>
+
+<h2>C5. Customers and leads</h2>
+<ul><li><strong>Customers</strong> sign up themselves on the website; you can view spend, addresses and orders, or bar a customer (their orders remain).</li>
+<li><strong>Lead Management</strong> shows website visitors per device with source and pages; set a stage and notes.</li></ul>
+
+<h1>Part D — What website visitors see</h1>
+<ul>
+<li>A home page with your slides and every section you have published.</li>
+<li>Products with photos, prices and offers; <em>Add to cart</em> or <em>Order now</em>, then WhatsApp or payment.</li>
+<li>Services with <em>Enquire</em> or a booking calendar.</li>
+<li>Sign in with phone number and a 6-digit code to save addresses and see orders and bookings.</li>
+<li>If your plan lapses, a branded “back shortly” page replaces the website until it is renewed.</li>
+</ul>
+
+<h1>Troubleshooting and FAQ</h1>
+<table><thead><tr><th>Question</th><th>Answer</th></tr></thead><tbody>
+<tr><td>A menu is missing from my sidebar.</td><td>Your role lacks View on it, or your plan does not include that feature.</td></tr>
+<tr><td>“Add branch/admin” is disabled.</td><td>Plan limit reached, or the plan is expired/suspended/missing — the reason is on the button.</td></tr>
+<tr><td>I switched a feature on but the website doesn't show it.</td><td>Add content to it — empty sections are not published.</td></tr>
+<tr><td>Website shows “offline / back shortly”.</td><td>The plan is not running; contact the platform to renew.</td></tr>
+<tr><td>Customer didn't receive an OTP.</td><td>SMS is not connected yet; the sign-in page shows the development code.</td></tr>
+<tr><td>Can I edit an order's items or price?</td><td>No. Cancel and ask the customer to re-order; you may edit warehouse, delivery adjustment and notes.</td></tr>
+<tr><td>I can't change a customer's phone.</td><td>The phone is the customer's identity and sign-in; it cannot be edited by staff.</td></tr>
+<tr><td>Session expired message.</td><td>Sign in again; tokens expire daily.</td></tr>
+</tbody></table>
+</body></html>

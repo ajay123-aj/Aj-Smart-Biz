@@ -40,6 +40,7 @@
                   class="nav-child"
                   [routerLink]="child.route"
                   routerLinkActive="active"
+                  [routerLinkActiveOptions]="{ exact: child.route === item.route }"
                   (click)="navOpen.set(false)"
                 >
                   <span class="nav-icon" aria-hidden="true">{{ child.icon }}</span>

@@ -10,6 +10,7 @@ import {
   CompanyCreateResult,
   CompanyDuplicateResult,
   SampleCompaniesResult,
+  CompanyStorage,
   QuotaView,
   Status,
   Subscription,
@@ -62,6 +63,11 @@ export class CompanyService {
   /** A new company from `payload`, with the `include` sections of company `id` copied in. */
   duplicate(id: number, payload: Record<string, unknown>): Observable<CompanyDuplicateResult> {
     return this.api.post<CompanyDuplicateResult>(`/super-admin/companies/${id}/duplicate`, payload);
+  }
+
+  /** Set this company's own storage limit (MB), or `null` to follow its plan. */
+  updateStorage(id: number, storageLimitMb: number | null): Observable<CompanyStorage> {
+    return this.api.patch<CompanyStorage>(`/super-admin/companies/${id}/storage`, { storageLimitMb });
   }
 
   update(id: number, payload: Record<string, unknown>): Observable<Company> {

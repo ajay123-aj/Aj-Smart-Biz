@@ -1,4 +1,7 @@
 import { cache } from 'react';
+import { readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 /**
  * Where this site gets everything it renders.
@@ -205,35 +208,99 @@ export interface Site {
 }
 
 /* ------------------------------------------------------------------ *
+ * Surviving a backend restart
+ *
+ * A backend restart or deploy takes a few seconds, and during that window every
+ * request to the API is refused. Before this, `getSite` threw on the first
+ * refusal and every page on the site rendered an error until the API was back.
+ *
+ * Three layers now stand between a restart and a visitor:
+ *
+ *   1. **Retry.** A refused connection or a 5xx is retried with a short
+ *      backoff (~3.5s in total), which covers most restarts on its own.
+ *   2. **Last good response.** Every successful answer is kept in memory and
+ *      written to a snapshot file in the OS temp directory. If the API is still
+ *      down after the retries, the page renders from that snapshot: the API's
+ *      own data, a little old, nothing invented. The file means a restart of
+ *      *this* app while the API is down still has something to serve.
+ *   3. **Friendly error page.** Only when the API has *never* answered does the
+ *      request fail, and `app/error.tsx` / `app/global-error.tsx` then show a
+ *      "back in a moment" screen that retries by itself.
+ * ------------------------------------------------------------------ */
+
+const RETRY_DELAYS_MS = [500, 1000, 2000];
+
+/** Statuses worth retrying: the API is starting, restarting or overloaded. */
+const isTransient = (status: number) => status === 408 || status === 429 || status >= 500;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * `fetch` that retries while the API is unreachable or answering 5xx.
+ * A 4xx is returned at once: asking again will not change the answer.
+ */
+async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      const response = await fetch(url, init);
+      if (!isTransient(response.status) || attempt === RETRY_DELAYS_MS.length) return response;
+      lastError = new Error(`The API answered ${response.status}.`);
+    } catch (cause) {
+      /* Connection refused, reset, DNS: the API is not reachable right now. */
+      lastError = cause;
+    }
+    if (attempt < RETRY_DELAYS_MS.length) await sleep(RETRY_DELAYS_MS[attempt]);
+  }
+
+  throw lastError;
+}
+
+/** In-memory last good answers, keyed by what was asked. */
+const lastGood = new Map<string, unknown>();
+
+/**
+ * Where snapshots are written. Read from the environment first so Next's file
+ * tracer cannot resolve it at build time: given a bare `tmpdir()` it treats the
+ * temp folder as a dependency and tries to copy it into `.next/standalone`.
+ */
+function snapshotPath(key: string): string {
+  const dir = process.env.SITE_SNAPSHOT_DIR || tmpdir();
+  return join(dir, `aj-smart-biz-technology-${key.replace(/[^a-z0-9_-]/gi, '_')}.json`);
+}
+
+/** Remember a good answer: memory first, then a best-effort file write. */
+async function remember<T>(key: string, value: T): Promise<void> {
+  lastGood.set(key, value);
+  try {
+    await writeFile(snapshotPath(key), JSON.stringify(value), 'utf8');
+  } catch {
+    /* A read-only disk costs us the file layer only; memory still works. */
+  }
+}
+
+/** The last good answer for `key`, from memory or the snapshot file. */
+async function recall<T>(key: string): Promise<T | undefined> {
+  if (lastGood.has(key)) return lastGood.get(key) as T;
+  try {
+    const value = JSON.parse(await readFile(snapshotPath(key), 'utf8')) as T;
+    lastGood.set(key, value);
+    return value;
+  } catch {
+    return undefined;
+  }
+}
+
+/* ------------------------------------------------------------------ *
  * Reading it
  * ------------------------------------------------------------------ */
 
-/**
- * Everything this site renders, in one call.
- *
- * `cache()` is what lets each section go on reading its own content the way it
- * always did: the home page renders eight components that each call `getSite`,
- * and React dedupes them into **one** request per render pass. Passing the
- * payload down through props would work too and would make every component's
- * signature depend on what its siblings need.
- *
- * Throws on a failure rather than returning a default. There is no wording in
- * this project to fall back to, and inventing some would put a price on the
- * page that nobody agreed to — a visible error is the honest failure. See
- * `REVALIDATE_SECONDS` for why a blip does not reach visitors.
- */
-export const getSite = cache(async (): Promise<Site> => {
-  let response: Response;
-
-  try {
-    response = await fetch(`${API_URL}/website/bootstrap`, {
-      headers: { Accept: 'application/json' },
-      next: { revalidate: REVALIDATE_SECONDS, tags: ['site'] },
-    });
-  } catch (cause) {
-    /* Connection refused, DNS, TLS — the API was not reachable at all. */
-    throw new Error(`Could not reach the API at ${API_URL}. Is the backend running?`, { cause });
-  }
+async function fetchSite(): Promise<Site> {
+  const response = await fetchWithRetry(`${API_URL}/website/bootstrap`, {
+    headers: { Accept: 'application/json' },
+    next: { revalidate: REVALIDATE_SECONDS, tags: ['site'] },
+  });
 
   if (!response.ok) {
     throw new Error(`The API answered ${response.status} for /website/bootstrap.`);
@@ -252,6 +319,32 @@ export const getSite = cache(async (): Promise<Site> => {
     businessTypes: payload.data.businessTypes ?? [],
     faqs: payload.data.faqs ?? [],
   };
+}
+
+/**
+ * Everything this site renders, in one call.
+ *
+ * `cache()` dedupes the many sections that each call this into **one** request
+ * per render pass.
+ *
+ * On failure it falls back to the last good response (see "Surviving a backend
+ * restart" above). It throws only when the API is down and has never answered:
+ * there is no wording in this project to fall back to, and inventing some would
+ * put a price on the page that nobody agreed to.
+ */
+export const getSite = cache(async (): Promise<Site> => {
+  try {
+    const site = await fetchSite();
+    await remember('site', site);
+    return site;
+  } catch (cause) {
+    const stale = await recall<Site>('site');
+    if (stale) {
+      console.warn('[api] /website/bootstrap failed; serving the last good response.', cause);
+      return stale;
+    }
+    throw new Error(`Could not reach the API at ${API_URL}. Is the backend running?`, { cause });
+  }
 });
 
 /* ------------------------------------------------------------------ *
@@ -339,19 +432,24 @@ export interface Showcase {
  */
 export const getTemplates = cache(async (design?: string): Promise<Showcase> => {
   const query = design ? `?design=${encodeURIComponent(design)}` : '';
+  const key = `templates${design ? `-${design}` : ''}`;
   try {
-    const response = await fetch(`${API_URL}/website/templates${query}`, {
+    const response = await fetchWithRetry(`${API_URL}/website/templates${query}`, {
       headers: { Accept: 'application/json' },
       next: { revalidate: REVALIDATE_SECONDS, tags: ['templates'] },
     });
-    if (!response.ok) return { designs: [], templates: [] };
+    if (!response.ok) throw new Error(`The API answered ${response.status} for /website/templates.`);
     const payload = (await response.json()) as ApiEnvelope<Showcase>;
-    return {
+    const showcase: Showcase = {
       designs: payload?.data?.designs ?? [],
       templates: payload?.data?.templates ?? [],
     };
+    await remember(key, showcase);
+    return showcase;
   } catch {
-    return { designs: [], templates: [] };
+    /* The last good showcase if there is one, else an empty one: the rest of
+       the page is still worth showing. */
+    return (await recall<Showcase>(key)) ?? { designs: [], templates: [] };
   }
 });
 

@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo';
+import PageHeader from '@/components/PageHeader';
 import Glyph from '@/components/Glyph';
 import CapabilitiesSection from '@/components/CapabilitiesSection';
 import RechargeSection from '@/components/RechargeSection';
@@ -6,11 +8,13 @@ import CtaBand from '@/components/CtaBand';
 import { getSite } from '@/lib/api';
 import styles from './page.module.css';
 
-export const metadata: Metadata = {
-  title: 'What you get',
-  description:
+export async function generateMetadata(): Promise<Metadata> {
+  return pageMetadata(
+    '/services',
+    'What you get',
     'Everything a business website on Aj Smart Biz can be built from — services, bookings, catalogue, orders, reviews, blog and more, all managed for you.',
-};
+  );
+}
 
 /**
  * What the product can actually do, in full.
@@ -31,13 +35,7 @@ export default async function ServicesPage() {
 
   return (
     <>
-      <section className={`section ${styles.head}`}>
-        <div className="container">
-          <span className="eyebrow">{page?.eyebrow}</span>
-          <h1 className={styles.title}>{page?.title}</h1>
-          <p className={styles.lede}>{page?.lede}</p>
-        </div>
-      </section>
+      <PageHeader path="/services" crumb="What you get" eyebrow={page?.eyebrow} title={page?.title} lede={page?.lede} />
 
       {always.length ? (
       <section className="section section--panel">

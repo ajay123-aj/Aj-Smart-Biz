@@ -8,6 +8,7 @@ const { success, created, paginated } = require('../utils/response');
 const { getPagination, buildSearch, getSort, mergeWhere } = require('../utils/query');
 const passwordUtil = require('../utils/password');
 const quota = require('../services/quota.service');
+const adminRoles = require('../services/adminRole.service');
 const { AUTH_SCOPE, STATUS } = require('../constants');
 
 /**
@@ -54,10 +55,15 @@ const adminQuota = asyncHandler(async (req, res) => {
 
 const list = asyncHandler(async (req, res) => {
   const { page, limit, offset } = getPagination(req.query);
+  const companyId = resolveCompanyId(req);
+  /* A role filter matches admins holding it as primary or extra role. */
+  const roleFilter = req.query.roleId
+    ? { id: await adminRoles.adminIdsWithRole(companyId, Number(req.query.roleId)) }
+    : null;
   const where = mergeWhere(
-    { companyId: resolveCompanyId(req) },
+    { companyId },
     req.query.status ? { status: req.query.status } : null,
-    req.query.roleId ? { roleId: req.query.roleId } : null,
+    roleFilter,
     req.query.branchId ? { branchId: req.query.branchId } : null,
     buildSearch(req.query.search, ['name', 'email', 'phone'])
   );
@@ -74,7 +80,8 @@ const list = asyncHandler(async (req, res) => {
     distinct: true,
   });
 
-  return paginated(res, result, { page, limit }, 'Admin list fetched successfully');
+  const rows = await adminRoles.attachRoles(companyId, result.rows.map((row) => row.toJSON()));
+  return paginated(res, { rows, count: result.count }, { page, limit }, 'Admin list fetched successfully');
 });
 
 const getById = asyncHandler(async (req, res) => {
@@ -84,7 +91,8 @@ const getById = asyncHandler(async (req, res) => {
       { model: db.Branch, as: 'branch', attributes: ['id', 'name'] },
     ],
   });
-  return success(res, { message: 'Admin fetched successfully', data: admin });
+  const [data] = await adminRoles.attachRoles(admin.companyId, [admin.toJSON()]);
+  return success(res, { message: 'Admin fetched successfully', data });
 });
 
 const create = asyncHandler(async (req, res) => {
@@ -95,9 +103,7 @@ const create = asyncHandler(async (req, res) => {
   const exists = await db.Admin.findOne({ where: { email } });
   if (exists) throw ApiError.conflict('An admin with this email already exists');
 
-  const role = await db.Role.findOne({ where: { id: req.body.roleId, companyId } });
-  if (!role) throw ApiError.badRequest('Role not found for this company');
-  if (role.isSystem) throw ApiError.badRequest('The company admin role cannot be assigned manually');
+  const roleIds = await adminRoles.assertAssignable(companyId, req.body.roleIds ?? [req.body.roleId]);
 
   if (req.body.branchId) {
     const branch = await db.Branch.findOne({ where: { id: req.body.branchId, companyId } });
@@ -105,16 +111,26 @@ const create = asyncHandler(async (req, res) => {
   }
 
   const generatedPassword = req.body.password ? null : passwordUtil.random(12);
-  const admin = await db.Admin.create({
-    ...req.body,
-    email,
-    companyId,
-    password: req.body.password || generatedPassword,
-    isCompanyAdmin: false,
-    createdBy: req.auth.id,
+  const { roleIds: _ignored, ...fields } = req.body;
+  const admin = await db.sequelize.transaction(async (transaction) => {
+    const row = await db.Admin.create(
+      {
+        ...fields,
+        email,
+        companyId,
+        roleId: roleIds[0],
+        password: req.body.password || generatedPassword,
+        isCompanyAdmin: false,
+        createdBy: req.auth.id,
+      },
+      { transaction }
+    );
+    await adminRoles.setRoles({ admin: row, roleIds, actorId: req.auth.id, transaction });
+    return row;
   });
 
-  const { password, ...safe } = admin.toJSON();
+  const [withRoles] = await adminRoles.attachRoles(companyId, [admin.toJSON()]);
+  const { password, ...safe } = withRoles;
   // The generated password is shown once so it can be handed over.
   return created(res, 'Admin created successfully', { ...safe, generatedPassword });
 });
@@ -129,12 +145,16 @@ const update = asyncHandler(async (req, res) => {
     });
     if (clash) throw ApiError.conflict('Another admin already uses this email');
   }
-  if (req.body.roleId) {
-    const role = await db.Role.findOne({ where: { id: req.body.roleId, companyId } });
-    if (!role) throw ApiError.badRequest('Role not found for this company');
-    if (admin.isCompanyAdmin && !role.isSystem) {
-      throw ApiError.badRequest('The main admin must keep the company admin role');
-    }
+  /* `roleIds` replaces the whole list; a lone `roleId` (older clients)
+     changes only the primary role and keeps the extras. */
+  let roleIds = null;
+  if (req.body.roleIds) {
+    roleIds = await adminRoles.assertAssignable(companyId, req.body.roleIds, { isCompanyAdmin: admin.isCompanyAdmin });
+  } else if (req.body.roleId) {
+    const extras = (await adminRoles.heldRoleIds({ adminId: admin.id, roleId: null })).filter((id) => id !== req.body.roleId);
+    roleIds = await adminRoles.assertAssignable(companyId, [req.body.roleId, ...extras], {
+      isCompanyAdmin: admin.isCompanyAdmin,
+    });
   }
   if (req.body.branchId) {
     const branch = await db.Branch.findOne({ where: { id: req.body.branchId, companyId } });
@@ -144,8 +164,13 @@ const update = asyncHandler(async (req, res) => {
     throw ApiError.badRequest('The main admin cannot be deactivated');
   }
 
-  await admin.update({ ...req.body, updatedBy: req.auth.id });
-  return success(res, { message: 'Admin updated successfully', data: admin });
+  const { roleIds: _ignored, roleId: _primary, ...fields } = req.body;
+  await db.sequelize.transaction(async (transaction) => {
+    await admin.update({ ...fields, updatedBy: req.auth.id }, { transaction });
+    if (roleIds) await adminRoles.setRoles({ admin, roleIds, actorId: req.auth.id, transaction });
+  });
+  const [data] = await adminRoles.attachRoles(companyId, [admin.toJSON()]);
+  return success(res, { message: 'Admin updated successfully', data });
 });
 
 const toggleStatus = asyncHandler(async (req, res) => {

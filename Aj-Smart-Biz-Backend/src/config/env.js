@@ -86,6 +86,9 @@ const config = {
     logging: bool(process.env.DB_LOGGING, NODE_ENV === 'development'),
     // alter -> sequelize.sync({ alter: true }); force -> drop & recreate; none -> skip
     syncMode: (process.env.DB_SYNC_MODE || 'alter').toLowerCase(),
+    // true -> on boot: create DB if missing, sync schema (DB_SYNC_MODE), run seeders.
+    // false -> connect and start immediately; use `npm run db:setup` when needed.
+    setupOnStart: bool(process.env.DB_SETUP_ON_START, true),
   },
 
   jwt: {

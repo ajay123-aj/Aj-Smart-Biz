@@ -1,15 +1,19 @@
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo';
+import PageHeader from '@/components/PageHeader';
 import Glyph from '@/components/Glyph';
 import StepsSection from '@/components/StepsSection';
 import CtaBand from '@/components/CtaBand';
 import { getSite } from '@/lib/api';
 import styles from './page.module.css';
 
-export const metadata: Metadata = {
-  title: 'About us',
-  description:
+export async function generateMetadata(): Promise<Metadata> {
+  return pageMetadata(
+    '/about',
+    'About us',
     'Aj Smart Biz Technology builds and runs business websites on a monthly recharge — hosting, domain, security, backups and every edit included.',
-};
+  );
+}
 
 /**
  * Who this is and why it works the way it does.
@@ -31,13 +35,7 @@ export default async function AboutPage() {
 
   return (
     <>
-      <section className={`section ${styles.head}`}>
-        <div className="container">
-          <span className="eyebrow">{page?.eyebrow}</span>
-          <h1 className={styles.title}>{page?.title}</h1>
-          <p className={styles.lede}>{page?.lede}</p>
-        </div>
-      </section>
+      <PageHeader path="/about" crumb="About us" eyebrow={page?.eyebrow} title={page?.title} lede={page?.lede} />
 
       <section className={styles.bodySection}>
         <div className="container">

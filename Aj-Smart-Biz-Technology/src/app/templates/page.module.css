@@ -1,29 +1,7 @@
-/*
- * The template showcase page: the heading block every inner page opens with,
- * a row of design filters, and the grid of cards.
- */
-
-.head {
-  padding-block: 64px 12px;
-}
-
-.title {
-  max-width: 20ch;
-  font-size: clamp(2.2rem, 5vw, 3.2rem);
-  line-height: 1.06;
-  letter-spacing: -0.032em;
-}
-
-.lede {
-  margin-top: 18px;
-  max-width: 62ch;
-  color: var(--text-muted);
-  font-size: 1.06rem;
-  line-height: 1.66;
-}
+/* The template showcase: design filters, then the grid of cards. */
 
 .showcase {
-  padding-top: 24px;
+  padding-top: 48px;
 }
 
 /* ----------------------------- filters ----------------------------- */
@@ -31,34 +9,35 @@
 .filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .filter {
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  padding: 9px 16px;
+  min-height: 40px;
+  padding: 8px 14px;
   border-radius: var(--radius-pill);
-  background: var(--glass);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-  border: 1px solid var(--hairline);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--hairline-strong);
   color: var(--text-muted);
-  font-size: 0.86rem;
-  font-weight: 600;
-  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
 .filter:hover {
-  border-color: var(--hairline-strong);
-  color: var(--text);
+  border-color: var(--brand);
+  color: var(--brand-strong);
 }
 
-.filterActive {
-  background: var(--glass-strong);
-  border-color: var(--hairline-strong);
-  color: var(--text);
+.filterActive,
+.filterActive:hover {
+  background: var(--gradient);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: var(--shadow-brand);
 }
 
 /* A swatch of the look in front of each design's name. */
@@ -83,14 +62,19 @@
   min-width: 20px;
   padding: 1px 6px;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface-2);
   color: var(--text-faint);
   font-size: 0.72rem;
   text-align: center;
 }
 
+.filterActive .count {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
 .designSummary {
-  margin-top: 16px;
+  margin-top: 18px;
   max-width: 62ch;
   color: var(--text-muted);
   font-size: 0.95rem;
@@ -101,16 +85,15 @@
 
 .grid {
   display: grid;
-  /* `min()` so a card never asks for more than the phone has. */
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
-  gap: 22px;
-  margin: 28px 0 0;
+  gap: 24px;
+  margin: 32px 0 0;
   padding: 0;
   list-style: none;
 }
 
 .none {
-  margin-top: 28px;
+  margin-top: 32px;
   color: var(--text-muted);
 }
 
@@ -125,10 +108,6 @@
   padding: 32px;
 }
 
-.empty:hover {
-  transform: none;
-}
-
 .emptyTitle {
   font-size: 1.3rem;
 }
@@ -136,4 +115,10 @@
 .emptyBody {
   color: var(--text-muted);
   line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+  .empty {
+    padding: 24px 20px;
+  }
 }

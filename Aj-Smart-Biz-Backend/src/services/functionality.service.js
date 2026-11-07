@@ -1496,14 +1496,10 @@ const publicProduct = (row, categoryPath = [], availability = null) => {
   const price = row.price === null || row.price === undefined ? null : Number(row.price);
   const offerPrice = row.offerPrice === null || row.offerPrice === undefined ? null : Number(row.offerPrice);
 
-  /* The column, unless the warehouse is answering for this one. See below. */
+  /* Always resolved by `availabilityOf`: the warehouse when it is live
+     (`availability` set), never out of stock when it is not (null). */
   const stored = PRODUCT_STOCK_VALUES.includes(row.stockStatus) ? row.stockStatus : PRODUCT_STOCK.IN_STOCK;
-  const resolvedStock = availability
-    ? stockService.availabilityOf(
-      { id: row.id, trackInventory: row.trackInventory, stockStatus: stored },
-      availability
-    )
-    : stored;
+  const resolvedStock = stockService.availabilityOf({ id: row.id, stockStatus: stored }, availability);
 
   return {
     id: row.id,
@@ -1547,15 +1543,10 @@ const publicProduct = (row, categoryPath = [], availability = null) => {
      * somebody whether to ring up, and a count it cannot keep true is worse there
      * than no count.
      *
-     * What the warehouse feature changes is where the word comes from. Without
-     * it, `stockStatus` is a flag somebody remembered to set. With it, on a
-     * product marked `trackInventory`, the answer is resolved from the shelf by
-     * `availabilityOf` — so the site says *out of stock* the moment the last one
-     * leaves the building, with nobody having to remember anything.
-     *
-     * `availability` is null on every tenant that has not bought it, and on
-     * every product that is not tracked, which is why the fallback is the
-     * column and not an error.
+     * The warehouse feature decides it. Without warehouse in the plan,
+     * `availability` is null and nothing is ever shown as out of stock. With it,
+     * every product is answered from the shelf by `availabilityOf`: a product
+     * never added to a warehouse, or with none left, says *out of stock*.
      */
     stockStatus: resolvedStock,
     inStock: resolvedStock !== PRODUCT_STOCK.OUT_OF_STOCK,

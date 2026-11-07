@@ -29,7 +29,7 @@ export default async function RechargeSection() {
           {points.map((point, index) => (
             <li key={point.title} className={styles.point}>
               <span className={styles.number} aria-hidden="true">
-                {index + 1}
+                {String(index + 1).padStart(2, '0')}
               </span>
               <div>
                 <h3 className={styles.title}>{point.title}</h3>

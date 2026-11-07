@@ -337,6 +337,20 @@ const PATHS: Record<string, React.ReactNode> = {
   ),
 
   /* --------------------------------- misc --------------------------------- */
+  /** A till receipt — invoices and billing. */
+  receipt: (
+    <>
+      <path d="M6 3h12v18l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4L6 21V3Z" />
+      <path d="M9 8h6M9 12h6M9 16h3.5" />
+    </>
+  ),
+  /** A file with lines — alias some catalogues use for an invoice. */
+  invoice: (
+    <>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" />
+      <path d="M14 3v5h5M9 13h6M9 17h6" />
+    </>
+  ),
   /** A handset — the number that is a phone rather than a queue. */
   phone: (
     <path d="M8.2 3.6 10 7.4l-2 1.6a12.6 12.6 0 0 0 5.4 5.4l1.6-2 3.8 1.8v3.2a1.8 1.8 0 0 1-2 1.8A16.6 16.6 0 0 1 3.4 5.6a1.8 1.8 0 0 1 1.8-2h3Z" />

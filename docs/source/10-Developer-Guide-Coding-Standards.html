@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Developer Guide — Aj Smart Biz</title>
+<link rel="stylesheet" href="assets/doc.css"></head><body>
+
+<section class="cover">
+  <div class="band">
+    <div class="kicker">Aj Smart Biz · Document 10</div>
+    <h1>Developer Guide &amp; Coding Standards</h1>
+    <div class="sub">Folder structure, code formats and conventions of every application, and the end-to-end recipe for adding a feature.</div>
+  </div>
+  <table class="meta">
+    <tr><td>Audience</td><td>Developers joining the project, code reviewers, AI coding agents</td></tr>
+    <tr><td>Version / date</td><td>1.0 · 7 November 2026</td></tr>
+    <tr><td>AI skill</td><td>The same rules are packaged as the Claude Code skill <code>.claude/skills/aj-smart-biz-feature</code></td></tr>
+  </table>
+</section>
+
+<section class="toc"><h2>Contents</h2><ol>
+<li>Repository layout</li><li>Golden rules</li><li>Backend — structure and conventions</li><li>Angular consoles — structure and conventions</li>
+<li>Next.js websites — structure and conventions</li><li>Recipe: add a new feature end to end</li><li>Formatting, naming and comments</li><li>Definition of done / review checklist</li></ol></section>
+
+<h1>1. Repository layout</h1>
+<pre>AJ SmartBiz/
+├─ Aj-Smart-Biz-Backend/        Express API (CommonJS)          :4000
+│  ├─ src/{config,constants,models,validators,middlewares,controllers,
+│  │       services,routes,modules,seeders,scripts,docs,utils}
+│  └─ docs/schema.dbml
+├─ Aj-Smart-Biz-Supper-Admin/   Angular 22 platform console     :4200
+├─ Aj-Smart-Biz-Admin/          Angular 22 company workspace    :4300
+│  └─ src/app/{core/{guards,interceptors,models,services},layout,shared/ui,features/*}
+├─ themes/{default,midnight,atelier}/  Next.js 15 tenant sites  :4400/4500/4600
+│  └─ src/{middleware.ts,app/{actions,api,uploads,...routes},components,config,lib}
+├─ Aj-Smart-Biz-Technology/     Next.js 15 product website      :4700
+├─ deploy/                      per-service env examples
+├─ docs/                        this documentation (source + pdf)
+└─ README.md                    product behaviour, in depth</pre>
+
+<h1>2. Golden rules</h1>
+<ol>
+<li><strong>API-first, no hard-coded data.</strong> Anything a client shows comes from a backend endpoint; templates never invent tenant content.</li>
+<li><strong>Constants are the catalogue.</strong> Enums, feature keys, transition maps and limits live in <code>Aj-Smart-Biz-Backend/src/constants/index.js</code>. Never duplicate a list elsewhere — mirror it in TypeScript types with a “Mirrors X in the API” comment.</li>
+<li><strong>One decision, one function.</strong> Entitlement (<code>functionality.service</code>), quota (<code>quota.service</code>), service state, offer status (<code>isOnOffer</code>), enquiry target — reuse them; never re-derive in a controller or UI.</li>
+<li><strong>Guard at the module.</strong> Add routes inside the right module (<code>/admin</code>, <code>/super-admin</code>, <code>/theme</code>, <code>/website</code>); never add ad-hoc auth.</li>
+<li><strong>Tenant from token.</strong> Use <code>resolveCompanyId(req)</code>; never accept <code>companyId</code> from an admin's body.</li>
+<li><strong>Server-side money.</strong> Prices, totals, discounts computed on the server.</li>
+<li><strong>Snapshots for history; soft delete for everything else.</strong></li>
+<li><strong>Explain why.</strong> The codebase uses long comments that state business reasons and rejected alternatives — keep that style.</li>
+<li><strong>Themes are triplets.</strong> Logic changes in <code>themes/</code> are copied verbatim to all three designs; only CSS differs.</li>
+</ol>
+
+<h1>3. Backend</h1>
+<h2>3.1 Folder responsibilities</h2>
+<table><thead><tr><th>Folder</th><th>Put here</th><th>File name</th></tr></thead><tbody>
+<tr><td>constants/index.js</td><td>Enums (<code>X</code> + <code>X_VALUES</code>), <code>X_CATALOGUE</code>, transitions, defaults</td><td>single file</td></tr>
+<tr><td>models/</td><td>Sequelize factory per table; associations only in <code>index.js</code></td><td><code>companyWarehouse.model.js</code></td></tr>
+<tr><td>validators/</td><td>Joi <code>{params, query, body}</code> schemas; primitives in <code>common.js</code></td><td><code>warehouse.validator.js</code></td></tr>
+<tr><td>services/</td><td>Business rules, transactions, state machines</td><td><code>stock.service.js</code></td></tr>
+<tr><td>controllers/</td><td>HTTP handlers with <code>asyncHandler</code></td><td><code>warehouse.controller.js</code></td></tr>
+<tr><td>routes/</td><td>Resource routers (<code>mergeParams: true</code>)</td><td><code>warehouse.routes.js</code></td></tr>
+<tr><td>modules/</td><td>Composed router per consumer + guard</td><td><code>admin/admin.routes.js</code></td></tr>
+<tr><td>seeders/</td><td>Idempotent boot steps, default menus</td><td><code>bootstrap.js</code>, <code>defaultMenus.js</code></td></tr>
+</tbody></table>
+
+<h2>3.2 Model</h2>
+<pre><code>'use strict';
+const { DataTypes } = require('sequelize');
+const { STATUS, STATUS_VALUES } = require('../constants');
+
+/** Why this table exists, what it is not, and the rules it keeps. */
+module.exports = (sequelize) =>
+  sequelize.define(
+    'CompanyWarehouse',
+    {
+      id: { type: DataTypes.INTEGER.UNSIGNED, primaryKey: true, autoIncrement: true },
+      companyId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
+      branchId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
+      name: { type: DataTypes.STRING(150), allowNull: false },
+      sequence: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+      status: { type: DataTypes.ENUM(...STATUS_VALUES), allowNull: false, defaultValue: STATUS.ACTIVE },
+      createdBy: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
+      updatedBy: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
+    },
+    { tableName: 'company_warehouses', indexes: [{ fields: ['company_id'] }, { fields: ['status'] }] }
+  );</code></pre>
+<p>Register in <code>models/index.js</code>: require, associate (<code>Company.hasMany(X, { foreignKey: 'companyId', as: '…', onDelete: 'CASCADE' })</code> + <code>X.belongsTo(Company)</code>), and add to the exported <code>db</code>. Use SET NULL / <code>constraints:false</code> for history references. No unique indexes on business keys — check in the service.</p>
+
+<h2>3.3 Validator</h2>
+<pre><code>const fields = {
+  name: Joi.string().trim().max(150),
+  code: Joi.string().trim().uppercase().max(30),
+  branchId: id.allow(null),
+  status,
+};
+const create = { body: Joi.object({ ...fields, name: fields.name.required(), code: fields.code.required() }) };
+const update = { params: idParam, body: Joi.object(fields).min(1) };   // no defaults on update
+const list   = { query: listQuery({ branchId: Joi.alternatives().try(id, Joi.string().valid('none')) }) };
+module.exports = { create, update, list };</code></pre>
+
+<h2>3.4 Controller</h2>
+<pre><code>const list = asyncHandler(async (req, res) =&gt; {
+  const companyId = resolveCompanyId(req);
+  const { page, limit, offset } = getPagination(req.query);
+  const where = mergeWhere({ companyId },
+    req.query.status ? { status: req.query.status } : null,
+    buildSearch(req.query.search, ['name', 'code']));
+  const result = await db.CompanyWarehouse.findAndCountAll({
+    where, order: getSort(req.query, ['name', 'created_at'], [['sequence', 'ASC']]),
+    limit, offset, distinct: true });
+  return paginated(res, result, { page, limit }, 'Warehouse list fetched successfully');
+});
+
+const create = asyncHandler(async (req, res) =&gt; {
+  const companyId = resolveCompanyId(req);
+  await functionalityService.assertGranted(companyId, FUNCTIONALITY.WAREHOUSE);
+  const row = await db.CompanyWarehouse.create({ ...req.body, companyId, createdBy: req.auth.id });
+  return created(res, 'Warehouse created successfully', row);
+});</code></pre>
+<ul><li>Errors: <code>throw ApiError.badRequest('Readable reason', errors?)</code>, <code>.notFound</code>, <code>.forbidden</code>, <code>.conflict</code>.</li>
+<li>Responses: <code>success()</code>, <code>created()</code>, <code>paginated()</code> — messages “&lt;Label&gt; created successfully”.</li>
+<li>Ordered card lists: use <code>cardResource.factory.js</code>; platform masters: <code>crud.factory.js</code>.</li></ul>
+
+<h2>3.5 Service</h2>
+<pre><code>/** Always call inside a Sequelize transaction. */
+async function applyMovement({ companyId, warehouseId, productId, reason, quantity }, { transaction }) {
+  const rule = STOCK_REASON_CATALOGUE.find((r) =&gt; r.key === reason);
+  if (!rule) throw ApiError.badRequest('Unknown stock reason');
+  // ... read level FOR UPDATE, compute balanceAfter, write ledger + level
+}
+module.exports = { applyMovement /* , ... */ };</code></pre>
+
+<h2>3.6 Route and mount</h2>
+<pre><code>const router = require('express').Router({ mergeParams: true });
+const may = (action) =&gt; requirePermission('warehouse', action);
+router.get('/', may('canView'), validate(schema.list), controller.list);
+/** Before `/:id`, or "reorder" would be read as an id. */
+router.patch('/reorder', may('canEdit'), validate(schema.reorder), controller.reorder);
+router.post('/', may('canCreate'), validate(schema.create), controller.create);
+router.put('/:id', may('canEdit'), validate(schema.update), controller.update);
+router.patch('/:id/status', may('canEdit'), validate(master.statusBody), controller.toggleStatus);
+router.delete('/:id', may('canDelete'), validate(master.idParam), controller.remove);
+module.exports = router;</code></pre>
+<p>Order: guard → <code>validate</code> → handler. Literal paths (<code>/summary</code>, <code>/reorder</code>, <code>/analytics</code>, <code>/quota</code>) before <code>/:id</code>. Mount tenant routes in <code>routes/myCompany.routes.js</code> (under <code>/admin/company</code>) or <code>modules/admin/admin.routes.js</code>; super-admin in <code>modules/superadmin</code>; public in <code>modules/theme</code>.</p>
+
+<h2>3.7 Menus, permissions, Swagger</h2>
+<ul>
+<li>Add <code>{ name, slug, icon, route, sequence, parent? }</code> to <code>seeders/defaultMenus.js</code>; add to <code>MENU_INHERITS_PARENT</code> if it is part of its parent's screen; to <code>MENU_FUNCTIONALITY</code> if plan-gated. Boot inserts it and grants every Company Admin role.</li>
+<li>New upload folder → <code>FOLDERS</code> in <code>middlewares/upload.js</code>.</li>
+<li>Swagger: routes are auto-scanned; add <code>@openapi</code> prose blocks and register request schemas in <code>SCHEMA_SOURCES</code> (<code>src/docs/openapi.js</code>).</li>
+<li>Backfills: an idempotent <code>ensureX()</code> step in <code>seeders/bootstrap.js</code>.</li>
+</ul>
+
+<h1>4. Angular consoles</h1>
+<h2>4.1 Conventions</h2>
+<table><tbody>
+<tr><td>Components</td><td>Standalone (no NgModule), <code>ChangeDetectionStrategy.OnPush</code>, <code>inject()</code> in fields, data loaded in the constructor (no <code>ngOnInit</code>).</td></tr>
+<tr><td>State</td><td><code>signal()</code>, <code>computed()</code>, <code>effect()</code>; signal inputs/outputs (<code>input()</code>, <code>output()</code>); <code>.subscribe({ next, error })</code>.</td></tr>
+<tr><td>Templates</td><td>Built-in control flow only: <code>@if</code>, <code>@for (x of xs; track x.id)</code>, <code>@empty</code>, <code>@switch</code>. Separate <code>.html</code> via <code>templateUrl</code>.</td></tr>
+<tr><td>Forms</td><td>Reactive, <code>fb.nonNullable.group</code>; <code>&lt;app-field-error&gt;</code>; <code>touchAll(form)</code> on invalid submit; <code>cleanPayload()</code>.</td></tr>
+<tr><td>Styles</td><td>Global design system in <code>src/styles.scss</code> (tokens + primitives: <code>.card .btn .table .badge .modal .field .input</code>…). Component styles inline <code>styles: [...]</code> using <code>var(--…)</code> only; budget 4 kB warn / 8 kB error.</td></tr>
+<tr><td>HTTP</td><td>Only through <code>ApiService</code> (unwraps envelope). Errors: <code>toast.error('Could not …', messageOf(err))</code>.</td></tr>
+<tr><td>Naming</td><td><code>kebab-name.component.ts/.html</code>; <code>*-list</code>, <code>*-detail</code>, <code>*-manager</code> (Company Details editors); selectors <code>app-*</code>.</td></tr>
+<tr><td>Models</td><td><code>interface X extends AuditFields</code>; string-literal unions for enums; <code>as const</code> arrays.</td></tr>
+<tr><td>Tests</td><td>None present; schematics skip spec files.</td></tr>
+</tbody></table>
+
+<h2>4.2 Typical list component</h2>
+<pre><code>@Component({
+  selector: 'app-supplier-list',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [ReactiveFormsModule, PageHeaderComponent, PagerComponent, StatusBadgeComponent,
+            TableStateComponent, ModalComponent, FieldErrorComponent, CanDirective],
+  templateUrl: './supplier-list.component.html',
+})
+export class SupplierListComponent {
+  private readonly companies = inject(CompanyService);
+  private readonly toast = inject(ToastService);
+  private readonly confirm = inject(ConfirmService);
+  readonly store = new ListStore&lt;Supplier&gt;((q) =&gt; this.companies.listSuppliers(q));
+  readonly modalOpen = signal(false);
+  readonly saving = signal(false);
+  constructor() { this.store.reload(); }
+}</code></pre>
+<p>Template skeleton: <code>&lt;app-page-header&gt;</code> with actions → <code>.card</code> → search input → <code>&lt;app-table-state&gt;</code> → <code>.table-wrap &gt; table.table</code> with <code>th.sortable</code> → <code>&lt;app-pager&gt;</code> → <code>@if (modalOpen()) { &lt;app-modal&gt; … &lt;ng-container footer&gt; }</code>. Write buttons wrapped in <code>*appCan="'suppliers'; action: 'canCreate'"</code> (Admin only).</p>
+
+<h2>4.3 Adding a screen</h2>
+<table><thead><tr><th>Step</th><th>Super Admin</th><th>Company Admin</th></tr></thead><tbody>
+<tr><td>Model</td><td colspan="2"><code>core/models/domain.model.ts</code> (or a new <code>x.model.ts</code>)</td></tr>
+<tr><td>Service</td><td>Method in a <code>core/services/*.service.ts</code> calling <code>/super-admin/…</code>; masters via <code>MASTER_PATHS</code> + <code>CrudFactory</code></td><td>Section in <code>company.service.ts</code> or a dedicated service with a <code>BASE</code> constant; card lists via <code>cards&lt;T&gt;()</code></td></tr>
+<tr><td>Component</td><td>Copy <code>features/masters/state-list.*</code> (CrudPage)</td><td>Copy <code>features/roles/role-list.*</code> (ListStore + appCan)</td></tr>
+<tr><td>Route</td><td>Child of shell in <code>app.routes.ts</code>, title <code>'X · Aj Smart Biz'</code></td><td>Child with <code>canActivate: [permissionGuard('slug')]</code>, title = page name</td></tr>
+<tr><td>Menu</td><td>Add to <code>navGroups</code> in <code>layout/shell.component.ts</code></td><td>Seed in backend <code>defaultMenus.js</code> (sidebar comes from <code>/auth/me</code>); optional emoji in <code>ICONS</code></td></tr>
+<tr><td>Gates</td><td>—</td><td><code>&lt;app-feature-gate&gt;</code> for plan features; <code>&lt;app-limit-notice&gt;</code> for quotas</td></tr>
+</tbody></table>
+
+<h1>5. Next.js websites</h1>
+<table><tbody>
+<tr><td>Rendering</td><td>Server Components by default; <code>'use client'</code> only for interactivity; client components receive props (themes pass <code>siteCompany(company)</code>).</td></tr>
+<tr><td>Data</td><td>Themes: <code>getCompanyDetails()</code> (<code>lib/company.server.ts</code>, no-store) + pure <code>resolveX(company)</code> view-models in <code>lib/x.ts</code>. Technology: only <code>lib/api.ts</code> (<code>getSite()</code>, revalidate 300).</td></tr>
+<tr><td>Server-only</td><td><code>*.server.ts</code> with <code>import 'server-only'</code>.</td></tr>
+<tr><td>Writes</td><td>Server Actions in <code>app/actions/&lt;verb&gt;-&lt;noun&gt;.ts</code> (<code>'use server'</code>), using <code>API_URL</code> and <code>domain: await resolveDomain()</code>, returning <code>{ status, message, fieldErrors? }</code>; types in a sibling <code>lib/&lt;noun&gt;-submit.ts</code>; forms use <code>useActionState</code>/<code>useFormStatus</code>.</td></tr>
+<tr><td>Page guard</td><td><code>apiReachable</code> → <code>resolved</code> → <code>service.active</code> → feature or <code>notFound()</code>; metadata via <code>anonymousMetadata(company) ?? {...}</code>.</td></tr>
+<tr><td>CSS</td><td><code>globals.css</code> tokens (<code>--brand --accent --surface --radius* --shadow*</code>) + co-located <code>Name.module.css</code>; tokens only, tints with <code>color-mix</code>; no Tailwind.</td></tr>
+<tr><td>Naming</td><td>Components PascalCase (<code>ProductsSection.tsx</code>), page bands end in <code>Section</code>; lib files kebab-case; config constants SCREAMING_SNAKE; imports via <code>@/</code>.</td></tr>
+<tr><td>Sections</td><td>Return <code>null</code> when their feature/content is absent — pages carry no conditions.</td></tr>
+</tbody></table>
+
+<h1>6. Recipe: add a new feature end to end</h1>
+<p>Example: a sellable “Suppliers” feature for the company workspace that also shows on the website.</p>
+<ol>
+<li><strong>Constants</strong> — add <code>FUNCTIONALITY.SUPPLIERS</code> + <code>FUNCTIONALITY_CATALOGUE</code> entry; any enums as <code>X</code>/<code>X_VALUES</code>.</li>
+<li><strong>Model</strong> — <code>models/companySupplier.model.js</code>; register and associate in <code>models/index.js</code>.</li>
+<li><strong>Validator</strong> — <code>validators/supplier.validator.js</code> (create/update/list).</li>
+<li><strong>Service</strong> (if rules) — <code>services/supplier.service.js</code>.</li>
+<li><strong>Controller</strong> — <code>controllers/supplier.controller.js</code> with <code>resolveCompanyId</code>, <code>assertGranted</code> on writes.</li>
+<li><strong>Routes</strong> — <code>routes/supplier.routes.js</code>; mount under <code>/admin/company/suppliers</code> with <code>requirePermission('suppliers')</code>; super-admin nested mount if needed.</li>
+<li><strong>Menu</strong> — <code>defaultMenus.js</code> row + <code>MENU_FUNCTIONALITY</code>.</li>
+<li><strong>Public payload</strong> (if on the website) — add <code>features.suppliers</code> in <code>functionality.service</code>/<code>public.controller</code>, <code>null</code> unless active; add a <code>NAV_PAGES</code> row if it is a page.</li>
+<li><strong>Swagger</strong> — <code>@openapi</code> blocks + <code>SCHEMA_SOURCES</code>.</li>
+<li><strong>Admin UI</strong> — model, service, <code>features/suppliers/supplier-list.component.*</code>, route with <code>permissionGuard</code>, <code>*appCan</code>, <code>&lt;app-feature-gate&gt;</code>.</li>
+<li><strong>Super Admin UI</strong> — nothing for the plan form (it reads the catalogue); add screens only if operators need them.</li>
+<li><strong>Themes ×3</strong> — <code>SiteFeatures</code> type + <code>FALLBACK_COMPANY</code> null; <code>lib/suppliers.ts</code> resolver; <code>SuppliersSection.tsx</code> + per-theme <code>.module.css</code>; page with guard chain.</li>
+<li><strong>Verify</strong> — run the API on SQLite, exercise endpoints (Swagger), <code>ng build</code> both consoles, <code>npm run typecheck</code> + <code>build</code> each theme.</li>
+<li><strong>Document</strong> — README section, <code>docs/schema.dbml</code>, these docs.</li>
+</ol>
+
+<h1>7. Formatting, naming and comments</h1>
+<table><thead><tr><th>Area</th><th>Rule</th></tr></thead><tbody>
+<tr><td>Indentation</td><td>2 spaces, UTF-8, final newline, trim trailing whitespace (<code>.editorconfig</code>).</td></tr>
+<tr><td>Quotes / width</td><td>Single quotes; Prettier <code>printWidth: 100</code> in Angular apps (HTML with angular parser).</td></tr>
+<tr><td>Backend files</td><td>camelCase with suffix: <code>.model.js .validator.js .controller.js .service.js .routes.js</code>; <code>'use strict'</code> first line.</td></tr>
+<tr><td>Database</td><td>Model PascalCase singular; table snake_case plural, <code>company_</code> prefix for tenant tables; columns snake_case (raw SQL uses snake_case).</td></tr>
+<tr><td>Keys</td><td>Menu slugs kebab-case; functionality keys snake_case; constants UPPER_SNAKE.</td></tr>
+<tr><td>Comments</td><td>JSDoc paragraphs explaining <em>why</em>; section dividers <code>/* ---- name ---- */</code>; route-order notes.</td></tr>
+<tr><td>Messages</td><td>User-facing errors are full sentences the UI can show verbatim.</td></tr>
+</tbody></table>
+
+<h1>8. Definition of done / review checklist</h1>
+<table><thead><tr><th>☐</th><th>Check</th></tr></thead><tbody>
+<tr><td>☐</td><td>No hard-coded tenant data in any client; new data comes from an endpoint</td></tr>
+<tr><td>☐</td><td>Company taken from token; queries scoped; foreign ids 404</td></tr>
+<tr><td>☐</td><td>Writes validated with Joi; update schemas have no defaults</td></tr>
+<tr><td>☐</td><td>Permission slug enforced on API and mirrored in UI</td></tr>
+<tr><td>☐</td><td>Plan-gated features use <code>assertGranted</code> and appear as <code>null</code> when not live</td></tr>
+<tr><td>☐</td><td>Multi-step writes in one transaction; history snapshotted</td></tr>
+<tr><td>☐</td><td>Literal routes declared before <code>/:id</code></td></tr>
+<tr><td>☐</td><td>Menu seeded; Swagger prose and schemas added</td></tr>
+<tr><td>☐</td><td>Theme changes applied to all three designs</td></tr>
+<tr><td>☐</td><td>Both consoles build; themes typecheck and build; README/docs updated</td></tr>
+</tbody></table>
+</body></html>

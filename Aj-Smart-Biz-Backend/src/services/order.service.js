@@ -130,13 +130,20 @@ async function buildLines(companyId, lines, transaction) {
     throw ApiError.badRequest('Something in your order is no longer available');
   }
 
+  /* The same availability rule the website shows (`availabilityOf`): from the
+     warehouse when it is live, never out of stock when it is not. */
+  const availability = (await warehouseLive(companyId))
+    ? await stockService.availabilityFor(companyId, products.map((product) => product.id), { transaction })
+    : null;
+
   const items = [];
   let subtotal = 0;
   let itemCount = 0;
   let unpricedItems = 0;
 
   for (const product of products) {
-    if (!product.orderable || product.stockStatus === PRODUCT_STOCK.OUT_OF_STOCK) {
+    const stock = stockService.availabilityOf(product, availability);
+    if (!product.orderable || stock === PRODUCT_STOCK.OUT_OF_STOCK) {
       throw ApiError.badRequest(`${product.name} cannot be ordered at the moment`);
     }
 

@@ -227,6 +227,9 @@ a:hover { text-decoration: underline; }
 
 .meter { height: 7px; margin-top: var(--space-2); background: var(--surface-3); border-radius: 99px; overflow: hidden; }
 .meter-fill { height: 100%; background: var(--brand-600); border-radius: 99px; transition: width .25s ease; }
+/* Filling up, and full. */
+.meter-fill-warn { background: var(--warning); }
+.meter-fill-full { background: var(--danger); }
 
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); }
 .stat {
@@ -514,3 +517,33 @@ table.table tbody tr:last-child td { border-bottom: none; }
 .dl-item { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .dl-item dt { font-size: 11.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); }
 .dl-item dd { margin: 0; font-size: 14px; word-break: break-word; }
+
+/* ------------------------------------------------------------------ *
+ * Printing
+ *
+ * Only `.print-area` reaches paper — the sidebar, toolbars and banners are
+ * hidden. Used by the invoice view; any screen can opt in the same way.
+ * ------------------------------------------------------------------ */
+@media print {
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area {
+    position: absolute; left: 0; top: 0; width: 100%; max-width: none !important;
+    margin: 0 !important; box-shadow: none !important; border: 0 !important;
+    background: #fff !important; color: #000 !important;
+  }
+  .no-print { display: none !important; }
+  @page { margin: 12mm; }
+}
+
+/* Multi-role picker (Admin Management form, Role > Assign admins). */
+.role-picker { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; padding: 2px; }
+.role-option {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  min-height: 44px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); transition: border-color .15s ease, background .15s ease;
+}
+.role-option.on { border-color: var(--brand-500); background: color-mix(in srgb, var(--brand-500) 10%, var(--surface)); }
+.role-option .check { flex: 1; min-width: 0; }
+.role-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.role-chips .role-off { opacity: .55; text-decoration: line-through; }

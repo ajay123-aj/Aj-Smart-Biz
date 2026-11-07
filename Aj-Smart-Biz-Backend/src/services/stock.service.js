@@ -123,24 +123,29 @@ async function availabilityFor(companyId, productIds = null, options = {}) {
 }
 
 /**
- * What a tracked product's availability should say, given the levels.
+ * What a product's availability should say. The one place this is decided, for
+ * the website and for order placement alike.
  *
- * Still one of the three `PRODUCT_STOCK` words rather than a number, which is
- * the platform's long-standing position and not an oversight: the website tells
- * a visitor whether to ring up, and a count it cannot keep true is worse there
- * than no count. What tracking changes is that the word is now *derived* instead
- * of remembered.
+ * Still one of the three `PRODUCT_STOCK` words rather than a number: the
+ * website tells a visitor whether to ring up, and a count it cannot keep true
+ * is worse there than no count.
  *
- * `made_to_order` is left alone. A tenant that has said a thing is made when it
- * is ordered has said something about how it is supplied, not about how many are
- * on the shelf, and a stock level of zero is exactly what that product is
- * supposed to look like.
+ * `totals` is the map from `availabilityFor`, or **null when the tenant's plan
+ * does not have the warehouse feature live**. The rules:
+ *
+ *   - `made_to_order` is always left alone. It says how a thing is supplied,
+ *     not how many are on the shelf, and zero stock is what it should look like.
+ *   - **Warehouse not in the plan (`totals` null): never out of stock.** There
+ *     is no stock system to say otherwise, so the site does not claim it.
+ *   - **Warehouse live: the warehouse decides, for every product.** A product
+ *     that has never been added to any warehouse, or has nothing available
+ *     (on hand minus reserved) across all of them, is out of stock.
  */
 function availabilityOf(product, totals) {
-  if (!product.trackInventory) return product.stockStatus;
   if (product.stockStatus === PRODUCT_STOCK.MADE_TO_ORDER) return PRODUCT_STOCK.MADE_TO_ORDER;
+  if (!totals) return PRODUCT_STOCK.IN_STOCK;
 
-  const found = totals?.get(product.id) ?? null;
+  const found = totals.get(product.id) ?? null;
   return found && found.available > 0 ? PRODUCT_STOCK.IN_STOCK : PRODUCT_STOCK.OUT_OF_STOCK;
 }
 
@@ -175,6 +180,7 @@ async function applyMovement(
     quantity,
     unitCost = null,
     orderId = null,
+    invoiceId = null,
     counterWarehouseId = null,
     reference = null,
     note = null,
@@ -257,6 +263,7 @@ async function applyMovement(
       balanceAfter: next,
       unitCost,
       orderId,
+      invoiceId,
       counterWarehouseId,
       reference,
       note,

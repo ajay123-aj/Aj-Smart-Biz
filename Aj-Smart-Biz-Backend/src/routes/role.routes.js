@@ -18,6 +18,36 @@ router.put('/:id', requirePermission(MENU, 'canEdit'), validate(schema.roleUpdat
 router.patch('/:id/status', requirePermission(MENU, 'canEdit'), validate(master.statusBody), controller.toggleStatus);
 router.delete('/:id', requirePermission(MENU, 'canDelete'), validate(master.idParam), controller.remove);
 
+/**
+ * @openapi
+ * /admin/roles/{id}/admins:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Admins and whether they hold this role
+ *     description: Every admin except the main admin, with `holds` and `holdsAs` (`primary`, `extra` or null) and all their `roles`.
+ *     responses:
+ *       200: { description: Admins., content: { application/json: { schema: { $ref: '#/components/schemas/ApiSuccess' } } } }
+ *   put:
+ *     tags: [Admin]
+ *     summary: Set which admins hold this role
+ *     description: |
+ *       `{ adminIds }` is the full list. Ticked admins gain the role as an extra
+ *       role (primary if they had none); unticked admins lose it, and if it was
+ *       their primary role their next role becomes primary. Refused when an
+ *       admin would be left with no role. An admin's access is the union of all
+ *       their active roles. Needs Edit on Role Management and on Admin Management.
+ *     responses:
+ *       200: { description: Saved., content: { application/json: { schema: { $ref: '#/components/schemas/ApiSuccess' } } } }
+ */
+router.get('/:id/admins', requirePermission(MENU, 'canView'), validate(master.idParam), controller.getAdmins);
+router.put(
+  '/:id/admins',
+  requirePermission(MENU, 'canEdit'),
+  requirePermission('admin-management', 'canEdit'),
+  validate(schema.roleAdminsSync),
+  controller.syncAdmins
+);
+
 // Permission matrix for a role
 router.get('/:roleId/permissions', requirePermission(PERMISSION_MENU, 'canView'), controller.getPermissions);
 router.put(

@@ -1,15 +1,19 @@
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo';
+import PageHeader from '@/components/PageHeader';
 import Link from 'next/link';
 import CtaBand from '@/components/CtaBand';
 import TemplateCard from '@/components/TemplateCard';
 import { getSite, getTemplates } from '@/lib/api';
 import styles from './page.module.css';
 
-export const metadata: Metadata = {
-  title: 'Templates',
-  description:
+export async function generateMetadata(): Promise<Metadata> {
+  return pageMetadata(
+    '/templates',
+    'Templates',
     'Real websites built on Aj Smart Biz for different kinds of business, in each of our designs. Open a live demo and see what yours would look like.',
-};
+  );
+}
 
 /**
  * The template showcase: real demo sites, one card each, filterable by design.
@@ -37,13 +41,7 @@ export default async function TemplatesPage({
 
   return (
     <>
-      <section className={`section ${styles.head}`}>
-        <div className="container">
-          <span className="eyebrow">{page?.eyebrow ?? 'Templates'}</span>
-          <h1 className={styles.title}>{page?.title}</h1>
-          {page?.lede ? <p className={styles.lede}>{page.lede}</p> : null}
-        </div>
-      </section>
+      <PageHeader path="/templates" crumb="Templates" eyebrow={page?.eyebrow ?? 'Templates'} title={page?.title} lede={page?.lede} />
 
       <section className={`section ${styles.showcase}`}>
         <div className="container">

@@ -32,6 +32,9 @@ const CompanyOrderItem = require('./companyOrderItem.model')(sequelize);
 const CompanyWarehouse = require('./companyWarehouse.model')(sequelize);
 const CompanyStock = require('./companyStock.model')(sequelize);
 const CompanyStockMovement = require('./companyStockMovement.model')(sequelize);
+const CompanyInvoice = require('./companyInvoice.model')(sequelize);
+const CompanyInvoiceItem = require('./companyInvoiceItem.model')(sequelize);
+const CompanyFile = require('./companyFile.model')(sequelize);
 const Customer = require('./customer.model')(sequelize);
 const CustomerAddress = require('./customerAddress.model')(sequelize);
 const CompanySubscription = require('./companySubscription.model')(sequelize);
@@ -42,6 +45,7 @@ const SuperAdmin = require('./superAdmin.model')(sequelize);
 const Role = require('./role.model')(sequelize);
 const Menu = require('./menu.model')(sequelize);
 const RolePermission = require('./rolePermission.model')(sequelize);
+const AdminRole = require('./adminRole.model')(sequelize);
 const Admin = require('./admin.model')(sequelize);
 const Lead = require('./lead.model')(sequelize);
 const LeadVisit = require('./leadVisit.model')(sequelize);
@@ -304,6 +308,12 @@ Admin.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch' });
 Admin.belongsTo(Role, { foreignKey: 'roleId', as: 'role' });
 Branch.hasMany(Admin, { foreignKey: 'branchId', as: 'admins' });
 Role.hasMany(Admin, { foreignKey: 'roleId', as: 'admins' });
+/* Extra roles beyond the primary `roleId` — see adminRole.model.js. */
+Admin.belongsToMany(Role, { through: AdminRole, foreignKey: 'adminId', otherKey: 'roleId', as: 'extraRoles' });
+Role.belongsToMany(Admin, { through: AdminRole, foreignKey: 'roleId', otherKey: 'adminId', as: 'extraAdmins' });
+Admin.hasMany(AdminRole, { foreignKey: 'adminId', as: 'roleLinks', onDelete: 'CASCADE' });
+AdminRole.belongsTo(Admin, { foreignKey: 'adminId', as: 'admin' });
+AdminRole.belongsTo(Role, { foreignKey: 'roleId', as: 'role' });
 
 /**
  * Website visitors, and the visits behind each one.
@@ -365,6 +375,10 @@ CompanyOrderItem.belongsTo(CompanyProduct, { foreignKey: 'productId', as: 'produ
  * does not cascade from the product for the opposite reason — what moved, and
  * who moved it, stays true after the catalogue entry is deleted.
  */
+/* Uploaded files and who is charged for them. See `companyFile.model.js`. */
+Company.hasMany(CompanyFile, { foreignKey: 'companyId', as: 'files', onDelete: 'CASCADE' });
+CompanyFile.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+
 Company.hasMany(CompanyWarehouse, { foreignKey: 'companyId', as: 'warehouses', onDelete: 'CASCADE' });
 CompanyWarehouse.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Branch.hasMany(CompanyWarehouse, { foreignKey: 'branchId', as: 'warehouses', onDelete: 'SET NULL' });
@@ -390,6 +404,21 @@ CompanyWarehouse.hasMany(CompanyStockMovement, { foreignKey: 'warehouseId', as: 
 CompanyStockMovement.belongsTo(CompanyWarehouse, { foreignKey: 'warehouseId', as: 'warehouse' });
 CompanyStockMovement.belongsTo(CompanyProduct, { foreignKey: 'productId', as: 'product', constraints: false });
 CompanyStockMovement.belongsTo(CompanyOrder, { foreignKey: 'orderId', as: 'order', constraints: false });
+
+/* Counter invoices. Lines go with their invoice; the pointers out (branch,
+   warehouse, customer, product) are loose so deleting any of those never
+   rewrites or removes a bill that was already printed. */
+Company.hasMany(CompanyInvoice, { foreignKey: 'companyId', as: 'invoices', onDelete: 'CASCADE' });
+CompanyInvoice.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+CompanyInvoice.belongsTo(Branch, { foreignKey: 'branchId', as: 'branch', constraints: false });
+CompanyInvoice.belongsTo(CompanyWarehouse, { foreignKey: 'warehouseId', as: 'warehouse', constraints: false });
+CompanyInvoice.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer', constraints: false });
+/* Who raised it — the admin login that created the invoice. */
+CompanyInvoice.belongsTo(Admin, { foreignKey: 'createdBy', as: 'creator', constraints: false });
+CompanyInvoice.hasMany(CompanyInvoiceItem, { foreignKey: 'invoiceId', as: 'items', onDelete: 'CASCADE' });
+CompanyInvoiceItem.belongsTo(CompanyInvoice, { foreignKey: 'invoiceId', as: 'invoice' });
+CompanyInvoiceItem.belongsTo(CompanyProduct, { foreignKey: 'productId', as: 'product', constraints: false });
+CompanyStockMovement.belongsTo(CompanyInvoice, { foreignKey: 'invoiceId', as: 'invoice', constraints: false });
 
 /**
  * Customers, and the addresses they keep.
@@ -454,6 +483,9 @@ const db = {
   CompanyWarehouse,
   CompanyStock,
   CompanyStockMovement,
+  CompanyInvoice,
+  CompanyInvoiceItem,
+  CompanyFile,
   Customer,
   CustomerAddress,
   CompanySubscription,
@@ -464,6 +496,7 @@ const db = {
   Role,
   Menu,
   RolePermission,
+  AdminRole,
   Admin,
   Lead,
   LeadVisit,

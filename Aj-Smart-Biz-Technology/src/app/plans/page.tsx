@@ -1,16 +1,19 @@
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo';
+import PageHeader from '@/components/PageHeader';
 import PlansSection from '@/components/PlansSection';
 import RechargeSection from '@/components/RechargeSection';
 import FaqSection from '@/components/FaqSection';
 import CtaBand from '@/components/CtaBand';
 import { getSite } from '@/lib/api';
-import styles from '../services/page.module.css';
 
-export const metadata: Metadata = {
-  title: 'Plans',
-  description:
+export async function generateMetadata(): Promise<Metadata> {
+  return pageMetadata(
+    '/plans',
+    'Plans',
     'Monthly recharge plans for a business website — hosting, domain, SSL, backups, support and unlimited edits included. No setup fee, no contract.',
-};
+  );
+}
 
 /**
  * The pricing page.
@@ -29,15 +32,9 @@ export default async function PlansPage() {
 
   return (
     <>
-      <section className={`section ${styles.head}`}>
-        <div className="container">
-          <span className="eyebrow">{page?.eyebrow}</span>
-          <h1 className={styles.title}>{page?.title}</h1>
-          <p className={styles.lede}>{page?.lede}</p>
-        </div>
-      </section>
+      <PageHeader path="/plans" crumb="Plans" eyebrow={page?.eyebrow} title={page?.title} lede={page?.lede} />
 
-      <PlansSection footnote={page?.footnote} />
+      <PlansSection footnote={page?.footnote} compare />
 
       <RechargeSection />
 

@@ -58,6 +58,10 @@ const nextConfig: NextConfig = {
 
   reactStrictMode: true,
 
+  /* Lets a second build (e.g. a local check) go to its own folder without
+     replacing the `.next` a running `next start` is serving. Unset = `.next`. */
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
+
   /**
    * Trace exactly which files the server needs and emit them, with a minimal
    * `node_modules`, into `.next/standalone`. This is what the Docker image

@@ -1,4 +1,6 @@
+import Glyph from './Glyph';
 import { getSite } from '@/lib/api';
+import { jsonLd } from '@/lib/seo';
 import styles from './FaqSection.module.css';
 
 /**
@@ -23,15 +25,52 @@ import styles from './FaqSection.module.css';
 export default async function FaqSection({ panel = false }: { panel?: boolean }) {
   const { content, faqs } = await getSite();
   const intro = content.faq_intro;
+  const contact = content.contact;
 
   if (!faqs.length) return null;
 
+  /* FAQPage structured data — lets search show these answers directly. */
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: { '@type': 'Answer', text: item.answer },
+    })),
+  };
+
   return (
     <section className={`section ${panel ? 'section--panel' : ''}`} id="faq">
-      <div className="container">
-        <header className="section-head">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(faqSchema) }} />
+      <div className={`container ${styles.layout}`}>
+        <header className={`section-head ${styles.head}`}>
           <span className="eyebrow">{intro?.eyebrow}</span>
           <h2 className="section-title">{intro?.title}</h2>
+          {contact?.whatsapp || contact?.phoneHref ? (
+            <div className={styles.ask}>
+              <p className={styles.askTitle}>Still have a question?</p>
+              <div className={styles.askActions}>
+                {contact?.whatsapp ? (
+                  <a
+                    className="btn btn--whatsapp"
+                    href={`https://wa.me/${contact.whatsapp}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Glyph name="message-circle" />
+                    WhatsApp
+                  </a>
+                ) : null}
+                {contact?.phoneHref ? (
+                  <a className="btn btn--ghost" href={`tel:${contact.phoneHref}`}>
+                    <Glyph name="phone" />
+                    {contact.phone ?? contact.phoneHref}
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </header>
 
         <div className={styles.list}>

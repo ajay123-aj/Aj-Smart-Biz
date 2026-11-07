@@ -6,7 +6,7 @@ import { AccessService } from '../../core/services/access.service';
 import { ConfirmService } from '../../core/services/confirm.service';
 import { ToastService } from '../../core/services/toast.service';
 import { messageOf } from '../../core/interceptors/auth.interceptor';
-import { Role } from '../../core/models/domain.model';
+import { Role, RoleAdminsView } from '../../core/models/domain.model';
 import { ListStore } from '../../shared/list-store';
 import { CanDirective } from '../../shared/can.directive';
 import { cleanPayload, touchAll } from '../../shared/utils';
@@ -45,6 +45,12 @@ export class RoleListComponent {
   readonly saving = signal(false);
 
   private searchTimer?: ReturnType<typeof setTimeout>;
+
+  /* ------------------------- Assign admins dialog ------------------------- */
+  readonly assignRole = signal<Role | null>(null);
+  readonly assignView = signal<RoleAdminsView | null>(null);
+  readonly assignPicked = signal<Set<number>>(new Set());
+  readonly assignSaving = signal(false);
 
   readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.minLength(2)]],
@@ -97,6 +103,57 @@ export class RoleListComponent {
       error: (error: HttpErrorResponse) => {
         this.saving.set(false);
         this.toast.error('Could not save the role', messageOf(error));
+      },
+    });
+  }
+
+  /** Opens the dialog with every admin ticked who holds the role now. */
+  openAssign(role: Role): void {
+    this.assignRole.set(role);
+    this.assignView.set(null);
+    this.access.roleAdmins(role.id).subscribe({
+      next: (view) => {
+        this.assignView.set(view);
+        this.assignPicked.set(new Set(view.admins.filter((admin) => admin.holds).map((admin) => admin.id)));
+      },
+      error: (error: HttpErrorResponse) => {
+        this.assignRole.set(null);
+        this.toast.error('Could not load the admins', messageOf(error));
+      },
+    });
+  }
+
+  isPicked(id: number): boolean {
+    return this.assignPicked().has(id);
+  }
+
+  togglePick(id: number): void {
+    const next = new Set(this.assignPicked());
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    this.assignPicked.set(next);
+  }
+
+  /** Other roles the admin holds, for context next to their name. */
+  otherRoles(admin: RoleAdminsView['admins'][number]): string {
+    const roleId = this.assignRole()?.id;
+    return admin.roles.filter((role) => role.id !== roleId).map((role) => role.name).join(', ');
+  }
+
+  saveAssign(): void {
+    const role = this.assignRole();
+    if (!role) return;
+    this.assignSaving.set(true);
+    this.access.syncRoleAdmins(role.id, [...this.assignPicked()]).subscribe({
+      next: (result) => {
+        this.assignSaving.set(false);
+        this.toast.success(result.changed ? `Updated ${result.changed} admin(s)` : 'No changes');
+        this.assignRole.set(null);
+        this.store.reload();
+      },
+      error: (error: HttpErrorResponse) => {
+        this.assignSaving.set(false);
+        this.toast.error('Could not update the assignments', messageOf(error));
       },
     });
   }

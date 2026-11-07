@@ -87,6 +87,13 @@ const update = asyncHandler(async (req, res) => {
     if (clash) throw ApiError.conflict('A menu with this slug already exists');
   }
   if (req.body.parentId === menu.id) throw ApiError.badRequest('A menu cannot be its own parent');
+  /* The same rule as `create`: a parent must be a system menu or one of this
+     company's own. Without it a menu could be hung under another company's,
+     which then could not delete it ("move the child menus first"). */
+  if (req.body.parentId) {
+    const parent = await db.Menu.findOne({ where: { id: req.body.parentId, ...visibleWhere(req.auth.companyId) } });
+    if (!parent) throw ApiError.badRequest('Parent menu not found');
+  }
 
   await menu.update({ ...req.body, updatedBy: req.auth.id });
   return success(res, { message: 'Menu updated successfully', data: menu });
@@ -95,7 +102,9 @@ const update = asyncHandler(async (req, res) => {
 const remove = asyncHandler(async (req, res) => {
   const menu = await findOwnedOrFail(req);
 
-  const childCount = await db.Menu.count({ where: { parentId: menu.id } });
+  /* Only children this company can see count: another company's menu must
+     never be able to pin this one in place. */
+  const childCount = await db.Menu.count({ where: { parentId: menu.id, ...visibleWhere(req.auth.companyId) } });
   if (childCount > 0) throw ApiError.badRequest('Delete or move the child menus first');
 
   await db.sequelize.transaction(async (transaction) => {

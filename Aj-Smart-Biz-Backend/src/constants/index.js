@@ -231,6 +231,7 @@ const FUNCTIONALITY = {
   SERVICE_ENQUIRY: 'service_enquiry',
   SERVICE_BOOKING: 'service_booking',
   SOCIAL_MEDIA: 'social_media',
+  INVOICES: 'invoices',
 };
 const FUNCTIONALITY_VALUES = Object.values(FUNCTIONALITY);
 
@@ -485,6 +486,28 @@ const FUNCTIONALITY_CATALOGUE = [
     description:
       'Adds a row of social icons to the website footer — one per profile the company adds, in the order it chooses. Each is a link out to the account itself, opened in a new tab. Switched off, the row is absent from the footer entirely rather than shown empty, and the links stay here so switching it back on restores them.',
     sequence: 18,
+  },
+  /**
+   * The billing counter.
+   *
+   * Different from Cart & orders, which is a stranger buying from the website.
+   * This is the shop's own staff ringing up a sale at the counter — pick the
+   * products, discount a line or the whole bill, take the money, print the
+   * invoice. Sold separately because a shop can bill walk-in customers without
+   * ever selling online, and the reverse.
+   *
+   * Issuing an invoice takes the stock off the shelf straight away when the
+   * Warehouse functionality is live and the product tracks inventory; cancelling
+   * an issued invoice puts it back. A draft touches nothing.
+   */
+  {
+    key: FUNCTIONALITY.INVOICES,
+    name: 'Invoice management',
+    icon: 'receipt',
+    summary: 'Bill customers at the counter, with discounts, and take stock off the shelf.',
+    description:
+      'Adds an Invoices screen to the workspace — create a bill by picking products from your catalogue, set the quantity, give a discount on a line (percentage or flat amount) or on the whole bill, add tax per line, and record how the customer paid. Save it as a draft or issue it; issuing gives it the next invoice number and, where Warehouse & stock is live, deducts every tracked product from stock after checking there is enough. Cancelling an issued invoice returns the stock. Print-ready invoice view, payment tracking (paid, partly paid, unpaid) and daily and monthly sales totals.',
+    sequence: 19,
   },
 ];
 
@@ -2076,6 +2099,7 @@ const STOCK_REASON = {
   DAMAGE: 'damage',
   CORRECTION: 'correction',
   TRANSFER: 'transfer',
+  INVOICE: 'invoice',
 };
 const STOCK_REASON_VALUES = Object.values(STOCK_REASON);
 
@@ -2088,6 +2112,7 @@ const STOCK_REASON_CATALOGUE = [
   { key: STOCK_REASON.DAMAGE, name: 'Damaged or lost', direction: STOCK_MOVEMENT_TYPE.OUT, summary: 'Gone, and not sold.', sequence: 5 },
   { key: STOCK_REASON.TRANSFER, name: 'Transfer', direction: null, summary: 'Moved between two of your own warehouses.', sequence: 6 },
   { key: STOCK_REASON.CORRECTION, name: 'Stock count', direction: null, summary: 'A physical count that disagreed with the ledger.', sequence: 7 },
+  { key: STOCK_REASON.INVOICE, name: 'Billed', direction: STOCK_MOVEMENT_TYPE.OUT, summary: 'Sold at the counter on an invoice. Written by the platform, never by hand.', sequence: 8 },
 ];
 
 /**
@@ -2117,6 +2142,66 @@ const STOCK_QUANTITY_MAX = 9999999;
 
 /** Below this a product is reported as low. Zero means do not warn me. */
 const STOCK_REORDER_DEFAULT = 0;
+
+/* ------------------------------------------------------------------ *
+ * Invoices
+ * ------------------------------------------------------------------ */
+
+/**
+ * Where an invoice is in its life.
+ *
+ *   draft      being written. Editable, deletable, touches no stock.
+ *   issued     final. Numbered, stock deducted, lines locked; only the payment
+ *              can still change.
+ *   cancelled  voided after issue. Stock returned, kept for the record.
+ */
+const INVOICE_STATUS = { DRAFT: 'draft', ISSUED: 'issued', CANCELLED: 'cancelled' };
+const INVOICE_STATUS_VALUES = Object.values(INVOICE_STATUS);
+const INVOICE_STATUS_CATALOGUE = [
+  { key: INVOICE_STATUS.DRAFT, name: 'Draft', tone: 'neutral', sequence: 1 },
+  { key: INVOICE_STATUS.ISSUED, name: 'Issued', tone: 'success', sequence: 2 },
+  { key: INVOICE_STATUS.CANCELLED, name: 'Cancelled', tone: 'danger', sequence: 3 },
+];
+
+/** Derived from amount paid against the total — never set by hand. */
+const INVOICE_PAYMENT_STATUS = { UNPAID: 'unpaid', PARTIAL: 'partial', PAID: 'paid' };
+const INVOICE_PAYMENT_STATUS_VALUES = Object.values(INVOICE_PAYMENT_STATUS);
+const INVOICE_PAYMENT_STATUS_CATALOGUE = [
+  { key: INVOICE_PAYMENT_STATUS.UNPAID, name: 'Unpaid', tone: 'danger', sequence: 1 },
+  { key: INVOICE_PAYMENT_STATUS.PARTIAL, name: 'Partly paid', tone: 'warning', sequence: 2 },
+  { key: INVOICE_PAYMENT_STATUS.PAID, name: 'Paid', tone: 'success', sequence: 3 },
+];
+
+/** How the customer paid at the counter. */
+const INVOICE_PAYMENT_MODE = { CASH: 'cash', UPI: 'upi', CARD: 'card', BANK: 'bank', CREDIT: 'credit', OTHER: 'other' };
+const INVOICE_PAYMENT_MODE_VALUES = Object.values(INVOICE_PAYMENT_MODE);
+const INVOICE_PAYMENT_MODE_CATALOGUE = [
+  { key: INVOICE_PAYMENT_MODE.CASH, name: 'Cash', sequence: 1 },
+  { key: INVOICE_PAYMENT_MODE.UPI, name: 'UPI', sequence: 2 },
+  { key: INVOICE_PAYMENT_MODE.CARD, name: 'Card', sequence: 3 },
+  { key: INVOICE_PAYMENT_MODE.BANK, name: 'Bank transfer', sequence: 4 },
+  { key: INVOICE_PAYMENT_MODE.CREDIT, name: 'Credit (pay later)', sequence: 5 },
+  { key: INVOICE_PAYMENT_MODE.OTHER, name: 'Other', sequence: 6 },
+];
+
+/**
+ * A discount is either a percentage or a flat amount — on a line, or on the
+ * whole bill. The same two words in both places, so the screen has one control.
+ */
+const DISCOUNT_TYPE = { PERCENT: 'percent', AMOUNT: 'amount' };
+const DISCOUNT_TYPE_VALUES = Object.values(DISCOUNT_TYPE);
+const DISCOUNT_TYPE_CATALOGUE = [
+  { key: DISCOUNT_TYPE.PERCENT, name: '%', label: 'Percentage', sequence: 1 },
+  { key: DISCOUNT_TYPE.AMOUNT, name: '₹', label: 'Flat amount', sequence: 2 },
+];
+
+/** Common GST slabs, offered as quick picks. Any 0–100 value is accepted. */
+const INVOICE_TAX_PRESETS = [0, 5, 12, 18, 28];
+
+const INVOICE_NO_PREFIX = 'INV';
+const INVOICE_NO_PAD = 5;
+const INVOICE_ITEMS_MAX = 200;
+const INVOICE_QTY_MAX = 99999;
 
 /* ------------------------------------------------------------------ *
  * Analytics
@@ -2280,6 +2365,23 @@ module.exports = {
   FUNCTIONALITY,
   FUNCTIONALITY_VALUES,
   FUNCTIONALITY_CATALOGUE,
+  INVOICE_STATUS,
+  INVOICE_STATUS_VALUES,
+  INVOICE_STATUS_CATALOGUE,
+  INVOICE_PAYMENT_STATUS,
+  INVOICE_PAYMENT_STATUS_VALUES,
+  INVOICE_PAYMENT_STATUS_CATALOGUE,
+  INVOICE_PAYMENT_MODE,
+  INVOICE_PAYMENT_MODE_VALUES,
+  INVOICE_PAYMENT_MODE_CATALOGUE,
+  DISCOUNT_TYPE,
+  DISCOUNT_TYPE_VALUES,
+  DISCOUNT_TYPE_CATALOGUE,
+  INVOICE_TAX_PRESETS,
+  INVOICE_NO_PREFIX,
+  INVOICE_NO_PAD,
+  INVOICE_ITEMS_MAX,
+  INVOICE_QTY_MAX,
   SOCIAL_PLATFORM,
   SOCIAL_PLATFORM_VALUES,
   SOCIAL_PLATFORM_CATALOGUE,

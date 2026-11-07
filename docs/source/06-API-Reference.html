@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>API Reference — Aj Smart Biz</title>
+<link rel="stylesheet" href="assets/doc.css">
+<style>td:first-child{white-space:nowrap;font-family:Consolas,monospace;font-size:8.6pt}</style></head><body>
+
+<section class="cover">
+  <div class="band">
+    <div class="kicker">Aj Smart Biz · Document 06</div>
+    <h1>API Reference</h1>
+    <div class="sub">Every endpoint of the backend, grouped by module, with conventions, authentication and error formats.</div>
+  </div>
+  <table class="meta">
+    <tr><td>Base URL</td><td><code>http://localhost:4000/api/v1</code> (dev) · <code>https://smart-biz-api.ajtechhub.com/api/v1</code> (deployed)</td></tr>
+    <tr><td>Live docs</td><td>Swagger UI at <code>/api/v1/docs</code>, JSON at <code>/api/v1/docs.json</code></td></tr>
+    <tr><td>Version / date</td><td>1.0 · 7 November 2026</td></tr>
+  </table>
+</section>
+
+<section class="toc"><h2>Contents</h2><ol>
+<li>Conventions</li><li>Shared — health, auth, masters, uploads</li><li>Theme — tenant public websites</li><li>Website — product marketing site</li>
+<li>Admin — company workspace</li><li>Super Admin — platform console</li><li>Rate limits</li></ol></section>
+
+<h1>1. Conventions</h1>
+<h3>Envelope</h3>
+<pre>{ "success": true,  "message": "Branch list fetched successfully",
+  "data": [ ... ],  "meta": { "total": 42, "page": 1, "limit": 10, "totalPages": 5, "hasNext": true } }
+
+{ "success": false, "message": "Validation failed",
+  "errors": [ { "field": "email", "message": "\"email\" must be a valid email", "in": "body" } ] }</pre>
+<h3>Authentication</h3>
+<p><code>Authorization: Bearer &lt;accessToken&gt;</code>. Login returns <code>{ accessToken, refreshToken, expiresIn, user }</code>. Scopes: <code>super_admin</code>, <code>admin</code>, <code>customer</code>.</p>
+<h3>List queries</h3>
+<p><code>?page=1&amp;limit=10&amp;search=&amp;status=active&amp;sortBy=name&amp;sortOrder=asc</code> plus resource filters. <code>limit</code> ≤ 200. <code>sortBy</code> is allow-listed per resource.</p>
+<h3>Common sub-routes</h3>
+<table><tbody>
+<tr><td>PATCH /:id/status</td><td>Toggle <code>{ status: "active" | "inactive" }</code></td></tr>
+<tr><td>PATCH /reorder</td><td>Send the whole ordered id list; sets <code>sequence</code></td></tr>
+<tr><td>GET /dropdown</td><td><code>[{ id, name }]</code> for selects</td></tr>
+<tr><td>POST /:id/restore</td><td>Undo a soft delete</td></tr>
+<tr><td>DELETE /:id</td><td>Soft delete</td></tr>
+</tbody></table>
+<h3>Status codes</h3>
+<p>200 OK · 201 Created · 202 Accepted (AI job) · 400 validation/business rule · 401 unauthenticated · 403 forbidden (permission) · 404 not found (including other tenants' ids) · 409 conflict · 429 rate limited · 500 server error.</p>
+
+<h1>2. Shared</h1>
+<table><thead><tr><th>Endpoint</th><th>Purpose</th></tr></thead><tbody>
+<tr><td>GET /health</td><td>Liveness</td></tr>
+<tr><td>POST /auth/super-admin/login</td><td>Super admin sign-in</td></tr>
+<tr><td>POST /auth/admin/login</td><td>Company admin sign-in</td></tr>
+<tr><td>POST /auth/refresh</td><td>Exchange refresh token</td></tr>
+<tr><td>GET /auth/me</td><td>Profile; for admins also <code>permissions</code> map and <code>menus</code> tree</td></tr>
+<tr><td>PATCH /auth/profile</td><td>Update own profile</td></tr>
+<tr><td>POST /auth/change-password</td><td>Change password; clears mustChangePassword</td></tr>
+<tr><td>POST /auth/logout</td><td>Stateless sign-out</td></tr>
+<tr><td>GET /masters/functionalities</td><td>Feature catalogue (and icon library)</td></tr>
+<tr><td>/masters/states · /business-types · /themes · /plans</td><td>GET /, /dropdown, /:id (any signed-in user); POST, PUT /:id, PATCH /:id/status, DELETE /:id, POST /:id/restore (super admin)</td></tr>
+<tr><td>POST /uploads/:folder</td><td>Multipart <code>file</code>; <code>?accept=ico</code> for favicons; super admin may pass <code>?companyId=</code>. Returns path, url, filename, mimeType, size. Folders: branch, company, slider, team, gallery, service, product, category, blog, avatar, misc</td></tr>
+<tr><td>DELETE /uploads?path=</td><td>Delete own company's file</td></tr>
+<tr><td>GET /uploads/folders</td><td>Allowed folders</td></tr>
+</tbody></table>
+
+<h1>3. Theme — tenant public websites (/theme)</h1>
+<p>No token required except <code>/theme/me</code>. The tenant is resolved from <code>?domain=</code> / body <code>domain</code> / X-Forwarded-Host / Host.</p>
+<table><thead><tr><th>Endpoint</th><th>Purpose</th></tr></thead><tbody>
+<tr><td>GET /theme/branding</td><td>Logo, name, description, favicon for a console login screen</td></tr>
+<tr><td>GET /theme/company-details</td><td>Full public payload: profile, branches, slides, nav, theme, live features, contact page, <code>service {active, reason}</code></td></tr>
+<tr><td>GET /theme/services/:slug/slots</td><td>Slots for a date plus next free days</td></tr>
+<tr><td>GET /theme/blog · /theme/blog/:slug</td><td>Paged archive (tag, page, limit) · post with prev/next</td></tr>
+<tr><td>POST /theme/leads</td><td>Visit / tracking beacon</td></tr>
+<tr><td>POST /theme/testimonials</td><td>Visitor review (held for moderation)</td></tr>
+<tr><td>POST /theme/service-leads</td><td>Enquiry or booking (optional customer token)</td></tr>
+<tr><td>POST /theme/orders</td><td>Place order: ids + quantities only (optional customer token)</td></tr>
+<tr><td>POST /theme/auth/register · /request-otp · /verify</td><td>Customer sign-up / OTP / verify → token</td></tr>
+<tr><td>GET · PUT /theme/me</td><td>Customer profile</td></tr>
+<tr><td>POST /theme/me/addresses · PUT/DELETE /:id</td><td>Saved addresses</td></tr>
+<tr><td>GET /theme/me/orders · /theme/me/services</td><td>Order and booking history</td></tr>
+</tbody></table>
+
+<h1>4. Website — product marketing site (/website)</h1>
+<table><thead><tr><th>Endpoint</th><th>Purpose</th></tr></thead><tbody>
+<tr><td>GET /website/bootstrap</td><td>Content, plans, capabilities, business types and FAQs in one call</td></tr>
+<tr><td>GET /website/content · /plans · /capabilities · /business-types · /faqs · /templates</td><td>Individual parts (templates accept <code>?design=</code>)</td></tr>
+<tr><td>POST /website/enquiries</td><td>Demo or contact enquiry</td></tr>
+<tr><td>POST /website/track</td><td>Marketing visitor beacon</td></tr>
+</tbody></table>
+
+<h1>5. Admin — company workspace (/admin)</h1>
+<p>Requires an <code>admin</code> token. The company is taken from the token. Each group shows the permission slug enforced.</p>
+<table><thead><tr><th>Endpoint</th><th>Purpose · permission</th></tr></thead><tbody>
+<tr><td>GET /admin/dashboard</td><td>Counts, plan, quotas, features, storage</td></tr>
+<tr><td>GET · PUT /admin/company</td><td>Company profile · company-details (PUT main admin only)</td></tr>
+<tr><td>GET /admin/company/plan · /plans</td><td>Current plan · requestable plans · my-plan</td></tr>
+<tr><td>GET · POST /admin/company/plan-requests, POST /:id/cancel</td><td>Plan change requests</td></tr>
+<tr><td>GET /admin/company/subscriptions · /transactions</td><td>Billing history</td></tr>
+<tr><td>/admin/company/branches</td><td>GET /, /quota, POST, GET/PUT/DELETE /:id, PATCH /:id/status; contacts at /:branchId/contacts · branch-management</td></tr>
+<tr><td>/admin/company/sliders</td><td>CRUD, /reorder, status · slider-management</td></tr>
+<tr><td>/admin/company/theme</td><td>GET/PUT/DELETE <code>?branchId</code> — primaryColor, secondaryColor, accentColor, mode</td></tr>
+<tr><td>/admin/company/domains</td><td>CRUD, status · company-details (writes main admin)</td></tr>
+<tr><td>/admin/company/functionalities</td><td>GET /, GET /:key, PATCH /:key/status, PUT /:key/settings</td></tr>
+<tr><td>/admin/company/whatsapp-numbers · /social-links</td><td>CRUD, reorder, status</td></tr>
+<tr><td>/admin/company/about · /contact</td><td>GET/PUT/DELETE <code>?branchId</code> (DELETE clears branch override)</td></tr>
+<tr><td>/admin/company/stats · /team · /gallery · /features · /services · /service-categories</td><td>Card routers: GET /, PATCH /reorder, POST, PUT /:id, PATCH /:id/status, DELETE /:id</td></tr>
+<tr><td>/admin/company/testimonials</td><td>Card router + PATCH /:id/moderation</td></tr>
+<tr><td>/admin/company/categories · /products</td><td>Tree and catalogue CRUD, reorder, status; products GET /:id</td></tr>
+<tr><td>/admin/company/blog</td><td>GET /, /summary, /tags, POST, GET/PUT/DELETE /:id, status</td></tr>
+<tr><td>/admin/company/service-leads</td><td>GET /, /summary, /revenue, /analytics, /diary?date; PATCH /:id, PATCH /:id/booking, DELETE · service-leads</td></tr>
+<tr><td>/admin/company/orders</td><td>GET /, /summary, /analytics, /:id; PATCH /:id/status, /:id/payment; PUT /:id · orders</td></tr>
+<tr><td>/admin/company/warehouses</td><td>GET, POST, PUT /:id, DELETE /:id · warehouse (writes canEdit)</td></tr>
+<tr><td>/admin/company/stock</td><td>GET /, GET/POST /movements, POST /transfer, PUT /settings, GET /analytics · warehouse</td></tr>
+<tr><td>/admin/company/invoices</td><td>GET /meta, /products, /summary, /access, /analysis; GET /, POST (canCreate), GET/PUT/DELETE /:id (drafts); POST /:id/issue, PATCH /:id/payment, POST /:id/cancel · invoices</td></tr>
+<tr><td>/admin/company/customers</td><td>GET /, /summary, GET/PUT/DELETE /:id, PATCH /:id/status · customers</td></tr>
+<tr><td>/admin/company/leads</td><td>GET /, /summary, /analytics, /:id, /:id/visits; PATCH /:id · lead-management</td></tr>
+<tr><td>/admin/roles</td><td>CRUD, /dropdown, status · role-management</td></tr>
+<tr><td>/admin/roles/:roleId/permissions</td><td>GET; PUT replaces the whole matrix · menu-permission</td></tr>
+<tr><td>/admin/menus</td><td>GET /, /tree, POST, GET/PUT/DELETE /:id · menu-permission</td></tr>
+<tr><td>/admin/admins</td><td>CRUD, /quota, status, PATCH /:id/reset-password · admin-management</td></tr>
+</tbody></table>
+
+<h1>6. Super Admin — platform console (/super-admin)</h1>
+<table><thead><tr><th>Endpoint</th><th>Purpose</th></tr></thead><tbody>
+<tr><td>GET /super-admin/dashboard</td><td>Platform KPIs, income series</td></tr>
+<tr><td>/super-admin/companies</td><td>GET (filters businessTypeId, stateId, planId, subscriptionStatus), POST (provision), POST /samples, GET/PUT/DELETE /:id, PATCH /:id/status, POST /:id/restore, PATCH /:id/storage, POST /:id/duplicate</td></tr>
+<tr><td>GET /super-admin/companies/:id/plan · /insights</td><td>Plan view · business insights (<code>?days=</code>)</td></tr>
+<tr><td>/super-admin/companies/:id/subscriptions</td><td>GET, POST (assign), POST /renew, POST /change-plan, GET /change-preview, POST /:subscriptionId/cancel</td></tr>
+<tr><td>/super-admin/companies/:id/transactions</td><td>GET, POST (record payment)</td></tr>
+<tr><td>POST /super-admin/companies/:id/ai-content · GET /:jobId</td><td>Start AI content job (202; 409 if running) · poll</td></tr>
+<tr><td>/super-admin/companies/:companyId/branches · /domains · /sliders · /admins</td><td>Tenant routers re-mounted for a chosen company</td></tr>
+<tr><td>/super-admin/subscriptions</td><td>GET /, /summary, POST /run-due, GET /:id, /:id/events; POST /:id/transition, /suspend, /resume, /cancel, /expire, /start-now, /reactivate, /extend; PATCH /:id/auto-renew</td></tr>
+<tr><td>/super-admin/plan-requests</td><td>GET /, POST /:id/approve, POST /:id/reject</td></tr>
+<tr><td>/super-admin/super-admins</td><td>CRUD, status, PATCH /:id/reset-password (root protected)</td></tr>
+<tr><td>/super-admin/marketing</td><td>content (GET, GET/PUT /:key), faqs, templates (CRUD), enquiries (GET, GET/PATCH /:id), leads (GET, /summary, /analytics, GET/PATCH /:id, /:id/visits)</td></tr>
+<tr><td>/super-admin/leads</td><td>Cross-tenant leads: GET /, /summary, /analytics, /:id, /:id/visits</td></tr>
+<tr><td>/super-admin/customers · /summary</td><td>Cross-tenant customers</td></tr>
+</tbody></table>
+
+<h1>7. Rate limits (production)</h1>
+<table><thead><tr><th>Scope</th><th>Limit</th></tr></thead><tbody>
+<tr><td>/auth/*/login</td><td>30 per 15 min per IP</td></tr>
+<tr><td>/theme reads</td><td>120 per 5 min</td></tr>
+<tr><td>/theme/leads</td><td>300 per 5 min</td></tr>
+<tr><td>/theme/testimonials</td><td>5 per hour</td></tr>
+<tr><td>/theme/service-leads</td><td>12 per hour</td></tr>
+<tr><td>/theme/orders</td><td>15 per hour</td></tr>
+<tr><td>/theme/auth/*</td><td>10 per 15 min</td></tr>
+<tr><td>/website reads</td><td>600 per 5 min</td></tr>
+<tr><td>/website/enquiries</td><td>10 per 15 min</td></tr>
+</tbody></table>
+<div class="callout warn"><strong>Server-side callers share an IP</strong>The websites call the API from their own server, so per-IP limits apply to the container unless <code>X-Forwarded-For</code> is trusted end to end.</div>
+</body></html>

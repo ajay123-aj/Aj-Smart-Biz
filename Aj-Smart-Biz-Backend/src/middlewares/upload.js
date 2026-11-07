@@ -166,6 +166,10 @@ function removeUploadedFile(publicPath) {
   fs.unlink(absolute, (error) => {
     if (error && error.code !== 'ENOENT') logger.warn(`Could not remove ${publicPath}: ${error.message}`);
   });
+
+  /* Stop charging the company for it. Required lazily: the storage service
+     loads the models, and this middleware is loaded before they are. */
+  require('../services/storage.service').forgetFile(publicPath);
 }
 
 module.exports = { uploadSingle, toPublicPath, removeUploadedFile, uploadRoot, FOLDERS };

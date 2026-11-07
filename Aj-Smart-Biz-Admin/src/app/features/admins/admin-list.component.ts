@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AccessService } from '../../core/services/access.service';
 import { CompanyService } from '../../core/services/company.service';
@@ -19,6 +19,10 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { PagerComponent } from '../../shared/ui/pager.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 import { TableStateComponent } from '../../shared/ui/table-state.component';
+
+/** At least one role must be ticked. */
+const atLeastOne = (control: AbstractControl): ValidationErrors | null =>
+  Array.isArray(control.value) && control.value.length ? null : { required: true };
 
 @Component({
   selector: 'app-admin-list',
@@ -68,7 +72,8 @@ export class AdminListComponent {
     name: ['', [Validators.required, Validators.minLength(2)]],
     email: ['', [Validators.required, Validators.email]],
     phone: [''],
-    roleId: [null as number | null, [Validators.required]],
+    /* Every role held; the first is the primary one. */
+    roleIds: [[] as number[], [atLeastOne]],
     branchId: [null as number | null],
     password: ['', [strongPassword]],
     status: ['active'],
@@ -100,6 +105,32 @@ export class AdminListComponent {
     return this.roles().filter((role) => role.name !== 'Company Admin');
   }
 
+  /* ----------------------------- role picker ----------------------------- */
+
+  /** Whether the admin being edited is the main admin, whose role is fixed. */
+  readonly editingMain = computed(() => !!this.editing()?.isCompanyAdmin);
+
+  hasRole(id: number): boolean {
+    return this.form.controls.roleIds.value.includes(id);
+  }
+
+  isPrimary(id: number): boolean {
+    return this.form.controls.roleIds.value[0] === id;
+  }
+
+  toggleRole(id: number): void {
+    const current = this.form.controls.roleIds.value;
+    const next = current.includes(id) ? current.filter((value) => value !== id) : [...current, id];
+    this.form.controls.roleIds.setValue(next);
+    this.form.controls.roleIds.markAsTouched();
+  }
+
+  /** Moves a held role to the front - the API treats the first as primary. */
+  makePrimary(id: number): void {
+    const current = this.form.controls.roleIds.value.filter((value) => value !== id);
+    this.form.controls.roleIds.setValue([id, ...current]);
+  }
+
   selectValue(event: Event): string {
     return (event.target as HTMLSelectElement).value;
   }
@@ -125,7 +156,7 @@ export class AdminListComponent {
       name: admin?.name ?? '',
       email: admin?.email ?? '',
       phone: admin?.phone ?? '',
-      roleId: admin?.roleId ?? null,
+      roleIds: admin?.roleIds?.length ? [...admin.roleIds] : admin?.roleId ? [admin.roleId] : [],
       branchId: admin?.branchId ?? null,
       password: '',
       status: admin?.status ?? 'active',
@@ -134,6 +165,8 @@ export class AdminListComponent {
   }
 
   save(): void {
+    // The main admin's role list is not edited, so it cannot block the save.
+    if (this.editingMain()) this.form.controls.roleIds.setErrors(null);
     if (this.form.invalid) {
       touchAll(this.form);
       return;
@@ -148,10 +181,11 @@ export class AdminListComponent {
         name: raw.name,
         email: raw.email,
         phone: raw.phone,
-        roleId: raw.roleId,
         branchId: raw.branchId,
         status: raw.status,
       }) as Record<string, unknown>;
+      // The main admin's role is fixed; everyone else sends the full list.
+      if (!admin.isCompanyAdmin) payload['roleIds'] = raw.roleIds;
 
       this.access.updateAdmin(admin.id, payload).subscribe({
         next: () => {
@@ -172,7 +206,7 @@ export class AdminListComponent {
       name: raw.name,
       email: raw.email,
       phone: raw.phone || null,
-      roleId: raw.roleId,
+      roleIds: raw.roleIds,
       branchId: raw.branchId,
       ...(raw.password ? { password: raw.password } : {}),
     };

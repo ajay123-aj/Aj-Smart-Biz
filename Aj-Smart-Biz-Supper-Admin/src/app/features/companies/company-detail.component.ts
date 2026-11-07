@@ -66,6 +66,13 @@ type Tab = 'overview' | 'business' | 'customers' | 'branches' | 'domains' | 'bil
 
       .mono { font-family: var(--font-mono, monospace); font-variant-numeric: tabular-nums; }
 
+      .storage-bar { height: 7px; margin-top: 10px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+      .storage-bar span { display: block; height: 100%; border-radius: inherit; background: var(--success); transition: width .4s ease; }
+      .storage-bar[data-level='warn'] span { background: var(--warning); }
+      .storage-bar[data-level='full'] span { background: var(--danger); }
+      .radio-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+      .radio-row input { margin-top: 3px; }
+
       .swatch { width: 16px; height: 16px; border-radius: 5px; border: 1px solid var(--border); display: inline-block; }
 
       .plan-panel {
@@ -137,6 +144,9 @@ export class CompanyDetailComponent {
   readonly planModalOpen = signal(false);
   readonly savingPlan = signal(false);
 
+  readonly storageModalOpen = signal(false);
+  readonly savingStorage = signal(false);
+
   readonly paymentModalOpen = signal(false);
   readonly savingPayment = signal(false);
 
@@ -192,6 +202,16 @@ export class CompanyDetailComponent {
     paymentReference: [''],
   });
 
+  /**
+   * The storage limit dialog. `follow` uses the plan's storage; `custom` sets
+   * this company's own, entered in MB or GB and sent to the API in MB.
+   */
+  readonly storageForm = this.fb.nonNullable.group({
+    mode: ['follow' as 'follow' | 'custom'],
+    amount: [1 as number | null, [Validators.min(1)]],
+    unit: ['GB' as 'MB' | 'GB'],
+  });
+
   readonly paymentForm = this.fb.nonNullable.group({
     amount: [0, [Validators.required, Validators.min(0)]],
     discount: [0],
@@ -244,6 +264,65 @@ export class CompanyDetailComponent {
   }
 
   /* ------------------------------ helpers ------------------------------ */
+
+  /* ------------------------------ storage ------------------------------ */
+
+  /** The bar's colour: calm, then amber from 80%, red when full. */
+  storageLevel(percent: number, atLimit: boolean): 'ok' | 'warn' | 'full' {
+    if (atLimit || percent >= 100) return 'full';
+    return percent >= 80 ? 'warn' : 'ok';
+  }
+
+  /** `2048` -> `2 GB`, `512` -> `512 MB`. */
+  mb(value: number | null | undefined): string {
+    if (value === null || value === undefined) return '—';
+    if (value >= 1024) {
+      const gb = value / 1024;
+      return `${Number.isInteger(gb) ? gb : gb.toFixed(1)} GB`;
+    }
+    return `${value} MB`;
+  }
+
+  openStorageModal(): void {
+    const own = this.company()?.storage?.companyStorageLimitMb ?? null;
+    const base = own ?? this.company()?.storage?.planStorageMb ?? 1024;
+    const inGb = base >= 1024 && base % 1024 === 0;
+    this.storageForm.reset({
+      mode: own === null ? 'follow' : 'custom',
+      amount: inGb ? base / 1024 : base,
+      unit: inGb ? 'GB' : 'MB',
+    });
+    this.storageModalOpen.set(true);
+  }
+
+  saveStorage(): void {
+    const { mode, amount, unit } = this.storageForm.getRawValue();
+    let limitMb: number | null = null;
+    if (mode === 'custom') {
+      if (!amount || amount < 1) {
+        this.toast.warning('Enter a storage size', 'Use at least 1 MB, or choose to follow the plan.');
+        return;
+      }
+      limitMb = Math.round(unit === 'GB' ? amount * 1024 : amount);
+    }
+
+    this.savingStorage.set(true);
+    this.companies.updateStorage(this.companyId(), limitMb).subscribe({
+      next: (storage) => {
+        this.savingStorage.set(false);
+        this.storageModalOpen.set(false);
+        this.company.update((company) => (company ? { ...company, storage, storageLimitMb: limitMb } : company));
+        this.toast.success(
+          limitMb === null ? 'Storage now follows the plan' : 'Storage limit updated',
+          `${storage.usedLabel} used of ${storage.limitLabel}`
+        );
+      },
+      error: (error: HttpErrorResponse) => {
+        this.savingStorage.set(false);
+        this.toast.error('Could not update storage', messageOf(error));
+      },
+    });
+  }
 
   money(value: number | string | null | undefined, currency = 'INR'): string {
     return formatMoney(value, currency);

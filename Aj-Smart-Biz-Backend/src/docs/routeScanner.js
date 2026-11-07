@@ -35,14 +35,38 @@ const logger = require('../utils/logger');
 function mountPathOf(layer) {
   if (layer.regexp?.fast_slash) return '';
 
-  const source = layer.regexp?.source;
+  let source = layer.regexp?.source;
   if (typeof source !== 'string') return '';
 
-  const match = /^\^\\\/(.*?)\\\/\?\(\?=\\\/\|\$\)\$?$/.exec(source);
-  if (!match) return '';
+  /*
+   * Express 4 compiles a mount like `/:companyId/branches` to
+   *   ^(?:\/([^/]+?))\/branches\/?(?=\/|$)
+   * and a plain one like `/uploads` to
+   *   ^\/uploads\/?(?=\/|$)
+   * A parameter is `(?:\/([^/]+?))` (or `([^\/]+?)` in older forms); its name
+   * is in `layer.keys`, in order. This used to recognise only the plain shape,
+   * so every router mounted under a parameter — branches, domains, sliders and
+   * admins under `/companies/:companyId` — was documented at its parent's path.
+   */
+  source = source.replace(/^\^/, '').replace(/\\\/\?\(\?=\\\/\|\$\)\$?$/, '');
 
-  // Escaped literals come back as `\/`; parameters as `(?:([^\/]+?))`.
-  return `/${match[1].replace(/\\\//g, '/').replace(/\(\?:\(\[\^\\\/\]\+\?\)\)/g, ':param')}`;
+  const names = (layer.keys ?? []).map((key) => key.name);
+  let index = 0;
+  source = source.replace(/\(\?:(\\\/)?\(\[\^\\?\/\]\+\?\)\)|\(\[\^\\?\/\]\+\?\)/g, (whole, slash) => {
+    const name = names[index++] ?? 'param';
+    return `${slash ? '/' : ''}:${name}`;
+  });
+
+  // Whatever is still escaped is a literal: `\/` -> `/`, `\-` -> `-`.
+  source = source.replace(/\\(.)/g, '$1');
+
+  // Anything regex-shaped left means a mount this does not understand; better
+  // to say so than to document a wrong path.
+  if (/[()[\]^$?*+|]/.test(source)) {
+    logger.warn(`OpenAPI: could not read the mount path of ${layer.regexp.source}`);
+    return '';
+  }
+  return source.startsWith('/') ? source : `/${source}`;
 }
 
 /** `/company/:id/branches` -> `/company/{id}/branches`, which is what OpenAPI wants. */

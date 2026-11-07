@@ -77,7 +77,7 @@
           <span class="tiny muted">Limits come from your active subscription</span>
         </div>
         <div class="card-body">
-          <div class="grid grid-3">
+          <div class="grid grid-4">
             <div>
               <div class="row-between">
                 <span class="tiny strong">Admins</span>
@@ -99,6 +99,31 @@
               </div>
               <div class="meter"><div class="meter-fill" style="width:0%"></div></div>
             </div>
+            <!-- Upload storage: images and files, against the plan or a custom limit. -->
+            @if (d.storage; as st) {
+              <div>
+                <div class="row-between">
+                  <span class="tiny strong">Storage</span>
+                  <span class="tiny muted">{{ st.usedLabel }} / {{ st.unlimited ? '∞' : st.limitLabel }}</span>
+                </div>
+                <div class="meter" role="progressbar" aria-label="Storage used"
+                     [attr.aria-valuenow]="st.percentUsed" aria-valuemin="0" aria-valuemax="100">
+                  <div class="meter-fill"
+                       [class.meter-fill-warn]="!st.atLimit && st.percentUsed >= 80"
+                       [class.meter-fill-full]="st.atLimit"
+                       [style.width.%]="st.percentUsed"></div>
+                </div>
+                <div class="tiny muted" style="margin-top:6px">
+                  @if (st.atLimit) {
+                    <span style="color:var(--danger)">Full — delete images or upgrade to upload more</span>
+                  } @else if (st.unlimited) {
+                    {{ st.fileCount }} files
+                  } @else {
+                    {{ st.percentUsed }}% used · {{ st.fileCount }} files{{ st.source === 'company' ? ' · custom limit' : '' }}
+                  }
+                </div>
+              </div>
+            }
           </div>
         </div>
       </section>

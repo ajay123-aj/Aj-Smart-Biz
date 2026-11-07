@@ -1,15 +1,19 @@
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo';
+import PageHeader from '@/components/PageHeader';
 import EnquiryForm from '@/components/EnquiryForm';
 import FaqSection from '@/components/FaqSection';
 import Glyph from '@/components/Glyph';
 import { getSite } from '@/lib/api';
 import styles from './page.module.css';
 
-export const metadata: Metadata = {
-  title: 'Contact',
-  description:
+export async function generateMetadata(): Promise<Metadata> {
+  return pageMetadata(
+    '/contact',
+    'Contact',
     'Talk to Aj Smart Biz Technology about a website, a plan, or an existing site. WhatsApp, phone or email — answered by a person.',
-};
+  );
+}
 
 /**
  * Contact.
@@ -69,13 +73,7 @@ export default async function ContactPage() {
 
   return (
     <>
-      <section className={`section ${styles.head}`}>
-        <div className="container">
-          <span className="eyebrow">{page?.eyebrow}</span>
-          <h1 className={styles.title}>{page?.title}</h1>
-          <p className={styles.lede}>{page?.lede}</p>
-        </div>
-      </section>
+      <PageHeader path="/contact" crumb="Contact" eyebrow={page?.eyebrow} title={page?.title} lede={page?.lede} />
 
       <section className={styles.channelsSection}>
         <div className="container">

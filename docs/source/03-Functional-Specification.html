@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Functional Specification — Aj Smart Biz</title>
+<link rel="stylesheet" href="assets/doc.css"></head><body>
+
+<section class="cover">
+  <div class="band">
+    <div class="kicker">Aj Smart Biz · Document 03</div>
+    <h1>Functional Specification (FRS)</h1>
+    <div class="sub">Every module, screen and feature of the five applications, and how they behave.</div>
+  </div>
+  <table class="meta">
+    <tr><td>Audience</td><td>Product, QA, support, developers</td></tr>
+    <tr><td>Version / date</td><td>1.0 · 7 November 2026</td></tr>
+    <tr><td>Related</td><td>02 BRD · 06 API Reference · 09 User Manual</td></tr>
+  </table>
+</section>
+
+<section class="toc"><h2>Contents</h2><ol>
+<li>Functionality catalogue (sellable features)</li><li>Super Admin console</li><li>Company Admin workspace</li>
+<li>Tenant website (themes)</li><li>Product website (Technology)</li><li>Cross-cutting behaviour</li></ol></section>
+
+<h1>1. Functionality catalogue</h1>
+<p>Sellable features are listed once, in <code>FUNCTIONALITY_CATALOGUE</code> (<code>Aj-Smart-Biz-Backend/src/constants/index.js</code>). A plan grants keys; the tenant switches them on; the platform serves them while the plan runs.</p>
+<table><thead><tr><th>Key</th><th>What it gives the tenant</th></tr></thead><tbody>
+<tr><td><code>whatsapp</code></td><td>Typed WhatsApp numbers (inquiry, contact, support, orders) and buttons across the site, floating chat bubble.</td></tr>
+<tr><td><code>share_link</code></td><td>Share button: native share sheet on phones, chosen channels elsewhere.</td></tr>
+<tr><td><code>services</code></td><td>Services band on home and a /services page with categories, prices and enquiry buttons.</td></tr>
+<tr><td><code>service_enquiry</code></td><td>Enquiry form on services, routed to WhatsApp and/or the Service Leads inbox.</td></tr>
+<tr><td><code>service_booking</code></td><td>Slot booking on bookable services with capacity, diary and accept/decline.</td></tr>
+<tr><td><code>about_us</code></td><td>Tenant-written About page; without it a factual fallback is built from the profile.</td></tr>
+<tr><td><code>figures</code></td><td>Stat cards — fixed values or counted from a date (“years in business”).</td></tr>
+<tr><td><code>team</code></td><td>Team section on /about.</td></tr>
+<tr><td><code>gallery</code></td><td>Gallery of the company's own photographs.</td></tr>
+<tr><td><code>contact_page</code></td><td>/contact page with tenant wording, hand-off form and locations.</td></tr>
+<tr><td><code>testimonials</code></td><td>Static wall or dynamic with visitor submission and moderation.</td></tr>
+<tr><td><code>features_benefits</code></td><td>Features/Benefits band with icons chosen from the platform library.</td></tr>
+<tr><td><code>products</code></td><td>Catalogue: categories, products, offers, /products, /categories, /offers.</td></tr>
+<tr><td><code>orders</code></td><td>Cart and order desk on top of products (withheld without products).</td></tr>
+<tr><td><code>warehouse</code></td><td>Warehouses, stock levels, ledger, transfers, stock analytics.</td></tr>
+<tr><td><code>customers</code></td><td>Customer sign-in with phone OTP, addresses, history.</td></tr>
+<tr><td><code>blog</code></td><td>Journal with scheduled publishing, tags, pagination.</td></tr>
+<tr><td><code>social_media</code></td><td>Social profile links in header/footer.</td></tr>
+<tr><td><code>invoices</code></td><td>Counter billing (POS) with stock deduction and analysis.</td></tr>
+</tbody></table>
+<div class="callout"><strong>Granted vs switched on vs published</strong>
+A feature can be <em>granted</em> (plan), <em>enabled</em> (tenant), <em>served</em> (plan running). The console additionally reports <code>published: false, reason: "empty"</code> when a live feature has no content yet, and shows “Nothing published yet — Add content →”.</div>
+
+<h1>2. Super Admin console (:4200)</h1>
+<p>Audience: platform owner and staff. Sign-in with email and password (<code>/auth/super-admin/login</code>). No per-menu permissions; the root account is protected.</p>
+<table><thead><tr><th>Menu</th><th>Route</th><th>Functions</th></tr></thead><tbody>
+<tr><td>Dashboard</td><td>/dashboard</td><td>Companies active/inactive/deleted, total and monthly income with growth, 12-month income chart, companies by plan, recent companies and transactions.</td></tr>
+<tr><td>Company Management</td><td>/companies, /companies/new, /companies/:id, /:id/edit</td><td>List with search and filters (business type, plan, status); create (profile, login branding, address, main admin, plan + payment, duplicate-from, AI content creator); detail tabs: overview, business insights, customers, branches (with quota), domains, plan &amp; transactions (suspend/resume/start now/auto-renew/cancel), storage limit override, admins (edit, reset password); sample companies.</td></tr>
+<tr><td>Company Plans</td><td>/subscriptions, /subscriptions/:id</td><td>Renewal desk: quick views (Running, Expiring 7/30 days, Scheduled, Suspended, Expired, Cancelled, All), plan-request queue (approve/reject), run expiry check, companies per plan; term detail with history, payments and lifecycle actions (suspend, resume, cancel, expire, start now, reactivate, extend, auto-renew).</td></tr>
+<tr><td>Customers</td><td>/customers</td><td>Read-only list of every tenant's customers with summary.</td></tr>
+<tr><td>Lead Management</td><td>/leads, /leads/analytics, /leads/:id</td><td>Cross-tenant website visitors (read-only), company filter, analytics, visit history.</td></tr>
+<tr><td>Plan Management</td><td>/plans</td><td>Plan cards: price, discount, cycle, duration, trial, quotas, marketing features, granted functionalities, popular/public/show-in-admin flags.</td></tr>
+<tr><td>Super Admins</td><td>/super-admins</td><td>Platform staff accounts, password reset; root protected.</td></tr>
+<tr><td>State / Business Types / Theme Management</td><td>/states, /business-types, /themes</td><td>Master data CRUD; themes with palette preview.</td></tr>
+<tr><td>Our website → Content</td><td>/website/content</td><td>JSON editor for the product website's sections (hero, steps, promises, pages…).</td></tr>
+<tr><td>Our website → Templates</td><td>/website/templates</td><td>Which demo companies appear on the product site's template showcase, by design.</td></tr>
+<tr><td>Our website → FAQ</td><td>/website/faq</td><td>FAQ CRUD and ordering.</td></tr>
+<tr><td>Our website → Enquiries</td><td>/website/enquiries</td><td>Demo/contact enquiries: status new → contacted → converted/closed, notes.</td></tr>
+<tr><td>Our website → Leads / Campaign Analysis</td><td>/website/leads, /website/analytics</td><td>Marketing-site visitors linked to enquiries; first-touch UTM campaign report.</td></tr>
+<tr><td>Profile</td><td>/profile</td><td>Own profile and password.</td></tr>
+</tbody></table>
+
+<h1>3. Company Admin workspace (:4300)</h1>
+<p>Audience: a company's admins. The login screen brands itself from the domain (<code>/theme/branding</code>). After sign-in, <code>/auth/me</code> returns the user, a permission map and the menu tree; the sidebar renders exactly that tree. First sign-in with a generated password forces a password change.</p>
+
+<h2>3.1 Company Details (website and profile)</h2>
+<table><thead><tr><th>Submenu</th><th>Route</th><th>Plan grant</th><th>Functions</th></tr></thead><tbody>
+<tr><td>Company profile</td><td>/company/profile</td><td>—</td><td>Company record, logo, favicon (.ico), description; editable by main admin.</td></tr>
+<tr><td>Branches</td><td>/company/branches, /company/branches/:id</td><td>—</td><td>Branch CRUD within quota, own logo/favicon, contacts (primary flag). Own permission row.</td></tr>
+<tr><td>Domains</td><td>/company/domains</td><td>—</td><td>Hostnames, branch pin, primary flag.</td></tr>
+<tr><td>Theme</td><td>/company/theme</td><td>—</td><td>Primary, secondary, accent colours and mode for company or one branch; reset to preset.</td></tr>
+<tr><td>Functionality</td><td>/company/functionality</td><td>—</td><td>One card per feature: switch (locked with reason if not granted), settings panel, WhatsApp numbers.</td></tr>
+<tr><td>Slider</td><td>/company/sliders</td><td>—</td><td>Hero slides, desktop + mobile image, CTA, company-wide or per branch, reorder.</td></tr>
+<tr><td>Services / Service categories</td><td>/company/services, /company/service-categories</td><td>services</td><td>Service cards (photo or icon, inclusions, price line, price/offer, duration, booking settings, featured), section wording, menu name, enquiry target.</td></tr>
+<tr><td>Categories / Products</td><td>/company/categories, /company/products</td><td>products</td><td>Three-level tree with product counts; paged catalogue with up to 8 images, price/offer/label, specs, stock status, orderable flag, tabs On offer/Featured/Hidden; live price preview.</td></tr>
+<tr><td>Cart &amp; orders</td><td>/company/orders</td><td>orders</td><td>Mode (WhatsApp / payment / none), basket on/off, required fields, minimum order, UPI id or payment link.</td></tr>
+<tr><td>Blog</td><td>/company/blog</td><td>blog</td><td>Posts with cover, tags, author, publish date; states live/scheduled/draft/hidden.</td></tr>
+<tr><td>About us / Figures / Team / Gallery</td><td>/company/about, /figures, /team, /gallery</td><td>about_us, figures, team, gallery</td><td>Per-branch or inherited copy; figures fixed or since-date; cards with reorder and “Shows on” branch.</td></tr>
+<tr><td>Contact page</td><td>/company/contact</td><td>contact_page</td><td>Eyebrow, heading, intro, show form, target (email/WhatsApp), show locations, menu name.</td></tr>
+<tr><td>Features / Benefits</td><td>/company/features</td><td>features_benefits</td><td>Cards with icon picker; section heading and button.</td></tr>
+<tr><td>Social</td><td>/company/social</td><td>social_media</td><td>Social profile links.</td></tr>
+<tr><td>Testimonials</td><td>/company/testimonials</td><td>testimonials</td><td>Static or dynamic mode, moderation queue (pending/approved/rejected), cards.</td></tr>
+<tr><td>Plan &amp; billing</td><td>/company/subscription</td><td>—</td><td>Subscriptions and transactions, read-only.</td></tr>
+</tbody></table>
+
+<h2>3.2 Operations</h2>
+<table><thead><tr><th>Menu (slug)</th><th>Route</th><th>Functions</th></tr></thead><tbody>
+<tr><td>Dashboard</td><td>/dashboard</td><td>Admins, branches, roles, current plan with days left, quota usage, live features, storage.</td></tr>
+<tr><td>My Plan (my-plan)</td><td>/plan</td><td>Countdown, limits vs usage (“3 of 5 admins”), features sold, booked renewal, payments; plan catalogue with Upgrade/Downgrade labels; request a change (one open at a time).</td></tr>
+<tr><td>Lead Management (lead-management)</td><td>/leads, /leads/analytics, /leads/:id</td><td>Visitors per device, traffic sources, stage and notes editable.</td></tr>
+<tr><td>Service Leads (service-leads)</td><td>/service-leads</td><td>Enquiry and booking inbox; stage, notes, accept/decline booking, payment; diary by date; revenue; analytics. No create; visitor input not editable.</td></tr>
+<tr><td>Orders (orders)</td><td>/orders</td><td>Queue with status and payment filters; move status forward; mark paid/refunded; warehouse, delivery adjustment and internal notes editable; analytics tab (7/30/90/365 days).</td></tr>
+<tr><td>Warehouse (warehouse)</td><td>/warehouse</td><td>Tabs: stock (low/out filters, reorder level, bin), warehouses (one default), movements ledger (receipt, damage, count…), transfers, analytics (retail and cost value with coverage).</td></tr>
+<tr><td>Customers (customers)</td><td>/customers</td><td>List with spend, detail with addresses and orders, bar/unbar, delete; no create; phone not editable.</td></tr>
+<tr><td>Invoices (invoices, invoices-all, invoice-analysis)</td><td>/invoices, /invoices/all, /invoices/analysis, /invoices/new, /invoices/:id, /:id/edit</td><td>My invoices with today/month totals; all invoices with creator filter; editor (products, line discounts, tax 0/5/12/18/28 %, bill discount, round-off); issue; record payment (partial); cancel; printable bill; analysis by product, admin, payment mode, branch.</td></tr>
+<tr><td>Role Management</td><td>/roles</td><td>Roles CRUD, admin count per role.</td></tr>
+<tr><td>Menu Permission</td><td>/menu-permissions</td><td>Role × menu grid with view/create/edit/delete/export; company-own menus CRUD; platform menus read-only.</td></tr>
+<tr><td>Admin Management</td><td>/admins</td><td>Admins within quota, role and branch, reset password, toggle.</td></tr>
+<tr><td>Profile</td><td>/profile</td><td>Own profile; forced password change (?force=1).</td></tr>
+</tbody></table>
+
+<h1>4. Tenant website (themes)</h1>
+<p>Three designs — <strong>default</strong> (light, cream, charcoal and brass), <strong>midnight</strong> (dark, gold, arches; salons), <strong>atelier</strong> (glass panels over gradient; decor/framing) — with identical logic. Tenant brand colours override the design's brand tokens.</p>
+<table><thead><tr><th>Page</th><th>Content</th><th>Shown when</th></tr></thead><tbody>
+<tr><td>/</td><td>Hero slider, service categories, services, service offers, product categories, product offers, products, Features/Benefits, testimonials (+ review form), blog, figures, closing CTA.</td><td>Each band only if its feature is live and has content.</td></tr>
+<tr><td>/services, /services/[slug]</td><td>Service menu with category filter; detail with price, duration, booking panel or enquiry button.</td><td>services</td></tr>
+<tr><td>/products, /products/[slug]</td><td>Catalogue with category filter; detail with no-JS photo gallery, price, stock label, Add to cart / Order now.</td><td>products</td></tr>
+<tr><td>/categories, /offers</td><td>Category tree; products on offer.</td><td>products + content</td></tr>
+<tr><td>/blog, /blog/[slug]</td><td>Archive with tags and pages; article with previous/next.</td><td>blog</td></tr>
+<tr><td>/about</td><td>Story, figures, team, gallery.</td><td>Always (fallback copy from profile).</td></tr>
+<tr><td>/contact</td><td>Wording, hand-off form (email/WhatsApp), branch locations.</td><td>contact_page</td></tr>
+<tr><td>/account, /account/orders, /account/services</td><td>OTP sign-in/sign-up, profile, addresses, order history, bookings history.</td><td>customers</td></tr>
+</tbody></table>
+<h3>Special states</h3>
+<ul><li><strong>ServiceUnavailable</strong> — the API cannot be reached.</li>
+<li><strong>CompanyNotFound</strong> — the domain belongs to no active tenant.</li>
+<li><strong>PlanNotice</strong> (holding page) — plan expired, suspended or never assigned; noindex.</li></ul>
+<h3>Cart behaviour</h3>
+<ul><li>Basket held in the browser (<code>ajsb.cart.v1</code>) as line snapshots.</li>
+<li>Submission sends product ids and quantities; the API returns order number, total and WhatsApp/payment hand-off.</li>
+<li>Basket off → “Order now” sends one product at once. Out-of-stock or non-orderable products show no button.</li></ul>
+
+<h1>5. Product website — Technology (:4700)</h1>
+<table><thead><tr><th>Page</th><th>Purpose</th></tr></thead><tbody>
+<tr><td>/</td><td>Hero, steps, capabilities, promises, templates showcase, business types, plans, FAQ, CTA.</td></tr>
+<tr><td>/services</td><td>Everything included plus detailed capability catalogue and recharge pitch.</td></tr>
+<tr><td>/plans</td><td>Public plans with pricing, compare table, FAQ.</td></tr>
+<tr><td>/templates</td><td>Demo tenant sites by design with live demo links.</td></tr>
+<tr><td>/demo</td><td>Free demo request form (pre-selects ?plan=).</td></tr>
+<tr><td>/about, /contact</td><td>Company story; contact cards and form.</td></tr>
+<tr><td>SEO routes</td><td>/sitemap.xml, /robots.txt, /manifest.webmanifest, /opengraph-image.</td></tr>
+</tbody></table>
+<p>All copy is served by <code>GET /website/bootstrap</code> and edited in the Super Admin's <em>Our website</em> section. Forms post to <code>/website/enquiries</code>, then offer WhatsApp/mailto hand-off even if the API failed.</p>
+
+<h1>6. Cross-cutting behaviour</h1>
+<table><thead><tr><th>Behaviour</th><th>Specification</th></tr></thead><tbody>
+<tr><td>Lists</td><td>Paged (10/25/50/100), search debounced 350 ms, sortable columns, status filter; envelope <code>meta {total, page, limit, totalPages, hasNext}</code>.</td></tr>
+<tr><td>Status toggle</td><td>Every entity active/inactive via <code>PATCH /:id/status</code>.</td></tr>
+<tr><td>Delete</td><td>Confirmation dialog; soft delete; restore where offered.</td></tr>
+<tr><td>Reorder</td><td>Whole ordered list sent in one <code>PATCH /reorder</code>.</td></tr>
+<tr><td>Uploads</td><td>Image MIME only; favicons validated as real ICO; per-company storage limit; replaced files deleted.</td></tr>
+<tr><td>Errors</td><td>Toast with the API's message; field errors under fields; 401 → sign out; server down → full-screen retry.</td></tr>
+<tr><td>Dark mode</td><td>Both consoles toggle light/dark, remembered per browser.</td></tr>
+<tr><td>Tracking</td><td>Websites send a beacon per page view (device id, session, UTM, device, optional geolocation) via their own <code>/api/track</code>.</td></tr>
+</tbody></table>
+</body></html>

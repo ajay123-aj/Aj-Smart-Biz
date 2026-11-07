@@ -15,6 +15,7 @@ const { createSampleCompanies } = require('../services/sampleCompany.service');
 const { activateSubscription } = subscriptionService;
 const { generateInvoiceNo } = require('../services/code.service');
 const { removeUploadedFile } = require('../middlewares/upload');
+const storageService = require('../services/storage.service');
 const {
   STATUS,
   SUBSCRIPTION_STATUS,
@@ -94,7 +95,12 @@ const list = asyncHandler(async (req, res) => {
 const getById = asyncHandler(async (req, res) => {
   const company = await findCompanyOrFail(req.params.id, { include: companyService.companyDetailInclude() });
 
-  const [transactions, admins, roles, totals] = await Promise.all([
+  /* Bring the storage ledger up to date before reporting it, so files the
+     super admin uploaded on this company's behalf are counted. Never fatal:
+     the rest of the screen is worth showing even if the disk is unreadable. */
+  await storageService.reconcileCompany(company.id).catch(() => undefined);
+
+  const [transactions, admins, roles, totals, storage] = await Promise.all([
     db.Transaction.findAll({
       where: { companyId: company.id },
       include: [{ model: db.Plan, as: 'plan', attributes: ['id', 'name'] }],
@@ -132,9 +138,11 @@ const getById = asyncHandler(async (req, res) => {
       ],
       raw: true,
     }),
+    storageService.getStorage(company.id),
   ]);
 
   const plain = company.toJSON();
+  plain.storage = storage;
   plain.subscriptions = (plain.subscriptions || []).map(subscriptionService.decorate);
   plain.activeSubscription = pickCurrent(plain.subscriptions);
   plain.scheduledSubscription =
@@ -176,6 +184,8 @@ const create = asyncHandler(async (req, res) => {
 const duplicate = asyncHandler(async (req, res) => {
   const { include, ...payload } = req.body;
   const result = await duplicateCompany(Number(req.params.id), payload, include, req.auth?.id);
+  /* The copy has its own files now; charge them to it. */
+  await storageService.reconcileCompany(result.company.id).catch(() => undefined);
   const company = await db.Company.findByPk(result.company.id, {
     include: companyService.companyDetailInclude(),
   });
@@ -227,6 +237,23 @@ const update = asyncHandler(async (req, res) => {
 
   const fresh = await db.Company.findByPk(company.id, { include: companyService.companyDetailInclude() });
   return success(res, { message: 'Company updated successfully', data: fresh });
+});
+
+/**
+ * PATCH /companies/:id/storage — set or clear this company's own storage limit.
+ *
+ * `storageLimitMb: null` returns the company to its plan's storage. Lowering a
+ * limit below what is already used is allowed: nothing is deleted, the company
+ * simply cannot upload more until it is back under.
+ */
+const updateStorage = asyncHandler(async (req, res) => {
+  const company = await findCompanyOrFail(req.params.id);
+  await company.update({ storageLimitMb: req.body.storageLimitMb ?? null, updatedBy: req.auth?.id ?? null });
+  const storage = await storageService.getStorage(company.id);
+  return success(res, {
+    message: storage.source === 'company' ? 'Storage limit updated' : 'Storage now follows the plan',
+    data: storage,
+  });
 });
 
 /** PATCH /companies/:id/status */
@@ -587,6 +614,7 @@ const aiContentStatus = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  updateStorage,
   list,
   getById,
   create,

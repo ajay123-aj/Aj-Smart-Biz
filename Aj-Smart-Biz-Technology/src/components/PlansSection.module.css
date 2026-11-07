@@ -1,156 +1,254 @@
-/*
- * The cards stretch to a common height so the buttons line up across the row.
- *
- * `align-items: stretch` is the grid default and is only half of it: each card
- * is also a flex column with `margin-top: auto` on its button slot, which is
- * what actually pins the four calls to action to one baseline when the feature
- * lists are different lengths. See `.ctaSlot`.
- */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(276px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(var(--plans, 3), minmax(0, 1fr));
+  gap: 22px;
+  align-items: stretch;
   margin: 0;
-  padding: 0;
+  padding: 16px 0 0;
   list-style: none;
 }
 
 .card {
+  position: relative;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   padding: 30px 26px 28px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
-/*
- * The popular plan.
- *
- * A brighter edge and a coloured ring, and it does **not** grow or lift above
- * the others. The usual trick — scaling the middle card up — breaks the row's
- * shared baseline and makes the comparison harder to read, which is the one
- * thing a pricing table exists to make easy.
- */
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* The popular plan: a gradient border and a soft gradient top. */
 .popular {
-  border-color: var(--hairline-strong);
-  box-shadow: var(--shadow), var(--glass-sheen),
-    0 0 0 1px color-mix(in srgb, var(--aurora-2) 30%, transparent);
+  border: 2px solid transparent;
+  background:
+    linear-gradient(180deg, rgba(99, 102, 241, 0.2) 0, var(--surface) 200px) padding-box,
+    var(--gradient) border-box;
+  box-shadow: var(--shadow-lg);
 }
 
 .flag {
-  align-self: flex-start;
-  margin-bottom: 14px;
-  padding: 5px 13px;
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 16px;
   border-radius: var(--radius-pill);
-  background: var(--accent-ramp);
-  color: var(--on-accent);
-  font-size: 0.72rem;
+  background: var(--gradient);
+  color: #ffffff;
+  font-size: 0.74rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: var(--shadow-brand);
 }
 
 .name {
-  font-size: 1.28rem;
+  font-size: 1.3rem;
 }
 
 .tagline {
-  margin-top: 9px;
+  margin-top: 6px;
+  min-height: 3em;
   color: var(--text-muted);
-  font-size: 0.9rem;
-  line-height: 1.55;
+  font-size: 0.93rem;
+  line-height: 1.5;
 }
-
-/* -------------------------------- price -------------------------------- */
 
 .priceRow {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 22px;
+  gap: 6px;
+  margin-top: 20px;
 }
 
 .price {
-  font-family: var(--font-display);
-  font-size: 2.3rem;
+  font-size: clamp(2.1rem, 1.4rem + 1.6vw, 2.7rem);
   font-weight: 800;
   line-height: 1;
-  letter-spacing: -0.035em;
-  /*
-   * Plain `--text`, not the gradient.
-   *
-   * This is the number the whole card is about and it has to be the most
-   * legible thing on it. A ramp that fades towards teal is decoration, and a
-   * price is not decoration.
-   */
-  color: var(--text);
+  letter-spacing: -0.04em;
+}
+
+.popular .price {
+  color: var(--brand-strong);
 }
 
 .unit {
-  color: var(--text-faint);
-  font-size: 0.88rem;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  font-weight: 600;
 }
 
 .saving {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-height: 24px;
   margin-top: 8px;
 }
 
 .wasPrice {
   color: var(--text-faint);
   font-size: 0.92rem;
-  text-decoration-thickness: 1px;
 }
 
 .savingBadge {
-  padding: 3px 10px;
+  padding: 2px 9px;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--aurora-3) 18%, transparent);
-  border: 1px solid color-mix(in srgb, var(--aurora-3) 34%, transparent);
-  color: var(--aurora-3);
-  font-size: 0.75rem;
-  font-weight: 700;
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
-/* -------------------------------- limits -------------------------------- */
+.cta {
+  width: 100%;
+  margin-top: 20px;
+}
 
-/*
- * Three facts in a row, on their own strip.
- *
- * Hairlines above and below rather than a filled band: the card is already
- * translucent, and a solid strip inside it would be the only opaque thing on
- * the page.
- */
 .limits {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
   margin: 22px 0 0;
-  padding: 16px 0;
-  border-top: 1px solid var(--hairline);
-  border-bottom: 1px solid var(--hairline);
+}
+
+.limits > div {
+  padding: 10px 6px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  text-align: center;
 }
 
 .limits dt {
   color: var(--text-faint);
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .limits dd {
-  margin: 5px 0 0;
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
   font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+/* One line of key facts, pushed to the bottom so the toggles line up
+   across a row of cards whatever their highlights. */
+.keyFacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 20px;
+}
+
+.keyFacts span {
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.8rem;
   font-weight: 600;
 }
 
-/* ------------------------------- features ------------------------------- */
+.keyFacts strong {
+  color: var(--brand-strong);
+}
+
+/* -------------------------- show details -------------------------- */
+
+.details {
+  margin-top: 14px;
+  border-top: 1px dashed var(--hairline-strong);
+}
+
+.detailsToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 10px 0 2px;
+  color: var(--brand-strong);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 8px;
+}
+
+.detailsToggle::-webkit-details-marker {
+  display: none;
+}
+
+.detailsToggle:hover {
+  color: var(--brand);
+}
+
+.detailsIcon {
+  width: 16px;
+  height: 16px;
+  transform: rotate(90deg);
+  transition: transform 0.25s ease;
+}
+
+.details[open] .detailsIcon {
+  transform: rotate(-90deg);
+}
+
+.hideLabel,
+.details[open] .showLabel {
+  display: none;
+}
+
+.details[open] .hideLabel {
+  display: inline;
+}
+
+.detailsBody {
+  padding-top: 6px;
+  animation: open 0.3s ease both;
+}
+
+.detailsBody > .limits {
+  margin-top: 12px;
+}
+
+@keyframes open {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detailsBody {
+    animation: none;
+  }
+}
 
 .features {
   display: grid;
   gap: 10px;
-  margin: 20px 0 0;
+  margin: 22px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -159,43 +257,40 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.94rem;
   line-height: 1.5;
 }
 
-/* A bare tick, not the ringed one: there are five per card and twenty per row,
-   and twenty rings read as a page of targets. */
 .tick {
   flex: none;
-  width: 16px;
-  height: 16px;
-  margin-top: 3px;
-  color: var(--aurora-3);
+  width: 20px;
+  height: 20px;
+  padding: 3px;
+  border-radius: 50%;
+  background: var(--success-soft);
+  color: var(--success);
+  stroke-width: 2.6;
 }
-
-/* ------------------------------- includes ------------------------------- */
 
 .includes {
   margin-top: 22px;
   padding-top: 18px;
-  border-top: 1px solid var(--hairline);
+  border-top: 1px dashed var(--hairline-strong);
 }
 
 .includesTitle {
-  margin-bottom: 11px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
   color: var(--text-faint);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
-  margin: 0;
+  gap: 6px;
+  margin: 10px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -203,62 +298,199 @@
 .chipIcon {
   width: 14px;
   height: 14px;
-  color: var(--accent-text);
+  color: var(--brand);
 }
-
-/* --------------------------------- cta --------------------------------- */
-
-/*
- * The slot the button sits in, rather than the button itself.
- *
- * `margin-top: auto` is what pins every card's call to action to one baseline
- * across the row — it eats whatever vertical slack a shorter list left behind.
- * It has to live on a wrapper and not on the `.btn`, because the gap above the
- * button would otherwise have to be a second `margin-top`, and a second
- * `margin-top` overrides the `auto`: the alignment would silently stop working
- * and there would be nothing in the rule to say why.
- *
- * Here the push and the gap are separate properties on separate boxes, and the
- * pill keeps its own padding untouched.
- */
-.ctaSlot {
-  margin-top: auto;
-  padding-top: 26px;
-  width: 100%;
-}
-
-.cta {
-  width: 100%;
-}
-
-/* --------------------------------- rest --------------------------------- */
 
 .footnote {
-  margin-top: 26px;
-  max-width: 68ch;
-  color: var(--text-faint);
-  font-size: 0.86rem;
-  line-height: 1.6;
+  max-width: 64ch;
+  margin: 28px auto 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-align: center;
 }
 
 .allLink {
-  margin-top: 26px;
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
 }
 
-.allIcon {
-  width: 16px;
-  height: 16px;
+/* ------------------------------ compare table ------------------------------ */
+
+.compare {
+  margin-top: 88px;
+  scroll-margin-top: calc(var(--header-height) + 20px);
+}
+
+.compareTitle {
+  margin-bottom: 24px;
+  font-size: clamp(1.6rem, 2.8vw, 2.1rem);
+  text-align: center;
+}
+
+.tableWrap {
+  /* `relative` makes this the containing block for the cells' absolutely
+     positioned `.sr-only` labels — without it they are placed against the
+     page, escape the scroll box, and widen the whole page to ~660px on phones. */
+  position: relative;
+  overflow-x: auto;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow);
+}
+
+.table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: 0.93rem;
+}
+
+.table th,
+.table td {
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--hairline);
+  text-align: center;
+  vertical-align: middle;
+}
+
+.table tbody th[scope='row'],
+.table tfoot th {
+  text-align: left;
+  font-weight: 500;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  vertical-align: bottom;
+}
+
+/* Pin the feature column while the plan columns scroll sideways on a phone. */
+.table .featureCol,
+.table tbody th[scope='row'],
+.table tfoot th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface);
+  max-width: 220px;
+}
+
+.table thead .featureCol {
+  z-index: 2;
+}
+
+.featureCol {
+  text-align: left !important;
+  color: var(--text-faint);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.popularCol {
+  background: var(--brand-soft) !important;
+  box-shadow: inset 0 4px 0 var(--brand);
+}
+
+.thName {
+  display: block;
+  font-size: 1.02rem;
+  font-weight: 800;
+}
+
+.thPrice {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.thPrice small {
+  color: var(--text-faint);
+  font-weight: 500;
+}
+
+.groupRow th {
+  padding-block: 10px;
+  background: var(--surface-2);
+  text-align: left !important;
+  color: var(--brand-ink);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.yes {
+  width: 22px;
+  height: 22px;
+  padding: 4px;
+  border-radius: 50%;
+  background: var(--success-soft);
+  color: var(--success);
+  stroke-width: 2.6;
+  vertical-align: middle;
+}
+
+.no {
+  color: var(--hairline-strong);
+}
+
+.table tfoot td,
+.table tfoot th {
+  border-bottom: 0;
+  padding-block: 18px;
+}
+
+.tableCta {
+  min-height: 40px;
+  padding: 8px 18px;
+}
+
+/* Four plans in a 976px container leave ~175px of content per card. */
+@media (max-width: 1180px) {
+  .card {
+    padding: 28px 20px 24px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  }
 }
 
 @media (max-width: 640px) {
-  .card {
-    padding: 26px 22px 24px;
+  .tagline {
+    min-height: 0;
   }
 
-  /* Three columns of limits at 320px gives each label eight characters and a
-     hyphen. Two is the last honest arrangement. */
-  .limits {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px 10px;
+  .card {
+    padding: 26px 18px 22px;
+  }
+
+  .compare {
+    margin-top: 56px;
+  }
+
+  .table {
+    min-width: 560px;
+  }
+
+  .table th,
+  .table td {
+    padding: 12px 12px;
+  }
+
+  .table .featureCol,
+  .table tbody th[scope='row'],
+  .table tfoot th {
+    max-width: 150px;
+    box-shadow: 1px 0 0 var(--hairline);
   }
 }

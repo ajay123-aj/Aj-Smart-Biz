@@ -5,6 +5,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { verifyAccessToken } = require('../utils/jwt');
 const { AUTH_SCOPE, STATUS } = require('../constants');
 const db = require('../models');
+const adminRoles = require('../services/adminRole.service');
 
 const extractToken = (req) => {
   const header = req.headers.authorization || '';
@@ -158,14 +159,11 @@ const requirePermission = (menuSlug, action = 'canView') =>
   asyncHandler(async (req, res, next) => {
     if (req.auth?.scope === AUTH_SCOPE.SUPER_ADMIN) return next();
     if (req.auth?.isCompanyAdmin) return next();
-    if (!req.auth?.roleId) throw ApiError.forbidden('No role assigned to this account');
+    /* Allowed when any of the admin's active roles allows it — see adminRole.service. */
+    const roleIds = await adminRoles.authRoleIds(req);
+    if (!roleIds.length) throw ApiError.forbidden('No active role assigned to this account');
 
-    const permission = await db.RolePermission.findOne({
-      where: { roleId: req.auth.roleId, companyId: req.auth.companyId },
-      include: [{ model: db.Menu, as: 'menu', where: { slug: menuSlug }, attributes: ['id', 'slug'] }],
-    });
-
-    if (!permission || permission[action] !== true) {
+    if (!(await adminRoles.rolesCan(req.auth.companyId, roleIds, menuSlug, action))) {
       throw ApiError.forbidden(`Missing "${action}" permission for "${menuSlug}"`);
     }
     return next();

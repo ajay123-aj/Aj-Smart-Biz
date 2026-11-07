@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Security &amp; Data Protection — Aj Smart Biz</title>
+<link rel="stylesheet" href="assets/doc.css"></head><body>
+
+<section class="cover">
+  <div class="band">
+    <div class="kicker">Aj Smart Biz · Document 08</div>
+    <h1>Security &amp; Data Protection</h1>
+    <div class="sub">Controls implemented in the code, the threat model they address, and the gaps to close before scale.</div>
+  </div>
+  <table class="meta">
+    <tr><td>Audience</td><td>Technical leads, security reviewers, DevOps, business owners</td></tr>
+    <tr><td>Version / date</td><td>1.0 · 7 November 2026</td></tr>
+  </table>
+</section>
+
+<section class="toc"><h2>Contents</h2><ol>
+<li>Security principles</li><li>Identity and access</li><li>Tenant isolation</li><li>Input, output and transport</li><li>Uploads and storage</li>
+<li>Public endpoints and abuse</li><li>Data protection and privacy</li><li>Threat model summary</li><li>Gaps and recommendations</li><li>Production hardening checklist</li></ol></section>
+
+<h1>1. Security principles</h1>
+<ol>
+<li><strong>Derive, don't trust.</strong> Tenant, prices, addresses and the customer's identity are derived on the server; the client sends ids and quantities only.</li>
+<li><strong>Guard at the module.</strong> Scope guards are mounted once per route module, so new routes inherit protection.</li>
+<li><strong>Absent, not hidden.</strong> A feature that is not live is <code>null</code> in the payload — not hidden with CSS — so a lapsed tenant's data never appears in page source.</li>
+<li><strong>Fail closed.</strong> No plan means blocked, not unlimited; unknown hosts get platform defaults, not errors that confirm existence.</li>
+</ol>
+
+<h1>2. Identity and access</h1>
+<table><thead><tr><th>Control</th><th>Implementation</th></tr></thead><tbody>
+<tr><td>Password storage</td><td>bcrypt (cost <code>BCRYPT_SALT_ROUNDS</code>, default 10) in model hooks; password excluded by default scope.</td></tr>
+<tr><td>Tokens</td><td>JWT access (default 1 day) and refresh (7 days) with separate secrets; scope in payload. Production boot refuses placeholder secrets.</td></tr>
+<tr><td>Session validity</td><td>Principal reloaded on every request; inactive/deleted user or inactive company is rejected immediately.</td></tr>
+<tr><td>Login throttling</td><td>30 attempts per 15 minutes per IP on login routes.</td></tr>
+<tr><td>Forced change</td><td>Generated main-admin passwords set <code>mustChangePassword</code>; the console blocks all routes until changed.</td></tr>
+<tr><td>RBAC</td><td>Role × menu × five actions enforced by <code>requirePermission</code> on the API; UI mirrors it.</td></tr>
+<tr><td>Privileged accounts</td><td>Root super admin (<code>isRoot</code>) and company main admin cannot be deleted or disabled.</td></tr>
+<tr><td>Customer auth</td><td>Phone + 6-digit OTP, hashed, 10-min expiry, 5 attempts, 10 requests/15 min; token in httpOnly, secure (prod) cookie on the website server; account pages are server-rendered.</td></tr>
+</tbody></table>
+
+<h1>3. Tenant isolation</h1>
+<ul>
+<li>Admin routes read <code>companyId</code> from the token; URL/body company ids are ignored for admins.</li>
+<li>Every query is scoped by company; another tenant's id returns a generic 404.</li>
+<li>Uploads can be deleted only within the caller's own company.</li>
+<li>Public tenant endpoints resolve the company from the host; an unknown/inactive host returns platform defaults, preventing enumeration.</li>
+<li>Customers are unique per company — the same phone at two shops is two unrelated accounts.</li>
+<li>Platform-wide views (cross-tenant leads/customers) exist only under <code>/super-admin</code> and are read-only.</li>
+</ul>
+
+<h1>4. Input, output and transport</h1>
+<table><tbody>
+<tr><td>Validation</td><td>Joi on params, query and body with <code>stripUnknown</code> and type conversion; sort fields allow-listed.</td></tr>
+<tr><td>SQL injection</td><td>Sequelize parameterised queries; raw fragments use fixed column names only.</td></tr>
+<tr><td>Headers</td><td>helmet defaults; <code>trust proxy</code> for correct client IPs behind nginx.</td></tr>
+<tr><td>CORS</td><td>Allow-list from <code>CORS_ORIGINS</code>; <code>*</code> intended only for dev tunnels.</td></tr>
+<tr><td>Body size</td><td>JSON 2 MB in the API; nginx limits per vhost (2–25 MB).</td></tr>
+<tr><td>Transport</td><td>TLS via certbot on every public domain; containers talk on a private Docker network.</td></tr>
+<tr><td>Errors</td><td>Stack traces only outside production.</td></tr>
+<tr><td>XSS</td><td>Blog bodies stored as plain text; Angular and React escape output by default.</td></tr>
+</tbody></table>
+
+<h1>5. Uploads and storage</h1>
+<ul>
+<li>Image MIME types only; favicons verified by ICO magic bytes.</li>
+<li>Random filenames (<code>{base36 time}-{hex}.ext</code>) in fixed folders; no user-chosen paths.</li>
+<li><code>/uploads</code> served with <code>Content-Security-Policy: default-src 'none'</code> and <code>nosniff</code>, so an SVG cannot execute script.</li>
+<li>Per-company storage quota enforced on upload; ledger in <code>company_files</code>; replaced images deleted.</li>
+<li>The theme <code>/uploads</code> proxy rejects <code>..</code> path segments.</li>
+</ul>
+
+<h1>6. Public endpoints and abuse</h1>
+<table><thead><tr><th>Endpoint</th><th>Protection</th></tr></thead><tbody>
+<tr><td>Orders</td><td>15/h per IP; server-side pricing; quantity and line caps; feature must be active and route usable.</td></tr>
+<tr><td>Service leads / bookings</td><td>12/h; slot capacity checked server-side.</td></tr>
+<tr><td>Testimonials</td><td>5/h; held as <em>pending</em> until moderated.</td></tr>
+<tr><td>Customer auth</td><td>10/15 min; <code>registered</code> flag reveals existence only (deliberate trade-off), barred customers look registered.</td></tr>
+<tr><td>Tracking beacons</td><td>300/5 min; body capped at 32 KB by the site proxy; failures swallowed.</td></tr>
+<tr><td>Marketing enquiries</td><td>10/15 min.</td></tr>
+</tbody></table>
+
+<h1>7. Data protection and privacy</h1>
+<table><thead><tr><th>Data</th><th>Where</th><th>Notes</th></tr></thead><tbody>
+<tr><td>Admin and staff identities</td><td>admins, super_admins</td><td>Email, phone, hashed password.</td></tr>
+<tr><td>Customer PII</td><td>customers, customer_addresses, orders, service_leads</td><td>Name, phone, email, addresses; addresses copied onto orders.</td></tr>
+<tr><td>Visitor tracking</td><td>leads, lead_visits, marketing_leads</td><td>Device id, IP, user agent, UTM, optional browser geolocation (asked once).</td></tr>
+<tr><td>Business data</td><td>company tables</td><td>GST/PAN never returned on public endpoints.</td></tr>
+</tbody></table>
+<ul>
+<li>Order history returned to customers strips internal notes and provenance.</li>
+<li>Soft delete keeps personal data recoverable — a data-erasure procedure (hard delete/anonymise on request) is <em>not</em> implemented.</li>
+<li>Team cards' contact details are optional and labelled as published.</li>
+</ul>
+<div class="callout warn"><strong>Compliance note</strong>Tracking with IP and geolocation, plus customer accounts, makes the tenants data fiduciaries under India's DPDP Act 2023. Add a privacy notice and consent to the website templates and a documented erasure process before scaling.</div>
+
+<h1>8. Threat model summary</h1>
+<table><thead><tr><th>Threat</th><th>Mitigation</th><th>Residual risk</th></tr></thead><tbody>
+<tr><td>Cross-tenant data access</td><td>Company from token; scoped queries</td><td>Low</td></tr>
+<tr><td>Price tampering</td><td>Server-side pricing</td><td>Low</td></tr>
+<tr><td>Credential stuffing</td><td>Login rate limit, bcrypt</td><td>Medium — no MFA, no lockout</td></tr>
+<tr><td>OTP brute force</td><td>Attempts + expiry + rate limit</td><td><strong>High until SMS gateway</strong> — dev code is predictable</td></tr>
+<tr><td>Malicious upload</td><td>MIME filter, CSP on /uploads, random names</td><td>Low</td></tr>
+<tr><td>Token theft (consoles)</td><td>HTTPS; short access token</td><td>Medium — tokens in localStorage</td></tr>
+<tr><td>Spam via public forms</td><td>Rate limits, moderation</td><td>Medium — no CAPTCHA</td></tr>
+<tr><td>Tenant enumeration</td><td>Defaults for unknown hosts</td><td>Low</td></tr>
+</tbody></table>
+
+<h1>9. Gaps and recommendations</h1>
+<ol>
+<li><strong>Connect an SMS gateway</strong> before enabling customer accounts on any live tenant; unset <code>CUSTOMER_OTP_DEV_CODE</code> in production.</li>
+<li>Implement refresh-token rotation in the consoles (refresh token is stored but unused), or shorten access tokens.</li>
+<li>Consider moving console tokens from localStorage to httpOnly cookies, and add MFA for super admins.</li>
+<li>Add account lockout / progressive delay per user, not only per IP.</li>
+<li>Add CAPTCHA or proof-of-work to public enquiry, review and order forms.</li>
+<li>Remove the default super-admin password from <code>.env.development</code> history and ensure production uses unique secrets.</li>
+<li>Add audit logging for admin actions beyond subscriptions and stock (who changed prices, roles, permissions).</li>
+<li>Automated dependency scanning (npm audit / Dependabot) and an automated test suite in CI.</li>
+<li>Encrypted, off-site backups of MySQL and the uploads volume with restore drills.</li>
+</ol>
+
+<h1>10. Production hardening checklist</h1>
+<table><thead><tr><th>☐</th><th>Item</th></tr></thead><tbody>
+<tr><td>☐</td><td>Unique <code>JWT_SECRET</code>/<code>JWT_REFRESH_SECRET</code>; strong <code>SUPER_ADMIN_PASSWORD</code>, changed after first boot</td></tr>
+<tr><td>☐</td><td><code>DB_SYNC_MODE</code> = alter or none (never force); database user with least privilege</td></tr>
+<tr><td>☐</td><td><code>CORS_ORIGINS</code> lists exact console origins; <code>ALLOWED_ORIGINS</code> empty</td></tr>
+<tr><td>☐</td><td><code>CUSTOMER_OTP_DEV_CODE</code> unset; SMS gateway configured</td></tr>
+<tr><td>☐</td><td><code>TENANT_DOMAIN</code> unset on theme containers</td></tr>
+<tr><td>☐</td><td>Persistent volume for <code>/app/uploads</code>; backups scheduled</td></tr>
+<tr><td>☐</td><td>TLS on every domain; HTTP redirects to HTTPS</td></tr>
+<tr><td>☐</td><td>Server firewall: only 80/443 (and SSH) open; container ports bound to localhost</td></tr>
+</tbody></table>
+</body></html>

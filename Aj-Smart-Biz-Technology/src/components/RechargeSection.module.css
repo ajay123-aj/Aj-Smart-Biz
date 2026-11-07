@@ -1,14 +1,8 @@
-/*
- * Two columns of two on a desktop, one column below.
- *
- * Not a four-across row: these are paragraphs, and four paragraphs side by side
- * at 280px each is four columns of a newspaper — the eye has to travel down and
- * back up three times to read them in the order they were written.
- */
+/* Four arguments, read in order: numbered cards, each number in its own colour. */
 .list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 30px 44px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -17,40 +11,58 @@
 .point {
   display: flex;
   align-items: flex-start;
-  gap: 18px;
+  gap: 16px;
+  padding: 22px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-sm);
 }
 
-/*
- * A numbered disc, outlined in the accent rather than filled with it.
- *
- * Filled, four of these become four coloured dots down the page and start
- * competing with the one gradient button the section is leading towards.
- */
+.point:nth-child(5n + 1) { --tone: #60a5fa; --tone-soft: rgba(96, 165, 250, 0.15); }
+.point:nth-child(5n + 2) { --tone: #34d399; --tone-soft: rgba(52, 211, 153, 0.14); }
+.point:nth-child(5n + 3) { --tone: #fb923c; --tone-soft: rgba(251, 146, 60, 0.15); }
+.point:nth-child(5n + 4) { --tone: #a78bfa; --tone-soft: rgba(167, 139, 250, 0.16); }
+.point:nth-child(5n + 5) { --tone: #f472b6; --tone-soft: rgba(244, 114, 182, 0.15); }
+
 .number {
-  flex: none;
   display: grid;
   place-items: center;
+  flex: none;
   width: 40px;
   height: 40px;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--aurora-2) 45%, transparent);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--accent-text);
-  font-family: var(--font-display);
-  font-size: 1rem;
+  border-radius: 12px;
+  background: var(--tone-soft);
+  color: var(--tone);
   font-weight: 800;
-  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.point > div {
+  min-width: 0;
+}
+
+@media (max-width: 400px) {
+  .point {
+    padding: 18px;
+    gap: 14px;
+  }
 }
 
 .title {
-  font-size: 1.06rem;
-  letter-spacing: -0.012em;
+  font-size: 1.08rem;
+  line-height: 1.35;
 }
 
 .body {
-  margin-top: 9px;
-  max-width: 44ch;
+  margin-top: 6px;
   color: var(--text-muted);
   font-size: 0.94rem;
-  line-height: 1.62;
+  line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+  .list {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

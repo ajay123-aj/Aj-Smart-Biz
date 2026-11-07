@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import Glyph from './Glyph';
 import { getSite } from '@/lib/api';
+import { TONES } from '@/lib/capabilityGroups';
 import styles from './BusinessTypesSection.module.css';
+
 
 /**
  * "Any kind of business" — bounded by a list that is actually shown.
@@ -35,15 +37,17 @@ export default async function BusinessTypesSection({
         </header>
 
         <ul className={styles.grid}>
-          {businessTypes.map((type) => (
-            <li key={type.id} className={`card-surface ${styles.tile}`}>
+          {businessTypes.map((type, index) => (
+            <li key={type.id} className={`card-surface ${styles.tile}`} data-tone={TONES[index % TONES.length]}>
               {type.icon ? (
-                <span className={styles.icon} aria-hidden="true">
+                <span className={`icon-tile ${styles.icon}`} aria-hidden="true">
                   <Glyph name={type.icon} />
                 </span>
               ) : null}
-              <h3 className={styles.name}>{type.name}</h3>
-              <p className={styles.body}>{type.description}</p>
+              <div>
+                <h3 className={styles.name}>{type.name}</h3>
+                {type.description ? <p className={styles.body}>{type.description}</p> : null}
+              </div>
             </li>
           ))}
 
@@ -51,17 +55,19 @@ export default async function BusinessTypesSection({
               because it is the only thing in the grid you can act on. */}
           <li>
             <Link className={`card-surface ${styles.tile} ${styles.other}`} href="/demo">
-              <span className={styles.icon} aria-hidden="true">
+              <span className={`icon-tile ${styles.icon}`} aria-hidden="true">
                 <Glyph name="spark" />
               </span>
-              <h3 className={styles.name}>Yours isn&rsquo;t listed?</h3>
-              <p className={styles.body}>
-                Tell us the trade on the demo form. We have not met one we could not build for.
-              </p>
-              <span className={styles.otherCta}>
-                Book a free demo
-                <Glyph name="arrow-right" className={styles.otherIcon} />
-              </span>
+              <div>
+                <h3 className={styles.name}>Yours isn&rsquo;t listed?</h3>
+                <p className={styles.body}>
+                  Tell us the trade on the demo form. We have not met one we could not build for.
+                </p>
+                <span className={styles.otherCta}>
+                  Book a free demo
+                  <Glyph name="arrow-right" className={styles.otherIcon} />
+                </span>
+              </div>
             </Link>
           </li>
         </ul>

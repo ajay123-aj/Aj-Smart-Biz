@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Executive Summary — Aj Smart Biz</title>
+<link rel="stylesheet" href="assets/doc.css"></head><body>
+
+<section class="cover">
+  <div class="band">
+    <div class="kicker">Aj Smart Biz · Document 01</div>
+    <h1>Executive Summary &amp; Business Overview</h1>
+    <div class="sub">What the platform is, who it serves, how it earns, and what is built today.</div>
+  </div>
+  <table class="meta">
+    <tr><td>Product</td><td>Aj Smart Biz — multi-tenant business platform (SaaS)</td></tr>
+    <tr><td>Audience</td><td>Founders, business stakeholders, sales, new team members</td></tr>
+    <tr><td>Version / date</td><td>1.0 · 7 November 2026</td></tr>
+    <tr><td>Source of truth</td><td>Generated from the repository code (branch <code>aj-smart-biz-backend-deploy</code>)</td></tr>
+  </table>
+</section>
+
+<section class="toc"><h2>Contents</h2><ol>
+<li>The product in one page</li><li>Problem and opportunity</li><li>Who uses it</li><li>Product suite</li>
+<li>Business model</li><li>Key capabilities</li><li>Design principles that run through the product</li><li>Current state and next steps</li></ol></section>
+
+<h1>1. The product in one page</h1>
+<p><strong>Aj Smart Biz</strong> gives a small or mid-sized business a complete online presence and a back office in one subscription: a branded public website on its own domain, a product and service catalogue, a cart and order desk, appointment booking, stock control, counter invoicing, customer accounts, enquiry inboxes and visitor analytics. Every business (a <em>tenant</em> or <em>company</em>) runs on one shared platform. The platform operator sells plans, provisions companies and controls which features each plan includes.</p>
+
+<div class="grid3">
+  <div class="card"><div class="kpi">5</div><p>applications in one repository: API, two admin consoles, product website, tenant website themes</p></div>
+  <div class="card"><div class="kpi">52</div><p>database tables covering tenants, website content, catalogue, orders, stock, invoices, billing and leads</p></div>
+  <div class="card"><div class="kpi">19</div><p>sellable features (functionalities) that a plan can grant and a tenant can switch on</p></div>
+</div>
+
+<div class="callout"><strong>The single idea behind the platform</strong>
+One deployment per website design serves <em>every</em> company that uses it. The website reads the domain it was opened on, asks the API which company owns that domain, and brands itself from the answer. Nothing is built per tenant, so onboarding a new business is a database operation and takes minutes, not a project.</div>
+
+<h1>2. Problem and opportunity</h1>
+<h2>The problem</h2>
+<ul>
+<li>Small businesses (salons, decor and framing studios, retailers, service providers) need a website, a way to take orders and bookings, and simple stock and billing — but buy each from a different vendor, or not at all.</li>
+<li>Agency-built websites are expensive, go stale, and cannot take an order or a booking.</li>
+<li>Generic site builders do not know about branches, GST invoices, WhatsApp-first ordering, or Indian payment habits (UPI, cash on delivery).</li>
+</ul>
+<h2>The opportunity</h2>
+<ul>
+<li>One subscription that bundles <strong>website + catalogue + orders + bookings + stock + billing + leads</strong>, sized by plan.</li>
+<li>WhatsApp-first: orders and enquiries can be handed to the business's WhatsApp, which is how its customers already talk to it.</li>
+<li>Recurring revenue (monthly to yearly plans), with upsell built in: tenants browse higher plans and request an upgrade from inside their console.</li>
+</ul>
+
+<h1>3. Who uses it</h1>
+<table><thead><tr><th>Persona</th><th>Where they work</th><th>What they need</th></tr></thead><tbody>
+<tr><td><strong>Platform owner / Super admin</strong></td><td>Super Admin console (:4200)</td><td>Sell plans, onboard companies, track income and renewals, approve upgrade requests, run the marketing website.</td></tr>
+<tr><td><strong>Platform staff</strong></td><td>Super Admin console (role <code>staff</code>)</td><td>Day-to-day tenant support; cannot touch the protected root account.</td></tr>
+<tr><td><strong>Company main admin</strong></td><td>Company Admin workspace (:4300)</td><td>Edit the website, manage branches, roles and staff, view the plan; bypasses all permission checks.</td></tr>
+<tr><td><strong>Company staff</strong></td><td>Company Admin workspace</td><td>Work the order queue, bookings, stock, invoices and leads — only the menus their role allows.</td></tr>
+<tr><td><strong>Website visitor / customer</strong></td><td>Tenant website (themes)</td><td>Browse products and services, place an order, book a slot, sign in with phone + OTP, see order history.</td></tr>
+<tr><td><strong>Prospect</strong></td><td>Product website (:4700)</td><td>Understand what is sold, compare plans, see template demos, book a demo.</td></tr>
+</tbody></table>
+
+<h1>4. Product suite</h1>
+<table><thead><tr><th>Application</th><th>Technology</th><th>Port</th><th>Purpose</th></tr></thead><tbody>
+<tr><td>Aj-Smart-Biz-Backend</td><td>Node.js · Express · Sequelize · MySQL</td><td>4000</td><td>The only API. Serves every other application.</td></tr>
+<tr><td>Aj-Smart-Biz-Supper-Admin</td><td>Angular 22</td><td>4200</td><td>Platform console — companies, plans, subscriptions, masters, marketing site CMS.</td></tr>
+<tr><td>Aj-Smart-Biz-Admin</td><td>Angular 22</td><td>4300</td><td>Company workspace — website content, orders, stock, invoices, customers, leads, roles.</td></tr>
+<tr><td>themes/default · midnight · atelier</td><td>Next.js 15</td><td>4400 · 4500 · 4600</td><td>Tenant public websites; three visual designs over identical logic.</td></tr>
+<tr><td>Aj-Smart-Biz-Technology</td><td>Next.js 15</td><td>4700</td><td>The product (marketing) website that sells the platform.</td></tr>
+</tbody></table>
+
+<h1>5. Business model</h1>
+<h2>Plans and subscriptions</h2>
+<p>Revenue comes from <strong>plans</strong> sold to companies as dated <strong>subscriptions</strong>. A plan defines:</p>
+<ul>
+<li><strong>Price</strong> (with optional discount price), currency and <strong>billing cycle</strong> — monthly, quarterly, half-yearly, yearly or lifetime — plus optional trial days.</li>
+<li><strong>Quotas</strong> — maximum branches, maximum admins, included users and storage (MB).</li>
+<li><strong>Functionalities</strong> — which sellable features the plan grants (see section 6).</li>
+<li><strong>Visibility</strong> — shown on the public pricing page (<code>isPublic</code>), offered to tenants for self-requested upgrades (<code>showInAdmin</code>), marked “popular”.</li>
+</ul>
+<p class="muted small">Actual price points are configured by the platform owner in Plan Management and are not fixed in code.</p>
+
+<h2>Revenue levers built into the product</h2>
+<div class="grid2">
+<div class="card"><h4>Upgrade requests</h4><p>Tenants see every requestable plan labelled <em>Upgrade</em> or <em>Downgrade</em> and ask for it in one click. The request lands at the top of the platform's renewal desk.</p></div>
+<div class="card"><h4>Fair proration</h4><p>Mid-term changes credit unused days by daily value: <code>credit = term total × remaining days ÷ term days</code>, so monthly and yearly plans compare fairly.</p></div>
+<div class="card"><h4>Pre-renewal &amp; auto-renew</h4><p>The next term can be booked before the current one ends; auto-renew rolls terms over automatically.</p></div>
+<div class="card"><h4>Feature-based tiers</h4><p>Website sections, cart, stock, invoices and customer accounts are separate grants, so plans can be tiered by value delivered.</p></div>
+</div>
+
+<h2>What happens when a plan lapses</h2>
+<p>Expired, suspended or missing plans block creating branches and admins, hide paid menus, and replace the public website with a polite <em>holding page</em> (still branded, <code>noindex</code>, never mentioning price). This gives a strong, fair reason to renew without destroying the tenant's data — nothing is ever deleted.</p>
+
+<h1>6. Key capabilities</h1>
+<table><thead><tr><th>Area</th><th>Capability</th></tr></thead><tbody>
+<tr><td>Website</td><td>Hero slider (desktop + mobile art), About page with self-counting figures, Team, Gallery, Contact page, Features/Benefits, Testimonials (curated or visitor-submitted with moderation), Blog, Social links, Share button, typed WhatsApp numbers, menu built by the API.</td></tr>
+<tr><td>Branding</td><td>Own domain(s), branch sub-domains with their own logo and content, theme colours per company or branch, three website designs.</td></tr>
+<tr><td>Catalogue</td><td>Three-level product category tree, up to 8 photos per product, price / offer price / free-text price label, specs, offers page, stock status.</td></tr>
+<tr><td>Orders</td><td>Cart or single “Order now”, order to WhatsApp or to UPI/payment link, order queue with six forward-only states, separate payment status, sales analytics.</td></tr>
+<tr><td>Services &amp; bookings</td><td>Service categories and cards, enquiry form (WhatsApp and/or inbox), slot booking with capacity, Service Leads inbox, booking diary, revenue.</td></tr>
+<tr><td>Stock</td><td>Multiple warehouses, append-only stock ledger, reservations on confirm, issue on dispatch, transfers, low/out-of-stock views, retail and cost valuation.</td></tr>
+<tr><td>Invoicing (POS)</td><td>Counter billing with line and bill discounts, GST tax presets, round-off, draft → issued → cancelled, partial payments, stock deduction, analysis by product/admin/payment mode/branch.</td></tr>
+<tr><td>Customers</td><td>Phone + OTP sign-in on the website, saved addresses, order and booking history, customer list in the console.</td></tr>
+<tr><td>Leads &amp; analytics</td><td>Device-level visitor tracking with UTM, sessions, stages; campaign analysis for the marketing site.</td></tr>
+<tr><td>Access</td><td>Roles × menus × five actions (view/create/edit/delete/export), main admin bypass, plan-driven menus.</td></tr>
+<tr><td>Operator tools</td><td>Company provisioning in one form, duplicate a company's set-up, AI content creator (Claude) that drafts a new tenant's website copy, sample companies.</td></tr>
+</tbody></table>
+
+<h1>7. Design principles that run through the product</h1>
+<ol>
+<li><strong>Nothing is deleted.</strong> Almost every table uses soft delete; deleting a company soft-deletes its branches, roles and admins together, and restore brings them all back.</li>
+<li><strong>History is frozen.</strong> A subscription snapshots the plan; an order line snapshots the product and price; an order copies the address as text. Editing the source later never rewrites the past.</li>
+<li><strong>One answer, many screens.</strong> Entitlement, quota, offer status and enquiry routing are each decided by one function, and every screen renders that answer — so a disabled button and a refused request never disagree.</li>
+<li><strong>Absent, not empty.</strong> A website section with no content or no entitlement is not rendered at all — no empty boxes, no invented copy.</li>
+<li><strong>Prices come from the server.</strong> The public cart sends product ids and quantities only; every price is taken from the catalogue at order time.</li>
+<li><strong>API-first.</strong> All content the websites show comes from the API; templates hold no business data.</li>
+</ol>
+
+<h1>8. Current state and next steps</h1>
+<div class="grid2">
+<div class="card"><h4>Built and verified</h4><ul>
+<li>All five applications build cleanly (dev and production).</li>
+<li>188 end-to-end API checks and 63 browser checks recorded in the project README.</li>
+<li>Docker images and CI/CD to a self-hosted server with nginx and TLS.</li></ul></div>
+<div class="card"><h4>Known gaps (see Document 11)</h4><ul>
+<li>No SMS gateway yet — OTP uses a development code.</li>
+<li>No online payment gateway; payment is UPI/link hand-off.</li>
+<li>No automated test suite in the repositories.</li>
+<li><code>maxUsers</code> and some quotas are displayed but not metered.</li>
+<li>Refresh tokens are issued but not used by the consoles.</li></ul></div>
+</div>
+</body></html>

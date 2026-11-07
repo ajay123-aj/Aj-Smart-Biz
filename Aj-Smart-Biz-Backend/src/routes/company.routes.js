@@ -45,6 +45,31 @@ router.post('/:id/restore', validate(master.idParam), controller.restore);
 
 /**
  * @openapi
+ * /super-admin/companies/{id}/storage:
+ *   patch:
+ *     tags: [Super Admin]
+ *     summary: Set this company's own upload storage limit
+ *     description: |
+ *       `storageLimitMb` (whole MB) overrides the plan's storage for this one
+ *       company; `null` returns it to the plan's `storageMb`. Lowering it below
+ *       what is already used deletes nothing — the company just cannot upload
+ *       more until it is back under.
+ *
+ *       Answers with the storage summary, the same object the company detail
+ *       (`GET /super-admin/companies/{id}`) returns as `storage`:
+ *       `usedBytes`, `usedLabel`, `limitMb`, `limitLabel`, `remainingBytes`,
+ *       `percentUsed`, `atLimit`, `unlimited`, `source` (`company`, `plan` or
+ *       `none`), `companyStorageLimitMb`, `planStorageMb`, `planName` and
+ *       `fileCount`.
+ *
+ *       Usage is the sum of the company's uploads, recorded as they are made.
+ *       Opening the company detail first reconciles it with the files its
+ *       records point at, so files uploaded before tracking began are counted.
+ */
+router.patch('/:id/storage', validate(schema.storageUpdate), controller.updateStorage);
+
+/**
+ * @openapi
  * /super-admin/companies/{id}/duplicate:
  *   post:
  *     tags: [Super Admin]

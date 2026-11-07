@@ -31,24 +31,21 @@ export default async function HomePage() {
 
       <StepsSection />
 
-      <PromisesSection />
-
       <CapabilitiesSection
         eyebrow="What you get"
         title="A website built from parts that already work."
         lede="Switch on what your business needs and leave the rest off. Every one of these is managed for you — you ask, we do it."
-        /* Six is one clean row at most widths and two at the rest. The full set
-           is on /services, which is what the counter underneath points at. */
-        limit={6}
+        alt
       />
 
-      <TemplatesSection />
+      <PromisesSection />
+
+      <TemplatesSection panel />
 
       <BusinessTypesSection
         eyebrow="Who it is for"
         title="Any business. We mean it."
         lede="These are the trades already running on the platform. The list grows every month, and yours not being on it has never stopped anybody."
-        panel
       />
 
       <PlansSection
@@ -56,6 +53,7 @@ export default async function HomePage() {
         title="One monthly recharge. Everything in it."
         lede="No setup fee, no contract, no notice period. Change plan any month; stop any month."
         showAllLink
+        alt
       />
 
       <FaqSection />

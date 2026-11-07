@@ -58,6 +58,16 @@
                     >
                       Permissions
                     </a>
+                    @if (!row.isSystem) {
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-ghost"
+                        (click)="openAssign(row)"
+                        *appCan="'role-management'; action: 'canEdit'"
+                      >
+                        Assign admins
+                      </button>
+                    }
                     <button
                       type="button"
                       class="btn btn-sm btn-ghost"
@@ -122,6 +132,57 @@
       <button type="button" class="btn btn-ghost" (click)="modalOpen.set(false)">Cancel</button>
       <button type="submit" form="role-form" class="btn btn-primary" [disabled]="saving()">
         {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Create role' }}
+      </button>
+    </ng-container>
+  </app-modal>
+}
+
+@if (assignRole(); as role) {
+  <app-modal
+    title="Assign admins"
+    [subtitle]="role.name"
+    size="sm"
+    [closeOnBackdrop]="false"
+    (closed)="assignRole.set(null)"
+  >
+    @if (assignView(); as view) {
+      @if (view.admins.length) {
+        <p class="tiny muted" style="margin:0 0 12px">
+          Tick everyone who should have this role. It is added alongside any roles they already have, and they get everything any of their roles allows.
+        </p>
+        <div class="role-picker">
+          @for (admin of view.admins; track admin.id) {
+            <div class="role-option" [class.on]="isPicked(admin.id)">
+              <label class="check">
+                <input type="checkbox" [checked]="isPicked(admin.id)" (change)="togglePick(admin.id)" />
+                <span>
+                  <span class="strong">{{ admin.name }}</span>
+                  <span class="tiny muted" style="display:block">{{ admin.email }}</span>
+                  @if (otherRoles(admin)) {
+                    <span class="tiny muted" style="display:block">Also: {{ otherRoles(admin) }}</span>
+                  }
+                </span>
+              </label>
+              @if (admin.holdsAs === 'primary') {
+                <span class="badge badge-brand">Primary</span>
+              }
+              @if (admin.status !== 'active') {
+                <span class="badge badge-muted">Inactive</span>
+              }
+            </div>
+          }
+        </div>
+      } @else {
+        <p class="muted">No admins yet. Add one in Admin Management first.</p>
+      }
+    } @else {
+      <p class="muted">Loading…</p>
+    }
+
+    <ng-container footer>
+      <button type="button" class="btn btn-ghost" (click)="assignRole.set(null)">Cancel</button>
+      <button type="button" class="btn btn-primary" [disabled]="assignSaving() || !assignView()" (click)="saveAssign()">
+        {{ assignSaving() ? 'Saving…' : 'Save' }}
       </button>
     </ng-container>
   </app-modal>

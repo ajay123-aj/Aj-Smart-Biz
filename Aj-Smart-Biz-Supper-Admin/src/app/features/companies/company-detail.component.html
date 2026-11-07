@@ -37,6 +37,31 @@
       <div class="strong" style="margin-top:6px;font-size:20px">{{ c.summary?.totalBranches ?? 0 }}</div>
       <div class="tiny muted">{{ c.summary?.activeBranches ?? 0 }} active · {{ c.summary?.totalAdmins ?? 0 }} admins</div>
     </div></div>
+    <!-- Upload storage: used vs allowed, and where the limit comes from. -->
+    @if (c.storage; as st) {
+      <div class="card"><div class="card-body">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <span class="tiny muted">Storage</span>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="openStorageModal()">Change</button>
+        </div>
+        <div class="strong" style="margin-top:4px;font-size:20px">{{ st.usedLabel }}</div>
+        <div class="tiny muted">of {{ st.limitLabel }} · {{ st.fileCount }} files</div>
+        @if (!st.unlimited) {
+          <div class="storage-bar" [attr.data-level]="storageLevel(st.percentUsed, st.atLimit)"
+               role="progressbar" aria-label="Storage used"
+               [attr.aria-valuenow]="st.percentUsed" aria-valuemin="0" aria-valuemax="100">
+            <span [style.width.%]="st.percentUsed"></span>
+          </div>
+        }
+        <div class="tiny muted" style="margin-top:6px">
+          @switch (st.source) {
+            @case ('company') { Custom limit for this company }
+            @case ('plan') { From plan{{ st.planName ? ' · ' + st.planName : '' }} }
+            @default { No plan — not limited }
+          }
+        </div>
+      </div></div>
+    }
     <div class="card"><div class="card-body">
       <div class="tiny muted">Lifetime paid</div>
       <div class="strong" style="margin-top:6px;font-size:20px">{{ money(c.summary?.totalPaid ?? 0, c.currency) }}</div>
@@ -341,6 +366,17 @@
           <div class="dl-item"><dt>Address</dt><dd>{{ addressOf(c) }}</dd></div>
           <div class="dl-item"><dt>State</dt><dd>{{ c.state?.name || '—' }}</dd></div>
           <div class="dl-item"><dt>Currency / timezone</dt><dd>{{ c.currency }} · {{ c.timezone }}</dd></div>
+          @if (c.storage; as st) {
+            <div class="dl-item"><dt>Storage</dt><dd>
+              {{ st.usedLabel }} used of {{ st.limitLabel }}
+              @if (!st.unlimited) { ({{ st.percentUsed }}%) }
+              <span class="tiny muted">
+                · plan {{ mb(st.planStorageMb) }}
+                @if (st.source === 'company') { · custom {{ mb(st.companyStorageLimitMb) }} }
+              </span>
+              <button type="button" class="btn btn-ghost btn-sm" style="margin-left:6px" (click)="openStorageModal()">Change</button>
+            </dd></div>
+          }
           <div class="dl-item"><dt>Created</dt><dd>{{ c.createdAt | date: 'dd MMM yyyy, HH:mm' }}</dd></div>
         </dl>
       </div>
@@ -867,6 +903,59 @@
           [disabled]="resettingPassword()"
         >
           {{ resettingPassword() ? 'Saving…' : 'Set password' }}
+        </button>
+      </ng-container>
+    </app-modal>
+  }
+
+  @if (storageModalOpen()) {
+    <app-modal title="Storage limit" [subtitle]="c.name" size="sm" [closeOnBackdrop]="false" (closed)="storageModalOpen.set(false)">
+      <form [formGroup]="storageForm" (ngSubmit)="saveStorage()" id="storage-form">
+        @if (c.storage; as st) {
+          <p class="tiny muted" style="margin:0 0 14px">
+            Using <strong>{{ st.usedLabel }}</strong> in {{ st.fileCount }} files.
+            The plan{{ st.planName ? ' (' + st.planName + ')' : '' }} allows
+            <strong>{{ mb(st.planStorageMb) }}</strong>.
+          </p>
+        }
+
+        <label class="radio-row">
+          <input type="radio" formControlName="mode" value="follow" />
+          <span>
+            <span class="strong">Use the plan&rsquo;s storage</span>
+            <span class="hint" style="display:block">Changes automatically when the plan changes.</span>
+          </span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" formControlName="mode" value="custom" />
+          <span>
+            <span class="strong">Set a custom limit for this company</span>
+            <span class="hint" style="display:block">Overrides the plan — more or less than it allows.</span>
+          </span>
+        </label>
+
+        @if (storageForm.controls.mode.value === 'custom') {
+          <div class="grid grid-2" style="margin-top:12px">
+            <div class="field">
+              <label for="samount">Storage</label>
+              <input id="samount" class="input" type="number" min="1" step="any" formControlName="amount" />
+            </div>
+            <div class="field">
+              <label for="sunit">Unit</label>
+              <select id="sunit" class="select" formControlName="unit">
+                <option value="MB">MB</option>
+                <option value="GB">GB</option>
+              </select>
+            </div>
+          </div>
+          <span class="hint">Lowering it below what is used deletes nothing — uploads just stop until there is room.</span>
+        }
+      </form>
+
+      <ng-container footer>
+        <button type="button" class="btn btn-ghost" (click)="storageModalOpen.set(false)">Cancel</button>
+        <button type="submit" form="storage-form" class="btn btn-primary" [disabled]="savingStorage()">
+          {{ savingStorage() ? 'Saving…' : 'Save' }}
         </button>
       </ng-container>
     </app-modal>

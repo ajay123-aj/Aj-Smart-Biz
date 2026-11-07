@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Deployment &amp; DevOps — Aj Smart Biz</title>
+<link rel="stylesheet" href="assets/doc.css">
+<style>
+svg text { font-family: 'Segoe UI', Arial, sans-serif; }
+.bx { fill: #fff; stroke: #2563eb; stroke-width: 1.3; } .bx2 { fill: #eef3fe; stroke: #2563eb; stroke-width: 1.3; }
+.bx3 { fill: #f5f7fa; stroke: #9aa4b5; stroke-dasharray: 4 3; } .db { fill: #fdf3e2; stroke: #9a5b00; stroke-width: 1.3; }
+.t { font-size: 11px; font-weight: 600; fill: #1b2130; } .s { font-size: 9.5px; fill: #4a5468; }
+.ar { stroke: #4a5468; stroke-width: 1.2; fill: none; marker-end: url(#a); }
+</style></head><body>
+<svg width="0" height="0" style="position:absolute"><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4a5468"/></marker></defs></svg>
+
+<section class="cover">
+  <div class="band">
+    <div class="kicker">Aj Smart Biz · Document 07</div>
+    <h1>Deployment, DevOps &amp; Operations Runbook</h1>
+    <div class="sub">Local setup, environments, Docker images, CI/CD pipelines, nginx and DNS, and day-2 operations.</div>
+  </div>
+  <table class="meta">
+    <tr><td>Audience</td><td>DevOps, developers, on-call</td></tr>
+    <tr><td>Version / date</td><td>1.0 · 7 November 2026</td></tr>
+    <tr><td>Sources</td><td>Dockerfiles, <code>.github/workflows/*</code> (at HEAD), <code>deploy/</code>, branch <code>nginx-domain-live</code></td></tr>
+  </table>
+</section>
+
+<section class="toc"><h2>Contents</h2><ol>
+<li>Local development</li><li>Configuration (environment variables)</li><li>Production topology</li><li>Docker images</li>
+<li>CI/CD pipelines</li><li>nginx, DNS and TLS</li><li>Onboarding a tenant domain</li><li>Operations runbook</li></ol></section>
+
+<h1>1. Local development</h1>
+<table><thead><tr><th>App</th><th>Folder</th><th>Command</th><th>URL</th></tr></thead><tbody>
+<tr><td>API</td><td>Aj-Smart-Biz-Backend</td><td><code>npm install &amp;&amp; npm run dev</code></td><td>http://localhost:4000/api/v1 (docs at /api/v1/docs)</td></tr>
+<tr><td>Super Admin</td><td>Aj-Smart-Biz-Supper-Admin</td><td><code>npm install &amp;&amp; npm start</code></td><td>http://localhost:4200</td></tr>
+<tr><td>Company Admin</td><td>Aj-Smart-Biz-Admin</td><td><code>npm install &amp;&amp; npm start</code></td><td>http://localhost:4300</td></tr>
+<tr><td>Theme default / midnight / atelier</td><td>themes/&lt;name&gt;</td><td><code>npm run dev</code></td><td>:4400 / :4500 / :4600 — use <code>salon.localhost:4500</code> or <code>?domain=</code></td></tr>
+<tr><td>Product website</td><td>Aj-Smart-Biz-Technology</td><td><code>npm run dev</code></td><td>http://localhost:4700</td></tr>
+</tbody></table>
+<ul>
+<li>MySQL must be running; the API creates its database. No MySQL? <code>DB_DIALECT=sqlite npm run dev</code>.</li>
+<li>First boot seeds the root super admin from <code>.env.development</code> (default <code>superadmin@ajsmartbiz.com</code>) and prints the credentials — change before any deployment.</li>
+<li>Angular dev servers proxy <code>/api/v1</code> and <code>/uploads</code> to <code>API_PROXY_TARGET</code> (default <code>http://localhost:4000</code>) via <code>proxy.conf.js</code>.</li>
+<li>Demo data (opt-in, idempotent): <code>npm run db:seed:salon</code>, <code>db:seed:decor</code>, <code>db:seed:catalogue [companyId]</code>, <code>db:seed:blog</code>, <code>db:seed:marketing</code>.</li>
+<li>After testing a Next.js site with <code>next dev</code>, run <code>npm run build</code> again before <code>npm start</code> — the dev server overwrites the production build.</li>
+</ul>
+
+<h1>2. Configuration</h1>
+<h2>Backend (<code>.env.development</code> / <code>.env.production</code>; real env wins)</h2>
+<table><thead><tr><th>Variable</th><th>Purpose</th></tr></thead><tbody>
+<tr><td>NODE_ENV, PORT, API_PREFIX</td><td>Mode, port (4000), prefix (/api/v1)</td></tr>
+<tr><td>DB_DIALECT, DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, DB_STORAGE, DB_LOGGING</td><td>Database</td></tr>
+<tr><td>DB_SYNC_MODE</td><td>alter (default) · force (refused in production) · none</td></tr>
+<tr><td>JWT_SECRET, JWT_EXPIRES_IN, JWT_REFRESH_SECRET, JWT_REFRESH_EXPIRES_IN</td><td>Tokens (boot refuses placeholder secrets in production)</td></tr>
+<tr><td>SUPER_ADMIN_NAME/EMAIL/PHONE/PASSWORD</td><td>Root account ensured on every boot</td></tr>
+<tr><td>CORS_ORIGINS</td><td>Comma list; <code>*</code> reflects origin (dev tunnels only)</td></tr>
+<tr><td>BCRYPT_SALT_ROUNDS, DEFAULT_COMPANY_ADMIN_PASSWORD</td><td>Hashing cost; fallback main-admin password</td></tr>
+<tr><td>UPLOAD_DIR, UPLOAD_PUBLIC_PATH, UPLOAD_MAX_SIZE_MB</td><td>Uploads (default 2 MB per file)</td></tr>
+<tr><td>CUSTOMER_OTP_DEV_CODE</td><td>Fixed OTP until an SMS gateway exists — not production-safe</td></tr>
+<tr><td>ANTHROPIC_API_KEY, AI_CONTENT_MODEL</td><td>AI content creator</td></tr>
+</tbody></table>
+<h2>Websites</h2>
+<table><thead><tr><th>Variable</th><th>App</th><th>Purpose</th></tr></thead><tbody>
+<tr><td>API_URL</td><td>both</td><td>Server-side API base, e.g. <code>http://aj-smart-biz-backend:4000/api/v1</code> (no trailing slash)</td></tr>
+<tr><td>SITE_URL, SITE_SNAPSHOT_DIR</td><td>Technology</td><td>Canonical URL; where the last good bootstrap snapshot is kept</td></tr>
+<tr><td>TENANT_DOMAIN</td><td>themes</td><td>Dev fallback only — leave unset in production</td></tr>
+<tr><td>NEXT_PUBLIC_FILES_URL</td><td>themes (build-time)</td><td>CDN origin for uploads</td></tr>
+<tr><td>UPLOADS_ORIGIN</td><td>themes</td><td>Target of the /uploads proxy (defaults to API_URL origin)</td></tr>
+<tr><td>ALLOWED_ORIGINS</td><td>both</td><td>Server Action origins for dev tunnels; empty in production</td></tr>
+<tr><td>TZ, HOST_PORT</td><td>deploy env files</td><td>Container timezone; published host port</td></tr>
+</tbody></table>
+<h2>Angular consoles</h2>
+<p><code>src/environments/environment.ts</code> (production) holds <code>apiUrl</code> and <code>filesUrl</code>; development uses relative <code>/api/v1</code> through the proxy. The nginx image can also proxy <code>/api/v1</code> to <code>API_ORIGIN</code> (default <code>http://aj-smart-biz-backend:4000</code>).</p>
+
+<h1>3. Production topology</h1>
+<figure>
+<svg viewBox="0 0 720 300" width="680">
+  <rect class="bx3" x="10" y="10" width="140" height="50" rx="7"/><text class="t" x="22" y="32">Cloudflare DNS</text><text class="s" x="22" y="48">zone ajtechhub.com</text>
+  <rect class="bx2" x="190" y="10" width="200" height="50" rx="7"/><text class="t" x="202" y="32">nginx (host) + certbot TLS</text><text class="s" x="202" y="48">vhost per domain → 127.0.0.1:port</text>
+  <path class="ar" d="M150 35 H190"/>
+  <rect class="bx3" x="10" y="90" width="700" height="200" rx="9"/><text class="t" x="22" y="108">Docker host · user network "aj-smart-biz" · self-hosted GitHub runner</text>
+  <rect class="bx" x="30" y="125" width="120" height="48" rx="6"/><text class="t" x="40" y="145">technology</text><text class="s" x="40" y="160">:4700</text>
+  <rect class="bx" x="165" y="125" width="120" height="48" rx="6"/><text class="t" x="175" y="145">theme-default</text><text class="s" x="175" y="160">:4400</text>
+  <rect class="bx" x="300" y="125" width="120" height="48" rx="6"/><text class="t" x="310" y="145">theme-midnight</text><text class="s" x="310" y="160">:4500</text>
+  <rect class="bx" x="435" y="125" width="120" height="48" rx="6"/><text class="t" x="445" y="145">theme-atelier</text><text class="s" x="445" y="160">:4600</text>
+  <rect class="bx" x="570" y="125" width="125" height="48" rx="6"/><text class="t" x="580" y="145">admin / super-admin</text><text class="s" x="580" y="160">nginx :80 → 4300/4200</text>
+  <rect class="bx2" x="230" y="210" width="200" height="50" rx="6"/><text class="t" x="242" y="230">aj-smart-biz-backend</text><text class="s" x="242" y="246">:4000 · VOLUME /app/uploads</text>
+  <rect class="db" x="490" y="215" width="140" height="42" rx="6"/><text class="t" x="502" y="234">MySQL</text><text class="s" x="502" y="249">database</text>
+  <path class="ar" d="M90 173 L280 210"/><path class="ar" d="M225 173 L300 210"/><path class="ar" d="M360 173 V210"/><path class="ar" d="M495 173 L400 210"/><path class="ar" d="M630 173 L430 215"/><path class="ar" d="M430 236 H490"/>
+  <path class="ar" d="M290 60 V125"/>
+</svg>
+<figcaption>Figure 1 — One server: nginx terminates TLS and proxies each domain to a container port; containers reach the API by name on the Docker network.</figcaption>
+</figure>
+
+<h1>4. Docker images</h1>
+<table><thead><tr><th>Image</th><th>Build</th><th>Runtime</th><th>Health check</th></tr></thead><tbody>
+<tr><td>Backend</td><td>node:24-alpine, <code>npm ci --omit=dev</code></td><td>user node, port 4000, <code>VOLUME /app/uploads</code></td><td>GET /</td></tr>
+<tr><td>Super Admin / Admin</td><td>node:24-alpine, <code>ng build --configuration production</code> (needs internet for font inlining)</td><td>nginx:1.29-alpine on :80; envsubst <code>API_ORIGIN</code>; gzip; hashed assets cached 1 year; SPA fallback; <code>/api/v1</code> and <code>/uploads</code> proxied (25 MB body, 120 s timeout)</td><td>wget /index.html</td></tr>
+<tr><td>Themes / Technology</td><td>3 stages deps → build → runtime, node:24-alpine + libc6-compat; themes take build arg <code>NEXT_PUBLIC_FILES_URL</code></td><td>Next standalone <code>node server.js</code> as user node, HOSTNAME 0.0.0.0, telemetry off</td><td>GET / every 30 s</td></tr>
+</tbody></table>
+<p>Registry: Docker Hub repository <code>ajtechhub/ajtechhub</code> with service-prefixed tags.</p>
+
+<h1>5. CI/CD pipelines</h1>
+<p>Each service has two GitHub Actions workflows triggered by pushing to a dedicated branch.</p>
+<table><thead><tr><th>Workflow</th><th>Trigger</th><th>What it does</th></tr></thead><tbody>
+<tr><td><code>&lt;service&gt;-live.yml</code></td><td>push to <code>&lt;service&gt;-live</code> or manual</td><td>Build with buildx and push only. Tags <code>&lt;service&gt;-1.0.&lt;run&gt;</code> and <code>&lt;service&gt;-live</code>.</td></tr>
+<tr><td><code>&lt;service&gt;-deploy.yml</code></td><td>push to <code>&lt;service&gt;-deploy</code></td><td>Job 1 (ubuntu-latest): build, push <code>&lt;service&gt;-deploy-1.0.&lt;run&gt;</code>, output digest. Job 2 (self-hosted runner on the server): validate <code>/opt/aj-smart-biz/&lt;svc&gt;.env</code> (API_URL set, unquoted, no trailing slash, no CRLF), pull by digest, <code>docker run -d --restart unless-stopped --network aj-smart-biz --env-file … -p HOST_PORT:APP_PORT</code>, wait ≤ 2 min for healthy, <strong>roll back</strong> to the previous image on failure, prune.</td></tr>
+<tr><td><code>docker-publish.yml</code></td><td>push to <code>dev_live</code> touching backend</td><td>Backend image tagged <code>aj-smart-biz-backend-dev_live</code>.</td></tr>
+<tr><td><code>deploy-nginx-domains.yml</code></td><td>push to <code>nginx-domain-live</code></td><td>Cloudflare A records → sync <code>domains/*.conf</code> to <code>/etc/nginx/conf.d/managed-*.conf</code> → <code>nginx -t</code> + reload (rollback on failure) → certbot <code>--nginx</code>.</td></tr>
+</tbody></table>
+<p><strong>Services:</strong> aj-smart-biz-backend, -admin, -supper-admin, -technology, -theme-default, -theme-midnight, -theme-atelier.</p>
+<p><strong>Secrets/vars:</strong> DOCKERHUB_USERNAME/TOKEN, &lt;SERVICE&gt;_ENV_FILE, &lt;SERVICE&gt;_HOST_PORT, theme build args (WHITE_THEME_*, BLACK_THEME_*, DECOR_FRAMING_*), NGINX_SERVER_*, CLOUDFLARE_API_TOKEN/ZONE_ID/ZONE.</p>
+<div class="callout warn"><strong>Working tree note</strong>The workflow files are deleted in the current working tree of branch <code>aj-smart-biz-backend-deploy</code> (uncommitted). They exist at HEAD. Confirm whether this deletion is intended before committing.</div>
+
+<h1>6. nginx, DNS and TLS</h1>
+<table><thead><tr><th>Domain</th><th>Upstream</th><th>Body limit</th></tr></thead><tbody>
+<tr><td>smart-biz.ajtechhub.com</td><td>4700 Technology</td><td>2 MB</td></tr>
+<tr><td>smart-biz-white.ajtechhub.com</td><td>4400 theme default</td><td>8 MB</td></tr>
+<tr><td>smart-biz-black.ajtechhub.com</td><td>4500 theme midnight</td><td>8 MB</td></tr>
+<tr><td>smart-biz-decor-framing.ajtechhub.com</td><td>4600 theme atelier</td><td>8 MB</td></tr>
+<tr><td>smart-biz-api.ajtechhub.com</td><td>4000 API</td><td>25 MB</td></tr>
+<tr><td>smart-biz-admin.ajtechhub.com</td><td>4300 Company Admin</td><td>4 MB</td></tr>
+<tr><td>smart-biz-super-admin.ajtechhub.com</td><td>4200 Super Admin</td><td>4 MB</td></tr>
+</tbody></table>
+<p>Vhosts listen on 80 (certbot adds 443 and the redirect) and forward <code>Host</code>, <code>X-Real-IP</code>, <code>X-Forwarded-For</code>, <code>X-Forwarded-Proto</code>, <code>X-Forwarded-Host</code> and WebSocket upgrade headers.</p>
+<div class="callout bad"><strong>Check the API hostname</strong>The Angular production environments point at <code>aj-smart-biz-api.ajtechhub.com</code>, while the nginx vhost is <code>smart-biz-api.ajtechhub.com</code>. Confirm which one is live and align them.</div>
+
+<h1>7. Onboarding a tenant domain</h1>
+<ol>
+<li>In the Super Admin (company → Domains) or Company Admin (Company Details → Domains), add the bare host, optionally pinned to a branch.</li>
+<li>Add a vhost in <code>nginx-domains/domains/&lt;host&gt;.conf</code> on branch <code>nginx-domain-live</code>, proxying to the chosen design's port (4400/4500/4600). Push — DNS, nginx and TLS are applied by the workflow.</li>
+<li>For domains not in the Cloudflare zone, the tenant points an A record to the server IP first.</li>
+<li>Open the site; the middleware resolves the tenant from <code>X-Forwarded-Host</code>.</li>
+</ol>
+
+<h1>8. Operations runbook</h1>
+<table><thead><tr><th>Situation</th><th>Action</th></tr></thead><tbody>
+<tr><td>Website shows “Service unavailable”</td><td>API unreachable from the container: check <code>docker ps</code>, API health (<code>/api/v1/health</code>), network <code>aj-smart-biz</code>, <code>API_URL</code> in the env file.</td></tr>
+<tr><td>Website shows “Company not found”</td><td>Domain row missing/inactive, company inactive, or vhost not forwarding <code>X-Forwarded-Host</code>.</td></tr>
+<tr><td>Website shows holding page</td><td>No running subscription — check Company Plans; reactivate or assign a plan.</td></tr>
+<tr><td>Plan did not expire/start on time</td><td>Super Admin → Company Plans → <em>Run expiry check</em> (<code>POST /super-admin/subscriptions/run-due</code>); check API logs for the hourly sweeper.</td></tr>
+<tr><td>Deploy failed</td><td>Workflow rolls back automatically; read job 2 logs (env file validation, health timeout).</td></tr>
+<tr><td>Uploads missing after redeploy</td><td>Ensure the backend container mounts a persistent volume at <code>/app/uploads</code>.</td></tr>
+<tr><td>Too many indexes (MySQL ER_TOO_MANY_KEYS)</td><td>Boot drops duplicate <code>key_N</code> indexes before alter-sync; restart the API.</td></tr>
+<tr><td>Backups</td><td>Schedule <code>mysqldump</code> of the database and an archive of the uploads volume; take one before any model change is deployed.</td></tr>
+<tr><td>Rotate secrets</td><td>Change JWT secrets (signs everyone out), super-admin password, Docker Hub token; update server env files.</td></tr>
+</tbody></table>
+</body></html>

@@ -4,6 +4,7 @@ const { Op } = require('sequelize');
 const db = require('../models');
 const ApiError = require('../utils/ApiError');
 const subscriptionService = require('./subscription.service');
+const storageService = require('./storage.service');
 const { SUBSCRIPTION_STATUS, OCCUPYING_SUBSCRIPTION_STATUSES } = require('../constants');
 
 /**
@@ -122,6 +123,8 @@ async function getQuota(companyId) {
     blockedBy,
     blockMessage: blockedBy ? messageFor(blockedBy, null, null) : null,
     metrics,
+    /** Upload storage: used vs the company's own limit or its plan's. */
+    storage: await storageService.getStorage(companyId),
   };
 }
 

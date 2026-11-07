@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Database Design — Aj Smart Biz</title>
+<link rel="stylesheet" href="assets/doc.css">
+<style>
+svg text { font-family: 'Segoe UI', Arial, sans-serif; }
+.e { fill: #fff; stroke: #2563eb; stroke-width: 1.3; } .eh { fill: #eef3fe; stroke: #2563eb; stroke-width: 1.3; }
+.t { font-size: 11px; font-weight: 700; fill: #1d3f9e; } .s { font-size: 9.5px; fill: #4a5468; }
+.l { stroke: #7a8396; stroke-width: 1.1; fill: none; }
+</style></head><body>
+
+<section class="cover">
+  <div class="band">
+    <div class="kicker">Aj Smart Biz · Document 05</div>
+    <h1>Database Design</h1>
+    <div class="sub">Conventions, entity relationships and a table-by-table reference for all 52 tables.</div>
+  </div>
+  <table class="meta">
+    <tr><td>Audience</td><td>Developers, DBAs, data analysts</td></tr>
+    <tr><td>Version / date</td><td>1.0 · 7 November 2026</td></tr>
+    <tr><td>Source</td><td><code>Aj-Smart-Biz-Backend/src/models/*.model.js</code> and <code>src/models/index.js</code> (authoritative). <code>docs/schema.dbml</code> is older and misses 13 tables.</td></tr>
+  </table>
+</section>
+
+<section class="toc"><h2>Contents</h2><ol>
+<li>Engine and conventions</li><li>Core entity relationships</li><li>Platform masters</li><li>Tenant core &amp; identity</li><li>Website content</li>
+<li>Services &amp; bookings</li><li>Catalogue</li><li>Orders &amp; customers</li><li>Inventory</li><li>Counter invoicing</li><li>Billing &amp; subscriptions</li>
+<li>Leads &amp; tracking</li><li>Platform marketing</li><li>Delete semantics</li><li>Schema change process</li></ol></section>
+
+<h1>1. Engine and conventions</h1>
+<table><tbody>
+<tr><td><strong>Engine</strong></td><td>MySQL (utf8mb4, timezone +05:30). SQLite supported for local work (<code>DB_DIALECT=sqlite</code>).</td></tr>
+<tr><td><strong>Schema management</strong></td><td><code>sequelize.sync({ alter: true })</code> on boot (<code>DB_SYNC_MODE</code> = alter | force (dev only) | none). There are no migration files.</td></tr>
+<tr><td><strong>Primary keys</strong></td><td><code>id INT UNSIGNED AUTO_INCREMENT</code>; <code>BIGINT</code> for <code>lead_visits</code> and <code>marketing_lead_visits</code>.</td></tr>
+<tr><td><strong>Naming</strong></td><td>Tables snake_case plural, explicit <code>tableName</code>; tenant tables prefixed <code>company_</code>. Model attributes camelCase → columns snake_case (<code>underscored: true</code>).</td></tr>
+<tr><td><strong>Common columns</strong></td><td><code>status ENUM('active','inactive')</code>, <code>created_by</code>, <code>updated_by</code>, <code>created_at</code>, <code>updated_at</code>, <code>deleted_at</code>.</td></tr>
+<tr><td><strong>Soft delete</strong></td><td>All tables paranoid except <code>company_functionalities</code>, <code>company_invoice_items</code>, <code>company_stock</code>, <code>company_stock_movements</code>, <code>lead_visits</code>, <code>marketing_lead_visits</code>.</td></tr>
+<tr><td><strong>Uniqueness</strong></td><td>Business keys (company code, slugs, warehouse code…) are checked in services, not by unique indexes, because soft-deleted rows would block reuse. Exceptions: <code>company_domain.domain</code>; composite (company_id, key) on <code>company_functionalities</code> (MySQL only).</td></tr>
+<tr><td><strong>Branch scoping</strong></td><td>Website content tables carry nullable <code>branch_id</code>: NULL = company-wide; a branch row overrides it.</td></tr>
+<tr><td><strong>JSON columns</strong></td><td>Plan features/functionalities, plan snapshot, product images/highlights/specs, service highlights/days, settings blobs, blog tags.</td></tr>
+<tr><td><strong>Associations</strong></td><td>Declared only in <code>src/models/index.js</code>.</td></tr>
+</tbody></table>
+
+<h1>2. Core entity relationships</h1>
+<figure>
+<svg viewBox="0 0 720 400" width="690">
+  <rect class="eh" x="290" y="170" width="140" height="56" rx="6"/><text class="t" x="302" y="190">companies</text><text class="s" x="302" y="206">tenant · code · branding</text><text class="s" x="302" y="219">currentSubscriptionId</text>
+  <rect class="e" x="20" y="20" width="130" height="44" rx="6"/><text class="t" x="30" y="38">plans</text><text class="s" x="30" y="53">quotas · functionalities</text>
+  <rect class="e" x="20" y="100" width="150" height="44" rx="6"/><text class="t" x="30" y="118">company_subscriptions</text><text class="s" x="30" y="133">planSnapshot · status</text>
+  <rect class="e" x="20" y="170" width="150" height="40" rx="6"/><text class="t" x="30" y="188">subscription_events</text><text class="s" x="30" y="201">audit trail</text>
+  <rect class="e" x="20" y="230" width="150" height="40" rx="6"/><text class="t" x="30" y="248">transactions</text><text class="s" x="30" y="261">payments · invoiceNo</text>
+  <rect class="e" x="20" y="290" width="150" height="40" rx="6"/><text class="t" x="30" y="308">plan_requests</text><text class="s" x="30" y="321">tenant asks</text>
+  <rect class="e" x="200" y="20" width="120" height="40" rx="6"/><text class="t" x="210" y="38">business_types</text><text class="s" x="210" y="51">master</text>
+  <rect class="e" x="340" y="20" width="90" height="40" rx="6"/><text class="t" x="350" y="38">themes</text><text class="s" x="350" y="51">preset</text>
+  <rect class="e" x="450" y="20" width="90" height="40" rx="6"/><text class="t" x="460" y="38">states</text><text class="s" x="460" y="51">GST code</text>
+  <rect class="e" x="560" y="90" width="140" height="44" rx="6"/><text class="t" x="570" y="108">branches</text><text class="s" x="570" y="123">isMain · own branding</text>
+  <rect class="e" x="560" y="20" width="140" height="44" rx="6"/><text class="t" x="570" y="38">company_domain</text><text class="s" x="570" y="53">host → company/branch</text>
+  <rect class="e" x="560" y="160" width="140" height="40" rx="6"/><text class="t" x="570" y="178">branch_contacts</text>
+  <rect class="e" x="560" y="225" width="140" height="44" rx="6"/><text class="t" x="570" y="243">admins</text><text class="s" x="570" y="258">isCompanyAdmin</text>
+  <rect class="e" x="560" y="290" width="140" height="40" rx="6"/><text class="t" x="570" y="308">roles</text>
+  <rect class="e" x="560" y="350" width="140" height="40" rx="6"/><text class="t" x="570" y="368">role_permissions</text>
+  <rect class="e" x="390" y="350" width="140" height="40" rx="6"/><text class="t" x="400" y="368">menus (tree)</text>
+  <rect class="e" x="200" y="290" width="160" height="96" rx="6"/><text class="t" x="210" y="308">Tenant content &amp; ops</text>
+  <text class="s" x="210" y="324">sliders · functionalities · about…</text><text class="s" x="210" y="338">categories · products · services</text><text class="s" x="210" y="352">orders · customers · warehouses</text><text class="s" x="210" y="366">stock · invoices · leads · files</text><text class="s" x="210" y="380">(all carry company_id)</text>
+  <path class="l" d="M85 64 V100"/><path class="l" d="M95 144 V170"/><path class="l" d="M170 122 L290 185"/><path class="l" d="M170 250 L290 210"/><path class="l" d="M170 310 L290 220"/>
+  <path class="l" d="M260 60 L330 170"/><path class="l" d="M385 60 V170"/><path class="l" d="M495 60 L400 170"/>
+  <path class="l" d="M430 185 L560 112"/><path class="l" d="M430 190 L560 42"/><path class="l" d="M630 134 V160"/><path class="l" d="M430 205 L560 247"/><path class="l" d="M430 215 L560 310"/><path class="l" d="M630 330 V350"/><path class="l" d="M530 370 H560"/><path class="l" d="M630 269 V290"/>
+  <path class="l" d="M330 226 L300 290"/>
+</svg>
+<figcaption>Figure 1 — Core relationships. A company has many of almost everything (CASCADE); history tables use SET NULL so records survive.</figcaption>
+</figure>
+
+<h1>3. Platform masters</h1>
+<table><thead><tr><th>Table</th><th>Purpose</th><th>Key columns</th></tr></thead><tbody>
+<tr><td>states</td><td>Indian states (8 seeded)</td><td>name, code, country, gst_code</td></tr>
+<tr><td>business_types</td><td>Trades (7 seeded)</td><td>name, slug, icon, description, is_public</td></tr>
+<tr><td>themes</td><td>Colour presets</td><td>name, code, primary/secondary/accent/text/background/sidebar colours, font_family, mode, preview_image, config, is_default</td></tr>
+<tr><td>plans</td><td>What is sold</td><td>name, code, price, discount_price, currency, billing_cycle, duration_days, trial_days, max_branches, max_admins, max_users, storage_mb, features (JSON), functionalities (JSON), is_popular, is_public, show_in_admin, sequence</td></tr>
+<tr><td>super_admins</td><td>Platform staff</td><td>name, email, phone, password (bcrypt, hidden by default scope), role (super_admin|staff), is_root, last_login_at</td></tr>
+</tbody></table>
+
+<h1>4. Tenant core &amp; identity</h1>
+<table><thead><tr><th>Table</th><th>Purpose</th><th>Key columns</th></tr></thead><tbody>
+<tr><td>companies</td><td>The tenant</td><td>name, code, legal_name, description, business_type_id, theme_id, theme_config, state_id, contact/address, gst, pan, logo, favicon, currency, timezone, storage_limit_mb, current_subscription_id, subscription_end_date</td></tr>
+<tr><td>branches</td><td>Trading places</td><td>company_id, name, code, is_main, logo, favicon, theme_config, contact/address, latitude/longitude, opening/closing time</td></tr>
+<tr><td>branch_contacts</td><td>People per branch</td><td>branch_id, company_id, name, designation, department, email, phone, is_primary, notes</td></tr>
+<tr><td>company_domain</td><td>Host → tenant</td><td>domain (unique, lower-case), company_id, sub_company_id (branch pin), is_primary</td></tr>
+<tr><td>roles</td><td>Company roles</td><td>company_id, name, slug, description, is_system</td></tr>
+<tr><td>menus</td><td>Console menu tree</td><td>company_id (NULL = system), parent_id, name, slug, icon, route, sequence, is_system</td></tr>
+<tr><td>role_permissions</td><td>RBAC matrix</td><td>company_id, role_id, menu_id, can_view, can_create, can_edit, can_delete, can_export</td></tr>
+<tr><td>admins</td><td>Company users</td><td>company_id, branch_id, role_id, name, email, phone, password, avatar, is_company_admin, must_change_password, last_login_at</td></tr>
+<tr><td>company_files</td><td>Storage ledger</td><td>company_id, path, folder, size_bytes, mime_type, uploaded_by</td></tr>
+</tbody></table>
+
+<h1>5. Website content</h1>
+<table><thead><tr><th>Table</th><th>Branch-aware</th><th>Key columns</th></tr></thead><tbody>
+<tr><td>sliders</td><td>Yes</td><td>title, eyebrow, subtitle, image, mobile_image, cta_label, cta_url, sequence</td></tr>
+<tr><td>company_functionalities</td><td>—</td><td>key (enum of FUNCTIONALITY), settings (JSON), status — one row per (company, key), not paranoid</td></tr>
+<tr><td>company_whatsapp_numbers</td><td>—</td><td>type (inquiry|contact|support|orders), country_code, number, label, default_message, sequence</td></tr>
+<tr><td>company_social_links</td><td>No</td><td>platform, url, label, sequence</td></tr>
+<tr><td>company_about</td><td>Yes</td><td>nav_label, eyebrow, title, lead, body</td></tr>
+<tr><td>company_contact</td><td>Yes</td><td>nav_label, eyebrow, title, lead, show_form, form_target (email|whatsapp), form_note, show_locations</td></tr>
+<tr><td>company_stats</td><td>Yes</td><td>label, value, mode (fixed|since_date), since_date, unit, prefix, suffix</td></tr>
+<tr><td>company_team_members</td><td>Yes</td><td>name, role, bio, photo, email, phone, linkedin_url</td></tr>
+<tr><td>company_gallery_items</td><td>Yes</td><td>image, title, caption, alt_text</td></tr>
+<tr><td>company_testimonials</td><td>Yes</td><td>author_name, author_role, photo, rating (≤5), body, source (admin|visitor), moderation (pending|approved|rejected), moderated_at/by, submitted_ip</td></tr>
+<tr><td>company_features</td><td>Yes</td><td>title, body, icon (FEATURE_ICONS key)</td></tr>
+<tr><td>company_blog_posts</td><td>—</td><td>slug, title, excerpt, body, cover_image, author, tags (JSON), published_at, featured</td></tr>
+</tbody></table>
+
+<h1>6. Services &amp; bookings</h1>
+<table><thead><tr><th>Table</th><th>Key columns</th></tr></thead><tbody>
+<tr><td>company_service_categories</td><td>parent_id, name, slug, description, image, icon, featured, sequence</td></tr>
+<tr><td>company_services</td><td>category_id (SET NULL), slug, image, icon, title, summary, highlights, price_label, price, offer_price, on_offer, description, duration_minutes, bookable, slot_capacity, open_time, close_time, slot_minutes, days, show_price, cta_label, featured</td></tr>
+<tr><td>service_leads</td><td>service_id (SET NULL) + service_title copy, name, phone, service_price_label, amount, currency, payment_status, payment_reference, paid_at, customer_id, booking_date, booking_time, booking_minutes, booking_status, booking_response, stage, note, sent_to_whatsapp, source_url, submitted_ip</td></tr>
+</tbody></table>
+
+<h1>7. Catalogue</h1>
+<table><thead><tr><th>Table</th><th>Key columns</th></tr></thead><tbody>
+<tr><td>company_categories</td><td>parent_id (self, max depth 3), name, slug, description, image, icon, featured, sequence</td></tr>
+<tr><td>company_products</td><td>category_id (SET NULL), name, slug, sku, summary, description, images (JSON ≤ 8), highlights, specs, price, offer_price, price_label, on_offer, offer_label, cta_label, stock_status (in_stock|out_of_stock|made_to_order), track_inventory, featured, orderable</td></tr>
+</tbody></table>
+
+<h1>8. Orders &amp; customers</h1>
+<table><thead><tr><th>Table</th><th>Key columns</th></tr></thead><tbody>
+<tr><td>company_orders</td><td>order_no (ORD#####), mode, customer_id (SET NULL), customer name/phone/address/note copies, item_count, unpriced_items, subtotal, adjustment, adjustment_note, total, currency, status, payment_status, payment_reference, warehouse_id, stock_reserved, stock_issued, sent_to_whatsapp, source_url, submitted_ip, internal_note, cancel_reason, confirmed/packed/dispatched/delivered/cancelled_at</td></tr>
+<tr><td>company_order_items</td><td>order_id, product_id (SET NULL), product_name, sku, slug, quantity, unit_price, list_price, price_label, line_total</td></tr>
+<tr><td>customers</td><td>company_id, name, phone (unique per company in service), email, otp_hash, otp_expires_at, otp_attempts, phone_verified, last_login_at, notes</td></tr>
+<tr><td>customer_addresses</td><td>customer_id, label, contact_name, contact_phone, line1, line2, landmark, city, state_id, pincode, is_default (≤10 per customer)</td></tr>
+</tbody></table>
+
+<h1>9. Inventory</h1>
+<table><thead><tr><th>Table</th><th>Key columns</th></tr></thead><tbody>
+<tr><td>company_warehouses</td><td>branch_id (optional), name, code (unique per company), address, state_id, pincode, contact, is_default (exactly one), notes, sequence</td></tr>
+<tr><td>company_stock</td><td>warehouse_id, product_id, quantity, reserved, reorder_level, bin_location, last_movement_at — running total</td></tr>
+<tr><td>company_stock_movements</td><td>warehouse_id, product_id, type (in|out|adjust), reason (opening|purchase|sale|return|damage|correction|transfer|invoice), quantity, balance_after, unit_cost, order_id, invoice_id, counter_warehouse_id, reference, note — append-only ledger</td></tr>
+</tbody></table>
+
+<h1>10. Counter invoicing</h1>
+<table><thead><tr><th>Table</th><th>Key columns</th></tr></thead><tbody>
+<tr><td>company_invoices</td><td>branch_id, warehouse_id, customer_id, invoice_no (INV#####), invoice_date, due_date, customer snapshot incl. GSTIN, item_count, subtotal, item_discount, tax_total, bill_discount_type/value, bill_discount, round_off, grand_total, amount_paid, status (draft|issued|cancelled), payment_status (unpaid|partial|paid), payment_mode, payment_reference, notes, stock_applied, issued_at/by, cancelled_at/by, cancel_reason</td></tr>
+<tr><td>company_invoice_items</td><td>product snapshot, quantity, unit_price, list_price, gross, discount_type/value, discount, taxable, tax_percent (0/5/12/18/28), tax, line_total, stock_deducted, sequence</td></tr>
+</tbody></table>
+
+<h1>11. Billing &amp; subscriptions</h1>
+<table><thead><tr><th>Table</th><th>Key columns</th></tr></thead><tbody>
+<tr><td>company_subscriptions</td><td>company_id, plan_id, plan_snapshot, start_date, end_date, amount, discount, tax_amount, total_amount, currency, credit_applied, is_trial, auto_renew, grace_days, change_type, status, previous_subscription_id, activated/suspended/cancelled/ended_at, remarks</td></tr>
+<tr><td>subscription_events</td><td>subscription_id, company_id, type, from/to_status, from/to_plan_id, amount, effective_at, reason, meta, actor_id, actor_name</td></tr>
+<tr><td>plan_requests</td><td>requested_plan_id, current_plan_id, type, status (pending|approved|rejected|cancelled), note, decision_note, requested_by, decided_by, decided_at, resulting_subscription_id</td></tr>
+<tr><td>transactions</td><td>subscription_id, plan_id, invoice_no (INV-YYYY-000001), amount, discount, tax_amount, total_amount, currency, payment_mode, payment_reference, paid_at, status, remarks</td></tr>
+</tbody></table>
+
+<h1>12. Leads &amp; tracking</h1>
+<table><thead><tr><th>Table</th><th>Key columns</th></tr></thead><tbody>
+<tr><td>leads</td><td>One per device per company: device_id, name, email, phone, fcm_token, visit/page_view counts, first/last seen and landing, referrer, utm_* columns, device/os/browser, device_type, is_bot, ip, geo, language, stage (new|contacted|qualified|converted|lost), notes</td></tr>
+<tr><td>lead_visits</td><td>Session (30 min): url, path, title, host, referrer, utm, user_agent, device and screen data, geo/location JSON, extra JSON</td></tr>
+</tbody></table>
+
+<h1>13. Platform marketing</h1>
+<table><thead><tr><th>Table</th><th>Key columns</th></tr></thead><tbody>
+<tr><td>marketing_contents</td><td>key (site, contact, hero, steps, promises, recharge, cta, services_page, plans_page, demo_page, about_page, contact_page, faq_intro, templates_page), label, payload JSON</td></tr>
+<tr><td>marketing_faqs</td><td>question, answer, sequence</td></tr>
+<tr><td>marketing_templates</td><td>company_id (demo tenant), title, summary, demo_url, design (default|midnight|atelier), featured</td></tr>
+<tr><td>marketing_enquiries</td><td>kind (demo|contact), name, business_name, phone, email, city, business_type, plan, message, source, status, note, ip_address, user_agent</td></tr>
+<tr><td>marketing_leads / marketing_lead_visits</td><td>As leads/lead_visits without company; enquiry_id link (SET NULL)</td></tr>
+</tbody></table>
+
+<h1>14. Delete semantics</h1>
+<ul>
+<li><strong>CASCADE</strong> from companies and branches for owned content (sliders, cards, products, stock rows).</li>
+<li><strong>SET NULL / no constraint</strong> for records of money and history: orders, service leads, order items and stock movements referencing products, invoice pointers.</li>
+<li><strong>Snapshots</strong> copied onto orders, order items, invoices, service leads and subscriptions so history survives edits and deletes.</li>
+<li>Deleting a category promotes subcategories and un-categorises products in one transaction (done by hand because a soft delete never fires <code>ON DELETE SET NULL</code>).</li>
+</ul>
+
+<h1>15. Schema change process</h1>
+<ol>
+<li>Edit or add <code>src/models/&lt;name&gt;.model.js</code>; register and associate in <code>src/models/index.js</code>.</li>
+<li>Restart the API: alter-sync adds tables and columns. Backfills go in an idempotent <code>ensureX()</code> step in <code>src/seeders/bootstrap.js</code>.</li>
+<li>Back up production before deploying a model change; alter-sync can rebuild tables on SQLite and must never run with <code>force</code> in production (boot refuses it).</li>
+<li>Update <code>docs/schema.dbml</code> and this document.</li>
+</ol>
+</body></html>

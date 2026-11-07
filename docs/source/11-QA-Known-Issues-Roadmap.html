@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>QA, Known Issues &amp; Roadmap — Aj Smart Biz</title>
+<link rel="stylesheet" href="assets/doc.css"></head><body>
+
+<section class="cover">
+  <div class="band">
+    <div class="kicker">Aj Smart Biz · Document 11</div>
+    <h1>QA Strategy, Known Issues &amp; Roadmap</h1>
+    <div class="sub">How the platform is verified, what is out of date or incomplete today, and what to build next.</div>
+  </div>
+  <table class="meta">
+    <tr><td>Audience</td><td>Product owner, QA, tech lead</td></tr>
+    <tr><td>Version / date</td><td>1.0 · 7 November 2026</td></tr>
+  </table>
+</section>
+
+<section class="toc"><h2>Contents</h2><ol>
+<li>Current verification</li><li>Test strategy (recommended)</li><li>Critical test scenarios</li><li>Known issues and documentation drift</li><li>Functional gaps</li><li>Roadmap</li></ol></section>
+
+<h1>1. Current verification</h1>
+<ul>
+<li>The project README records <strong>188 API checks over five passes</strong> (both logins, provisioning, quotas, permission matrix, soft-delete cascade and restore, dashboards, uploads, ICO validation, domain resolution, guard rails, cross-tenant isolation) and <strong>63 browser checks</strong> against production bundles of both consoles.</li>
+<li>These suites were run from a scratch directory (SQLite + puppeteer-core) and are <strong>not committed</strong> to the repository.</li>
+<li>No unit tests exist in any application; Angular schematics are configured with <code>skipTests</code>; there is no linter configuration.</li>
+</ul>
+<div class="callout warn"><strong>Risk</strong>Without committed tests, regressions in business rules (proration, stock, entitlement) are caught only manually.</div>
+
+<h1>2. Test strategy (recommended)</h1>
+<table><thead><tr><th>Level</th><th>Tooling</th><th>Focus</th></tr></thead><tbody>
+<tr><td>Unit — backend services</td><td>node:test or Jest, SQLite in-memory</td><td>subscription transitions and proration, quota reasons, entitlement, order/stock side effects, invoice maths, booking slots, phone normalisation.</td></tr>
+<tr><td>API integration</td><td>supertest against <code>app.js</code> on SQLite</td><td>Guards per module, permission matrix, tenant isolation (foreign id → 404), validation envelopes.</td></tr>
+<tr><td>Console E2E</td><td>Playwright</td><td>Sign-in flows, forced password change, create company, plan change dialog, order workflow.</td></tr>
+<tr><td>Website E2E</td><td>Playwright with <code>?domain=</code></td><td>Holding page, absent sections, cart → order, OTP sign-in, booking.</td></tr>
+<tr><td>CI</td><td>GitHub Actions on pull requests</td><td>Run all of the above + <code>ng build</code> + <code>next build</code> before the deploy branches.</td></tr>
+</tbody></table>
+
+<h1>3. Critical test scenarios</h1>
+<table><thead><tr><th>#</th><th>Scenario</th><th>Expected</th></tr></thead><tbody>
+<tr><td>T1</td><td>Admin of company A requests company B's branch id</td><td>404</td></tr>
+<tr><td>T2</td><td>Create admin when quota used / plan expired / no plan</td><td>400 with reason limit_reached / expired / no_plan</td></tr>
+<tr><td>T3</td><td>Upgrade mid-term</td><td>Old term superseded; credit = total × remaining ÷ term days; event + transaction written</td></tr>
+<tr><td>T4</td><td>Sweeper on a term past end + grace</td><td>Expired (or renewed if autoRenew); website shows holding page</td></tr>
+<tr><td>T5</td><td>Edit plan quotas during a running term</td><td>Running term unchanged (snapshot)</td></tr>
+<tr><td>T6</td><td>Order body includes a price</td><td>Ignored; catalogue price used</td></tr>
+<tr><td>T7</td><td>Confirm order with insufficient stock</td><td>Refused; order remains pending; no ledger change</td></tr>
+<tr><td>T8</td><td>Dispatch then cancel</td><td>Stock returned via ledger movement</td></tr>
+<tr><td>T9</td><td>Move order backward</td><td>Refused</td></tr>
+<tr><td>T10</td><td>Feature granted but not enabled</td><td><code>features.x = null</code> in public payload; console write still allowed</td></tr>
+<tr><td>T11</td><td>Feature live with no content</td><td>Section absent; console says “Nothing published yet”</td></tr>
+<tr><td>T12</td><td>Category moved under its own descendant / to level 4</td><td>Refused</td></tr>
+<tr><td>T13</td><td>Unknown domain on /theme/company-details</td><td><code>resolved:false</code>, no error</td></tr>
+<tr><td>T14</td><td>Role without view on a menu</td><td>Menu absent from /auth/me, route guard redirects, API 403</td></tr>
+<tr><td>T15</td><td>Issue invoice then cancel</td><td>Stock deducted then returned; totals and round-off correct</td></tr>
+</tbody></table>
+
+<h1>4. Known issues and documentation drift</h1>
+<table><thead><tr><th>#</th><th>Area</th><th>Issue</th><th>Suggested fix</th></tr></thead><tbody>
+<tr><td>K1</td><td>Deployment</td><td>Angular production <code>environment.ts</code> uses <code>aj-smart-biz-api.ajtechhub.com</code>; nginx vhost is <code>smart-biz-api.ajtechhub.com</code>.</td><td>Align; or use relative <code>/api/v1</code> and let the image's nginx proxy it (as its template intends).</td></tr>
+<tr><td>K2</td><td>Repo state</td><td>All <code>.github/workflows/*</code> and <code>deploy/*/.env</code> are deleted (uncommitted) in the working tree.</td><td>Confirm intent before committing.</td></tr>
+<tr><td>K3</td><td>Backend README</td><td>Says <code>/website/branding</code> and <code>/website/company-details</code> — code uses <code>/theme/…</code>; says <code>/dashboard/super-admin</code> — code is <code>/super-admin/dashboard</code>; “14 models” — there are 52; stale upload folder list.</td><td>Update README.</td></tr>
+<tr><td>K4</td><td>schema.dbml</td><td>39 tables; missing company_features, company_invoices, company_invoice_items, company_social_links, company_testimonials, leads, lead_visits and six marketing tables.</td><td>Regenerate (Document 05 is current).</td></tr>
+<tr><td>K5</td><td>Theme READMEs</td><td>Wrong endpoint prefix (<code>/public</code> or <code>/website</code>); describe an uploads rewrite and <code>BACKEND_ORIGIN</code> that the code does not use; wrong domain-resolution order.</td><td>Update READMEs.</td></tr>
+<tr><td>K6</td><td>Console READMEs</td><td>Module tables outdated; Admin README says branding is <code>/public/branding</code> (code: <code>/theme/branding</code>).</td><td>Update READMEs.</td></tr>
+<tr><td>K7</td><td>Technology README</td><td>Describes the old “aurora glass” look and says only /demo is dynamic (layout is force-dynamic).</td><td>Update README.</td></tr>
+<tr><td>K8</td><td>Backend</td><td><code>routes/order.routes.js</code> is imported but never mounted (orders are declared inline in <code>myCompany.routes.js</code>).</td><td>Remove or mount.</td></tr>
+<tr><td>K9</td><td>Admin console</td><td>Two classes named <code>OrdersManagerComponent</code> (settings vs queue).</td><td>Rename settings one, e.g. <code>OrderSettingsComponent</code>.</td></tr>
+<tr><td>K10</td><td>Admin console</td><td><code>AccessService</code> mixes <code>/admin/roles</code> and <code>/roles</code> prefixes.</td><td>Use one prefix.</td></tr>
+<tr><td>K11</td><td>Admin console</td><td>Seeded menu icons are names (<code>grid</code>) but the shell only uses icons ≤ 3 chars, so emoji fallbacks are always used.</td><td>Map names to icons or seed emoji.</td></tr>
+<tr><td>K12</td><td>Auth</td><td>Refresh token stored but never used; sessions end at access-token expiry.</td><td>Implement refresh in the interceptor.</td></tr>
+<tr><td>K13</td><td>Backend</td><td><code>resolveCompanyId</code> is copy-pasted in ~10 controllers.</td><td>Move to <code>utils/</code>.</td></tr>
+<tr><td>K14</td><td>Workflows</td><td>Stale comments (“calls no API”, “nginx listens on 80” in Next.js workflows).</td><td>Clean up.</td></tr>
+</tbody></table>
+
+<h1>5. Functional gaps</h1>
+<table><thead><tr><th>Gap</th><th>Impact</th></tr></thead><tbody>
+<tr><td>No SMS gateway (OTP dev code)</td><td>Customer accounts are not production-safe.</td></tr>
+<tr><td>No payment gateway</td><td>Platform payments recorded manually; tenant orders hand off to UPI/link without confirmation callback.</td></tr>
+<tr><td>No email/notification service</td><td>No order, booking, renewal or expiry emails.</td></tr>
+<tr><td><code>maxUsers</code> not metered</td><td>Displayed on My Plan as included amount only.</td></tr>
+<tr><td>No data export / erasure tooling</td><td>Export permission exists in RBAC; privacy requests handled manually.</td></tr>
+<tr><td>AI jobs in memory</td><td>A restart loses running AI content jobs.</td></tr>
+<tr><td>No migrations</td><td>Alter-sync is risky for destructive schema changes in production.</td></tr>
+</tbody></table>
+
+<h1>6. Roadmap</h1>
+<div class="grid3">
+<div class="card"><h4>Now (stabilise)</h4><ul>
+<li>Fix K1–K2 and README drift</li><li>Commit API + E2E suites; CI on PRs</li><li>SMS gateway behind <code>hasSmsGateway()</code></li><li>Backups and restore drill</li></ul></div>
+<div class="card"><h4>Next (monetise)</h4><ul>
+<li>Payment gateway for platform invoices and tenant orders (webhook → paid)</li><li>Email/WhatsApp notifications for renewals and orders</li><li>Self-serve sign-up from the product site</li><li>Refresh tokens</li></ul></div>
+<div class="card"><h4>Later (scale)</h4><ul>
+<li>Sequelize migrations</li><li>Object storage/CDN for uploads</li><li>More website designs per business type</li><li>Data export &amp; privacy tooling</li><li>Persistent job queue for AI and reports</li></ul></div>
+</div>
+</body></html>

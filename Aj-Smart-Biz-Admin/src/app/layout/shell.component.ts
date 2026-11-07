@@ -17,6 +17,10 @@ const ICONS: Record<string, string> = {
   'role-management': '🛡️',
   'menu-permission': '🔐',
   'admin-management': '👥',
+  invoices: '🧾',
+  'invoices-mine': '🧾',
+  'invoices-all': '📚',
+  'invoice-analysis': '📈',
   // Company Details submenus
   'company-profile': '🏢',
   'branch-management': '📍',

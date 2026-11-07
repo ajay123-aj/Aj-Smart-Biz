@@ -318,6 +318,55 @@ export const routes: Routes = [
         title: 'Lead',
         loadComponent: () => import('./features/leads/lead-detail.component').then((m) => m.LeadDetailComponent),
       },
+      /**
+       * Counter invoices. The menu entry only appears when the plan carries
+       * Invoice management; the API refuses writes without it either way.
+       * `new` and `:id/edit` before `:id`, so the words are not read as ids.
+       */
+      {
+        path: 'invoices',
+        canActivate: [permissionGuard('invoices')],
+        title: 'Invoices',
+        loadComponent: () => import('./features/invoices/invoice-list.component').then((m) => m.InvoiceListComponent),
+      },
+      /**
+       * Everyone's invoices, and the reports. Each has its own row in Menu
+       * Permission ("All invoices", "Invoice analysis"); without "All
+       * invoices" an admin sees only the invoices they created.
+       * Before `:id`, so the words are not read as ids.
+       */
+      {
+        path: 'invoices/all',
+        canActivate: [permissionGuard('invoices-all')],
+        title: 'All invoices',
+        data: { scope: 'all' },
+        loadComponent: () => import('./features/invoices/invoice-list.component').then((m) => m.InvoiceListComponent),
+      },
+      {
+        path: 'invoices/analysis',
+        canActivate: [permissionGuard('invoice-analysis')],
+        title: 'Invoice analysis',
+        loadComponent: () =>
+          import('./features/invoices/invoice-analysis.component').then((m) => m.InvoiceAnalysisComponent),
+      },
+      {
+        path: 'invoices/new',
+        canActivate: [permissionGuard('invoices', 'canCreate')],
+        title: 'New invoice',
+        loadComponent: () => import('./features/invoices/invoice-editor.component').then((m) => m.InvoiceEditorComponent),
+      },
+      {
+        path: 'invoices/:id/edit',
+        canActivate: [permissionGuard('invoices', 'canEdit')],
+        title: 'Edit invoice',
+        loadComponent: () => import('./features/invoices/invoice-editor.component').then((m) => m.InvoiceEditorComponent),
+      },
+      {
+        path: 'invoices/:id',
+        canActivate: [permissionGuard('invoices')],
+        title: 'Invoice',
+        loadComponent: () => import('./features/invoices/invoice-detail.component').then((m) => m.InvoiceDetailComponent),
+      },
       {
         path: 'roles',
         canActivate: [permissionGuard('role-management')],
